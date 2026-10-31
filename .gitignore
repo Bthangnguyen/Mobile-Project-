@@ -1,0 +1,21 @@
+# Gradle / build
+.gradle/
+.kotlin/
+build/
+/captures
+
+# Android Studio
+.idea/
+*.iml
+.cxx/
+.externalNativeBuild/
+
+# Máy cá nhân — KHÔNG commit (chứa đường dẫn SDK, có thể chứa key)
+local.properties
+*.keystore
+*.jks
+secrets.properties
+
+# OS
+.DS_Store
+Thumbs.db

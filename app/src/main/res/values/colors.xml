@@ -1,0 +1,9 @@
+<resources>
+    <!-- Bảng màu tạm, D (UI chung) sẽ chốt lại theo thiết kế. -->
+    <color name="brand_primary">#3F51B5</color>
+    <color name="brand_on_primary">#FFFFFF</color>
+    <color name="brand_secondary">#00897B</color>
+    <color name="brand_primary_dark_theme">#B9C3FF</color>
+    <color name="brand_on_primary_dark_theme">#1A237E</color>
+    <color name="brand_secondary_dark_theme">#80CBC4</color>
+</resources>

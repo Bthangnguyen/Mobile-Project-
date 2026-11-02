@@ -1,0 +1,17 @@
+# Ai sửa file khớp đường dẫn thì GitHub tự yêu cầu chủ sở hữu review.
+# TODO: thay @A-username… bằng GitHub username thật của nhóm.
+# Dòng sau ghi đè dòng trước.
+
+*                                                   @A-username
+/gradle/                                            @A-username
+/.github/                                           @A-username
+
+/app/src/main/java/com/lttbdd/socialagent/core/     @A-username @B-username @C-username @D-username
+/app/src/main/java/com/lttbdd/socialagent/core/social/  @B-username
+/app/src/main/java/com/lttbdd/socialagent/core/ai/      @C-username
+/app/src/main/java/com/lttbdd/socialagent/core/ui/      @D-username
+/app/src/main/res/values/                           @D-username
+/app/src/main/res/values-vi/                        @D-username
+
+/AGENTS.md                                          @C-username
+/docs/                                              @A-username @C-username

@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  5 tab chính. Hiện tất cả dùng PlaceholderFragment.
+  Chủ mảng thay android:name bằng Fragment thật của mình (giữ nguyên android:id).
+    composeFragment   -> D (F3 nhập topic + F2 tiến độ agent của C)
+    postsFragment     -> D (F4 duyệt bài) + A (F5 trạng thái đăng)
+    commentsFragment  -> B (F6)
+    analyticsFragment -> D (F7)
+    settingsFragment  -> A (F9), từ đây mở Kênh của tôi (B, F1) và API key (C, F8)
+-->
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/composeFragment">
+
+    <fragment
+        android:id="@+id/composeFragment"
+        android:name="com.lttbdd.socialagent.core.ui.PlaceholderFragment"
+        android:label="@string/nav_compose">
+        <argument
+            android:name="titleRes"
+            android:defaultValue="@string/nav_compose"
+            app:argType="reference" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/postsFragment"
+        android:name="com.lttbdd.socialagent.core.ui.PlaceholderFragment"
+        android:label="@string/nav_posts">
+        <argument
+            android:name="titleRes"
+            android:defaultValue="@string/nav_posts"
+            app:argType="reference" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/commentsFragment"
+        android:name="com.lttbdd.socialagent.core.ui.PlaceholderFragment"
+        android:label="@string/nav_comments">
+        <argument
+            android:name="titleRes"
+            android:defaultValue="@string/nav_comments"
+            app:argType="reference" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/analyticsFragment"
+        android:name="com.lttbdd.socialagent.core.ui.PlaceholderFragment"
+        android:label="@string/nav_analytics">
+        <argument
+            android:name="titleRes"
+            android:defaultValue="@string/nav_analytics"
+            app:argType="reference" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/settingsFragment"
+        android:name="com.lttbdd.socialagent.core.ui.PlaceholderFragment"
+        android:label="@string/nav_settings">
+        <argument
+            android:name="titleRes"
+            android:defaultValue="@string/nav_settings"
+            app:argType="reference" />
+    </fragment>
+
+</navigation>

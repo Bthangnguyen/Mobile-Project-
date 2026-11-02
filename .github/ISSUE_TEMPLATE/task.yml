@@ -1,0 +1,39 @@
+name: Task / Feature
+description: Ticket theo template chuẩn của môn học
+title: "[F?] "
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Làm gì, vì sao, thuộc tính năng nào (F1–F9)
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Điều kiện để coi là xong, mỗi dòng một tiêu chí kiểm tra được
+      value: |
+        - [ ]
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Solution
+      description: Hướng làm kỹ thuật (màn hình, class, thư viện, API sẽ dùng)
+    validations:
+      required: true
+  - type: input
+    id: estimate
+    attributes:
+      label: Estimate (hour)
+      placeholder: "8"
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: |
+        Nhớ chọn **Assignee**, thêm vào **Project** và đặt field **Milestone** (Milestone 1/2/3) cùng **Estimate** trên board.

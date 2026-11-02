@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">Social Agent</string>
+
+    <string name="nav_compose">Tạo bài</string>
+    <string name="nav_posts">Bài viết</string>
+    <string name="nav_comments">Bình luận</string>
+    <string name="nav_analytics">Số liệu</string>
+    <string name="nav_settings">Cài đặt</string>
+
+    <string name="placeholder_coming_soon">Sắp ra mắt</string>
+</resources>

@@ -1,17 +1,16 @@
 # Ai sửa file khớp đường dẫn thì GitHub tự yêu cầu chủ sở hữu review.
-# TODO: thay @A-username… bằng GitHub username thật của nhóm.
 # Dòng sau ghi đè dòng trước.
 
-*                                                   @A-username
-/gradle/                                            @A-username
-/.github/                                           @A-username
+*                                                   @Bthangnguyen
+/gradle/                                            @Bthangnguyen
+/.github/                                           @Bthangnguyen
 
-/app/src/main/java/com/lttbdd/socialagent/core/     @A-username @B-username @C-username @D-username
-/app/src/main/java/com/lttbdd/socialagent/core/social/  @B-username
-/app/src/main/java/com/lttbdd/socialagent/core/ai/      @C-username
-/app/src/main/java/com/lttbdd/socialagent/core/ui/      @D-username
-/app/src/main/res/values/                           @D-username
-/app/src/main/res/values-vi/                        @D-username
+/app/src/main/java/com/lttbdd/socialagent/core/     @Bthangnguyen @dhminh678 @sangcotdo2407 @quaanluuw0210
+/app/src/main/java/com/lttbdd/socialagent/core/social/  @dhminh678
+/app/src/main/java/com/lttbdd/socialagent/core/ai/      @sangcotdo2407
+/app/src/main/java/com/lttbdd/socialagent/core/ui/      @quaanluuw0210
+/app/src/main/res/values/                           @quaanluuw0210
+/app/src/main/res/values-vi/                        @quaanluuw0210
 
-/AGENTS.md                                          @C-username
-/docs/                                              @A-username @C-username
+/AGENTS.md                                          @sangcotdo2407
+/docs/                                              @Bthangnguyen @sangcotdo2407

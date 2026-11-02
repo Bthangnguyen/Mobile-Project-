@@ -29,11 +29,12 @@ jobs:
 
             const pr = context.payload.pull_request;
             const author = pr.user.login;
-            const reviewers = ROTATION[author];
-            if (!reviewers) {
+            // Dùng Object.hasOwn để username như "constructor" không khớp nhầm thuộc tính kế thừa của Object.
+            if (!Object.hasOwn(ROTATION, author)) {
               core.info(`${author} không có trong bảng xoay vòng, bỏ qua.`);
               return;
             }
+            const reviewers = ROTATION[author];
 
             const { owner, repo } = context.repo;
             await github.rest.pulls.requestReviewers({

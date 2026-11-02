@@ -22,7 +22,7 @@
 - **F9:** Khi offline vẫn xem được dữ liệu đã lưu; không mặc định suy ra có thể gọi API LLM khi offline.
 - **Kiến trúc nhóm:** Kotlin, XML + ViewBinding, MVVM, Hilt, Coroutines/Flow, Room; UI → ViewModel → Repository/Client; không import implementation của mảng khác và không thay chữ ký `core/` khi chưa được phê duyệt.
 
-Nguồn nội bộ: [Issue #3](https://github.com/Bthangnguyen/Mobile-Project-/issues/3), [`docs/architecture.md`](https://github.com/Bthangnguyen/Mobile-Project-/blob/chore/project-setup/docs/architecture.md), [`core/ai/ContentAgent.kt`](https://github.com/Bthangnguyen/Mobile-Project-/blob/chore/project-setup/app/src/main/java/com/lttbdd/socialagent/core/ai/ContentAgent.kt), [`core/ai/LlmClient.kt`](https://github.com/Bthangnguyen/Mobile-Project-/blob/chore/project-setup/app/src/main/java/com/lttbdd/socialagent/core/ai/LlmClient.kt), [`core/model/Agent.kt`](https://github.com/Bthangnguyen/Mobile-Project-/blob/chore/project-setup/app/src/main/java/com/lttbdd/socialagent/core/model/Agent.kt) và [`core/model/Llm.kt`](https://github.com/Bthangnguyen/Mobile-Project-/blob/chore/project-setup/app/src/main/java/com/lttbdd/socialagent/core/model/Llm.kt).
+Nguồn nội bộ: [Issue #3](https://github.com/Bthangnguyen/Mobile-Project-/issues/3), [`docs/architecture.md`](https://github.com/Bthangnguyen/Mobile-Project-/blob/main/docs/architecture.md), [`core/ai/ContentAgent.kt`](https://github.com/Bthangnguyen/Mobile-Project-/blob/main/app/src/main/java/com/lttbdd/socialagent/core/ai/ContentAgent.kt), [`core/ai/LlmClient.kt`](https://github.com/Bthangnguyen/Mobile-Project-/blob/main/app/src/main/java/com/lttbdd/socialagent/core/ai/LlmClient.kt), [`core/model/Agent.kt`](https://github.com/Bthangnguyen/Mobile-Project-/blob/main/app/src/main/java/com/lttbdd/socialagent/core/model/Agent.kt) và [`core/model/Llm.kt`](https://github.com/Bthangnguyen/Mobile-Project-/blob/main/app/src/main/java/com/lttbdd/socialagent/core/model/Llm.kt).
 
 ## 3. So sánh nhà cung cấp LLM
 
@@ -34,7 +34,7 @@ Nguồn nội bộ: [Issue #3](https://github.com/Bthangnguyen/Mobile-Project-/i
 |---|---|---|---|---|---|---|
 | **Google Gemini** | `gemini-2.5-flash` khi cần chất lượng; `gemini-2.5-flash-lite` cho chi phí thấp | `gemini-2.5-flash-lite` | **Flash-Lite: $0.10 / $0.40** | **Có** với Flash-Lite theo hạn mức/rate limit hiện hành | **Có**, `streamGenerateContent`/SSE | **Có**, dùng model ảnh riêng, ví dụ `gemini-3.1-flash-lite-image` |
 | **OpenAI** | `gpt-6.1-terra` khi cần nâng chất lượng; `gpt-6-luna` khi tiết kiệm | `gpt-6-luna` | **Luna: $0.10 / $0.50**; Terra: $1.00 / $5.00 (Standard) | Không mặc định có free tier API thường xuyên; tùy credits/ưu đãi | **Có**, Responses API `stream=true` | **Có**, dòng `gpt-image-*` qua API ảnh (tính giá riêng) |
-| **Anthropic** | `claude-sonnet-4-5` hoặc model Sonnet đang được hỗ trợ | `claude-haiku-4-5` | **Haiku 4.5: $1.00 / $5.00**; Sonnet 4.5: $3.00 / $15.00 | Không nên giả định có free tier API; tùy credits/tài khoản | **Có**, Messages `stream=true` | **Không có API sinh ảnh gốc tương đương**; kết hợp provider ảnh khác/template |
+| **Anthropic** | Claude Sonnet 5.5 (`claude-sonnet-5-5`) | Claude Haiku 5.5 (`claude-haiku-5-5`) | **Haiku 5.5: $0.10 / $0.50** với prompt ≤100.000 token; **$0.50 / $2.50** khi vượt ngưỡng; **Sonnet 5.5: $2.00 / $10.00** | Không nên giả định có free tier API; tùy credits/tài khoản | **Có**, Messages `stream=true` | **Không có API sinh ảnh gốc tương đương**; kết hợp provider ảnh khác/template |
 | **OpenRouter** | Chọn model text theo danh mục (vd. tuyến Gemini/OpenAI/nhà cung cấp khác) | Model rẻ hoặc model `:free` nếu phù hợp | **Thay đổi theo model & tuyến**; không có một mức giá chung cho toàn OpenRouter | Có model `:free`, **có giới hạn** | **Có**, chat completions `stream=true` | **Phụ thuộc model/endpoint**; không mặc định mọi model đều sinh được ảnh |
 
 **Ghi chú quan trọng:**
@@ -44,6 +44,13 @@ Nguồn nội bộ: [Issue #3](https://github.com/Bthangnguyen/Mobile-Project-/i
 - OpenRouter có thể định tuyến qua bên thứ ba: phải nêu rõ chính sách dữ liệu, mức giá, độ sẵn có, quota và model ID trước khi bật.
 - Free model OpenRouter có rate limit (theo tài liệu: các biến thể `:free` giới hạn số request/phút/ngày tùy điều kiện tài khoản); không dùng làm cam kết SLA.
 - Giá ở đây là **giá niêm yết tại thời điểm nghiên cứu**, không phải hóa đơn hay kết quả test tốc độ/chất lượng của nhóm.
+
+**Đối chiếu Anthropic ngày 02/11/2026:** Sonnet 5.5 và Haiku 5.5 có trạng thái **Active** trên Claude API. Model cũ không đồng nghĩa với đã ngừng hoạt động:
+
+- `claude-sonnet-4-5` là alias của `claude-sonnet-4-5-20250929`: **Deprecated**, vẫn hoạt động trước lịch retirement **30/11/2026**; giá $3.00 / $15.00, không còn là lựa chọn đề xuất cho tích hợp mới.
+- `claude-haiku-4-5` là alias của `claude-haiku-4-5-20251001`: **Active (legacy)**, giá $1.00 / $5.00; có thể tiếp tục dùng nếu phù hợp. Vẫn phải kiểm tra Models API và vòng đời hỗ trợ trước khi triển khai, không suy ra model đã retired chỉ từ mốc “not sooner than”.
+
+Nguồn đối chiếu: [Anthropic Models](https://platform.claude.com/docs/en/models/overview), [Model IDs](https://platform.claude.com/docs/en/about-claude/models/model-ids-and-versions), [Model Deprecations](https://platform.claude.com/docs/en/about-claude/model-deprecations) và [Pricing](https://platform.claude.com/docs/en/about-claude/pricing). Chưa benchmark các model mới trên dữ liệu của nhóm.
 
 **Nguồn giá và tính năng:** [OpenAI Pricing](https://developers.openai.com/api/docs/pricing), [OpenAI Streaming](https://developers.openai.com/api/docs/guides/streaming-responses), [Gemini Pricing](https://ai.google.dev/gemini-api/docs/pricing), [Gemini API Reference](https://ai.google.dev/api/models), [Anthropic Pricing](https://platform.claude.com/docs/en/about-claude/pricing), [Anthropic Streaming](https://platform.claude.com/docs/en/build-with-claude/streaming), [OpenRouter Free Models](https://openrouter.ai/collections/free-models), [OpenRouter Support](https://openrouter.ai/support).
 
@@ -93,24 +100,31 @@ Nguồn: [OpenAI List Models](https://developers.openai.com/api/reference/resour
 
 ### 5.1. Luồng xử lý và phân tầng
 
-```text
-TopicFragment (F3, XML)
-       ↓ user nhấn “Tạo nội dung”
-TopicViewModel / AgentViewModel (StateFlow<UiState>)
-       ↓ collect ContentAgent.generate(TopicBrief)
-ContentAgentImpl (data/ai/, orchestrator)
-       ├── brief chung → AgentEvent.BriefReady
-       └── supervisorScope / channelFlow
-           ├── Facebook sub-agent (Coroutine A)
-           │   OUTLINE → DRAFT → SELF_REVIEW → IMAGE_PROMPT → IMAGE → PACKAGE
-           └── LinkedIn sub-agent (Coroutine B)
-               OUTLINE → DRAFT → SELF_REVIEW → IMAGE_PROMPT → IMAGE → PACKAGE
-                     ↓ AgentEvent stream theo channel
-              Room: draft + nhật ký + cost
-                     ↓
-           ViewModel cập nhật UiState
-                     ↓
-           Fragment render tiến độ từng kênh
+```mermaid
+flowchart TD
+    topic["TopicFragment (F3, XML)"] -->|"Nhấn Tạo nội dung"| vm["TopicViewModel / AgentViewModel<br/>StateFlow&lt;UiState&gt;"]
+    vm -->|"Collect ContentAgent.generate(TopicBrief)"| orchestrator["ContentAgentImpl (data/ai/)<br/>Orchestrator"]
+    orchestrator -->|"Brief chung: BriefReady"| events["Flow&lt;AgentEvent&gt;<br/>BriefReady, StepStarted, TextDelta,<br/>StepFinished, ChannelDone, ChannelFailed"]
+
+    subgraph parallel["channelFlow + supervisorScope: chạy song song, lỗi độc lập"]
+        direction LR
+        facebook["Facebook sub-agent (Coroutine A)<br/>OUTLINE → DRAFT → SELF_REVIEW<br/>→ IMAGE_PROMPT → IMAGE → PACKAGE"]
+        linkedin["LinkedIn sub-agent (Coroutine B)<br/>OUTLINE → DRAFT → SELF_REVIEW<br/>→ IMAGE_PROMPT → IMAGE → PACKAGE"]
+    end
+
+    orchestrator --> facebook
+    orchestrator --> linkedin
+    facebook -->|"Các bước text: streamChat"| llm["LlmClient<br/>Adapter provider theo BYOK"]
+    linkedin -->|"Các bước text: streamChat"| llm
+    llm -.->|"Flow&lt;ChatChunk&gt;"| facebook
+    llm -.->|"Flow&lt;ChatChunk&gt;"| linkedin
+    facebook -->|"Sự kiện theo kênh"| events
+    linkedin -->|"Sự kiện theo kênh"| events
+    events -->|"Tiến độ streaming"| vm
+    events --> repository["Repository lưu kết quả và nhật ký"]
+    repository --> room[("Room: draft + nhật ký + cost")]
+    room -->|"Dữ liệu đã lưu qua Repository"| vm
+    vm -->|"Cập nhật UiState"| progress["Fragment render tiến độ từng kênh"]
 ```
 
 **Nguyên tắc:**
@@ -207,6 +221,7 @@ costUsd = inputTokens / 1_000_000 × inputPricePerMillion
 |---|---:|---:|---:|
 | Gemini 2.5 Flash-Lite | $0.000100 | $0.000200 | **$0.000300** |
 | OpenAI GPT-6 Luna (Standard) | $0.000100 | $0.000250 | **$0.000350** |
+| Anthropic Claude Haiku 5.5 (prompt ≤100.000 token) | $0.000100 | $0.000250 | **$0.000350** |
 | Anthropic Claude Haiku 4.5 | $0.001000 | $0.002500 | **$0.003500** |
 
 Các số trên là **ví dụ tính toán**, không phải chi phí đã phát sinh của nhóm. Nếu response có cached tokens, tool calls, reasoning tokens, image output, batch/priority hoặc phụ phí, phải áp dụng biểu giá tương ứng **và tránh tính hai lần các token đã nằm trong trường tổng**.
@@ -296,7 +311,7 @@ Thực hiện unit test bằng **JUnit + `kotlinx-coroutines-test` + Fake**, dù
 
 **Slide 1 – Bài toán và mục tiêu:** Social Agent viết bài cho Facebook Page & LinkedIn, hiển thị streaming, ảnh, chạy đa kênh, BYOK. F2/F8 là bắt buộc; không tự đăng khi chưa duyệt.
 
-**Slide 2 – So sánh provider:** Gemini Flash-Lite $0.10/$0.40 / 1M token và có free tier giới hạn; OpenAI Luna $0.10/$0.50; Anthropic Haiku 4.5 $1/$5; OpenRouter giá phụ thuộc model, có model `:free`. Cần phân biệt sinh text và sinh ảnh.
+**Slide 2 – So sánh provider:** Gemini Flash-Lite $0.10/$0.40 / 1M token và có free tier giới hạn; OpenAI Luna $0.10/$0.50; Anthropic Haiku 5.5 $0.10/$0.50 với prompt ≤100.000 token (vượt ngưỡng: $0.50/$2.50); OpenRouter giá phụ thuộc model, có model `:free`. Cần phân biệt sinh text và sinh ảnh.
 
 **Slide 3 – Quyết định:** Chọn **Gemini + OpenAI** giai đoạn đầu vì hỗ trợ ≥2 provider, có streaming và hệ sinh thái sinh ảnh. Anthropic/OpenRouter để mở rộng. Kết quả là đề xuất chưa benchmark.
 
@@ -312,10 +327,10 @@ Tài liệu đã bao phủ các hạng mục **research** của Issue #3: ≥3 p
 
 ### Mã nguồn/đề bài nhóm
 1. [Issue #3](https://github.com/Bthangnguyen/Mobile-Project-/issues/3)
-2. [Kiến trúc](https://github.com/Bthangnguyen/Mobile-Project-/blob/chore/project-setup/docs/architecture.md)
-3. [ContentAgent](https://github.com/Bthangnguyen/Mobile-Project-/blob/chore/project-setup/app/src/main/java/com/lttbdd/socialagent/core/ai/ContentAgent.kt)
-4. [LlmClient](https://github.com/Bthangnguyen/Mobile-Project-/blob/chore/project-setup/app/src/main/java/com/lttbdd/socialagent/core/ai/LlmClient.kt)
-5. [Agent models](https://github.com/Bthangnguyen/Mobile-Project-/blob/chore/project-setup/app/src/main/java/com/lttbdd/socialagent/core/model/Agent.kt) / [LLM models](https://github.com/Bthangnguyen/Mobile-Project-/blob/chore/project-setup/app/src/main/java/com/lttbdd/socialagent/core/model/Llm.kt)
+2. [Kiến trúc](https://github.com/Bthangnguyen/Mobile-Project-/blob/main/docs/architecture.md)
+3. [ContentAgent](https://github.com/Bthangnguyen/Mobile-Project-/blob/main/app/src/main/java/com/lttbdd/socialagent/core/ai/ContentAgent.kt)
+4. [LlmClient](https://github.com/Bthangnguyen/Mobile-Project-/blob/main/app/src/main/java/com/lttbdd/socialagent/core/ai/LlmClient.kt)
+5. [Agent models](https://github.com/Bthangnguyen/Mobile-Project-/blob/main/app/src/main/java/com/lttbdd/socialagent/core/model/Agent.kt) / [LLM models](https://github.com/Bthangnguyen/Mobile-Project-/blob/main/app/src/main/java/com/lttbdd/socialagent/core/model/Llm.kt)
 
 ### API, giá, streaming và bảo mật
 6. [OpenAI API Pricing](https://developers.openai.com/api/docs/pricing)

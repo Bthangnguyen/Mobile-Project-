@@ -146,11 +146,33 @@ Nếu Meta hỗ trợ cấu hình custom scheme và bỏ qua secret qua `code_ve
   1. Người dùng đổi mật khẩu tài khoản Facebook.
   2. Người dùng gỡ quyền của App trong trang Cài đặt bảo mật Facebook.
   3. Người dùng bị xóa vai trò quản trị viên (Admin/Editor) khỏi Page.
-* **Cơ chế kiểm tra an toàn (F1):**
-  - **Không gọi endpoint `/debug_token`** vì endpoint này yêu cầu App Secret (`app_id|app_secret`).
-  - Thay vào đó, app kiểm tra token bằng cách gọi trực tiếp `GET /me?access_token={token}` hoặc `GET /me/accounts?access_token={token}`.
-  - Khi token hết hạn hoặc quyền bị thu hồi, Graph API sẽ trả về lỗi HTTP 401 kèm mã lỗi `OAuthException` (mã lỗi `190` - Invalid/Expired Token).
-  - Khi bắt được mã lỗi `190`: Chuyển trạng thái kênh sang `ConnectionStatus.TOKEN_EXPIRED` và hiển thị thông báo hướng dẫn người dùng kết nối lại.
+* **Cơ chế kiểm tra token an toàn & Xử lý lỗi (F1):**
+  - **Lý do không dùng endpoint `/debug_token` trên client:**
+    - Theo tài liệu Meta về [Debugging Access Tokens](https://developers.facebook.com/docs/facebook-login/guides/access-tokens/debugging), endpoint `GET /debug_token?input_token={input-token}&access_token={access-token}` đòi hỏi một "valid access token" (thường là App Access Token phía server hoặc một token hợp lệ cùng App ID) để kiểm tra metadata.
+    - Việc gọi `/debug_token` trên app di động làm phát sinh thêm một network round-trip thừa và đòi hỏi token kiểm tra phụ không cần thiết cho client.
+    - Do đó, ứng dụng kiểm tra trạng thái token trực tiếp bằng cách thực hiện gọi dữ liệu thật tới `GET /v26.0/me` hoặc `GET /v26.0/me/accounts` với chính token đang dùng.
+  - **Xử lý mã lỗi `OAuthException` (Code `190`) & Phân loại theo `error_subcode`:**
+    - Theo tài liệu [Meta Graph API Error Handling](https://developers.facebook.com/docs/graph-api/guides/error-handling), Meta **không cam kết cố định HTTP status** (lỗi có thể trả về HTTP 400 Bad Request hoặc 401 Unauthorized tùy ngữ cảnh). Ứng dụng **phải parse và phân loại lỗi dựa trên body JSON** (`error.code` và `error.error_subcode`), không phụ thuộc đơn thuần vào HTTP status code:
+      ```json
+      {
+        "error": {
+          "message": "Error validating access token: ...",
+          "type": "OAuthException",
+          "code": 190,
+          "error_subcode": 463,
+          "fbtrace_id": "..."
+        }
+      }
+      ```
+    - **Bảng ánh xạ `error_subcode` sang trạng thái ứng dụng:**
+      | `error_subcode` | Ý nghĩa kỹ thuật từ Meta | Ánh xạ & Hành vi xử lý trong App |
+      |---|---|---|
+      | **`458`** | *App Not Installed / Permissions Revoked*: Người dùng đã gỡ cài đặt app hoặc thu hồi quyền truy cập trong Facebook Settings. | Chuyển trạng thái sang `ConnectionStatus.TOKEN_EXPIRED` $\rightarrow$ Hướng dẫn người dùng đăng nhập và ủy quyền lại từ đầu. |
+      | **`460`** | *Password Changed*: Người dùng đổi mật khẩu tài khoản Facebook $\rightarrow$ Toàn bộ session token bị vô hiệu hóa. | Chuyển trạng thái sang `ConnectionStatus.TOKEN_EXPIRED` $\rightarrow$ Thông báo mật khẩu Facebook đã thay đổi, cần đăng nhập lại. |
+      | **`463`** | *Token Expired*: Token đã hết hạn tự nhiên sau chu kỳ sống (TTL). | Chuyển trạng thái sang `ConnectionStatus.TOKEN_EXPIRED` $\rightarrow$ Thực hiện refresh ngầm (nếu dùng SDK) hoặc yêu cầu kết nối lại. |
+      | **`467`** | *Invalid Access Token*: Token không hợp lệ hoặc đã bị đăng xuất/thu hồi chủ động. | Chuyển trạng thái sang `ConnectionStatus.TOKEN_EXPIRED` $\rightarrow$ Hướng dẫn người dùng kết nối lại. |
+      | **`492`** | *Role Removed / Inadequate Permissions*: Người dùng không còn vai trò phù hợp trên Page (ví dụ: bị gỡ khỏi Admin/Editor Page). | **Lỗi phân quyền Page (không phải hết hạn token)** $\rightarrow$ Giữ trạng thái tài khoản, hiển thị cảnh báo người dùng không còn quyền quản trị trên Page đó. |
+      | **Khác / Không có** | Lỗi token chung (`OAuthException 190`). | Mặc định xem như token không còn hiệu lực $\rightarrow$ Gán `ConnectionStatus.TOKEN_EXPIRED`. |
 
 ### 2.2. Danh sách quyền (Permissions / Scopes)
 Đối chiếu trực tiếp với các khả năng trong `ChannelCapability` (`core/model/Channel.kt`):
@@ -678,7 +700,7 @@ Thay vì xem trường hợp không gọi được API là lỗi thất bại (`
     - ⚠️ **Trạng thái: Chưa xác minh chính thức từ Meta Graph API (thử nghiệm)**. Việc dùng Custom Scheme trực tiếp làm `redirect_uri` hoặc trao đổi token bằng PKCE (`code_verifier`) không secret chưa có căn cứ chính thức từ tài liệu Graph API cho ứng dụng di động thông thường.
     - Android Key Hash đã cấu hình trên Portal **chỉ áp dụng cho Phương án 1 (SDK), không áp dụng cho Phương án 2 (Web OAuth)**.
     - Nếu sử dụng Phương án 2, luồng triển khai chuẩn là Meta redirect HTTPS về máy chủ BFF; server BFF giữ bí mật `app_secret` để đổi mã ủy quyền lấy Long-lived Token và cấp mã trao đổi dùng một lần (`exchange_code`) về app Android qua back-channel; file APK tuyệt đối không nhúng `app_secret`.
-  - **Kiểm tra Token an toàn:** App chỉ gọi endpoint công khai `GET /v26.0/me` với Access Token (không gọi endpoint quản trị `/debug_token` đòi hỏi App Secret / App Access Token).
+  - **Kiểm tra Token an toàn:** App kiểm tra token trực tiếp qua endpoint dữ liệu `GET /v26.0/me`, tránh phát sinh thêm network round-trip và token phụ khi gọi endpoint quản trị `/debug_token`.
 - **Thành viên có quyền thử nghiệm:** Thêm tài khoản Facebook của 4 thành viên nhóm vào danh sách **Developers / Testers** trong mục *App Roles*.
 
 ### 5.2. LinkedIn Developers

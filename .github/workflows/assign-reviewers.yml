@@ -1,0 +1,46 @@
+name: Assign reviewers
+
+# Tự gắn 2 reviewer theo vòng xoay và gán tác giả làm assignee khi PR sẵn sàng review.
+# Bảng xoay vòng: mỗi người review đúng 2 người khác. Đổi thành viên thì sửa ROTATION bên dưới
+# và bảng trong docs/git-workflow.md.
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  assign:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v9
+        with:
+          script: |
+            const ROTATION = {
+              Bthangnguyen:  ['dhminh678', 'sangcotdo2407'],
+              dhminh678:     ['sangcotdo2407', 'quaanluuw0210'],
+              sangcotdo2407: ['quaanluuw0210', 'Bthangnguyen'],
+              quaanluuw0210: ['Bthangnguyen', 'dhminh678'],
+            };
+
+            const pr = context.payload.pull_request;
+            const author = pr.user.login;
+            // Dùng Object.hasOwn để username như "constructor" không khớp nhầm thuộc tính kế thừa của Object.
+            if (!Object.hasOwn(ROTATION, author)) {
+              core.info(`${author} không có trong bảng xoay vòng, bỏ qua.`);
+              return;
+            }
+            const reviewers = ROTATION[author];
+
+            const { owner, repo } = context.repo;
+            await github.rest.pulls.requestReviewers({
+              owner, repo, pull_number: pr.number, reviewers,
+            });
+            await github.rest.issues.addAssignees({
+              owner, repo, issue_number: pr.number, assignees: [author],
+            });
+            core.info(`PR #${pr.number} của ${author}: reviewer ${reviewers.join(', ')}`);

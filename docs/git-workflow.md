@@ -34,7 +34,8 @@ Ticket (Todo) → branch → commit… → push → PR (In Review) → 2 approve
    ```bash
    git push -u origin feature/12-oauth-facebook
    ```
-   Điền đủ PR template, ghi `Closes #12`, mời **2 thành viên khác** review, kéo ticket sang **In Review**.
+   Điền đủ PR template, ghi `Closes #12`, kéo ticket sang **In Review**.
+   2 reviewer được **tự động gắn** theo vòng xoay (xem bên dưới).
 6. **Review**: đọc code, chạy thử, để comment cụ thể. Người làm sửa bằng commit mới trên cùng branch.
 7. **Merge** khi đủ **2 approve** và CI xanh, dùng kiểu **Create a merge commit**, rồi xoá branch.
 
@@ -45,6 +46,20 @@ Ticket (Todo) → branch → commit… → push → PR (In Review) → 2 approve
 - Mỗi PR một ticket, cố gắng dưới ~400 dòng thay đổi.
 - Review PR của người khác trong vòng 24 giờ.
 - Mỗi tuần mỗi người phải có PR của mình **và** review PR của người khác — điểm cá nhân tính theo đó.
+
+## Reviewer xoay vòng
+
+Workflow [`assign-reviewers.yml`](../.github/workflows/assign-reviewers.yml) tự gắn 2 reviewer khi mở PR
+(hoặc khi chuyển PR draft sang "Ready for review") và gán tác giả làm assignee:
+
+| Tác giả | Reviewer |
+|---|---|
+| Bthangnguyen (A) | dhminh678, sangcotdo2407 |
+| dhminh678 (B) | sangcotdo2407, quaanluuw0210 |
+| sangcotdo2407 (C) | quaanluuw0210, Bthangnguyen |
+| quaanluuw0210 (D) | Bthangnguyen, dhminh678 |
+
+Mỗi người review đúng 2 người khác. Reviewer bận thì có thể nhờ người còn lại thay, miễn đủ 2 approve.
 
 ## Viết review tốt
 

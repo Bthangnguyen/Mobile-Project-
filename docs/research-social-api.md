@@ -5,6 +5,36 @@
 > **Milestone:** Milestone 1  
 > **Mục tiêu:** Nắm vững luồng xác thực OAuth 2.0 (PKCE) trên Android, quyền hạn, endpoint, giới hạn rate limit/App Review, giải pháp dự phòng và kiến trúc tích hợp cho `core/social/SocialChannelClient`.
 
+## 0. Phạm vi và trạng thái quyết định
+
+Tài liệu này là kết quả nghiên cứu, không phải cam kết rằng mọi endpoint hoặc quyền trong bảng dưới đây
+đã được Meta/LinkedIn cấp cho ứng dụng `SocialAgent`. Các nội dung có nhãn **Chưa xác minh**, **Cần kiểm
+thử thực tế** hoặc **Đề xuất** không được dùng làm căn cứ duy nhất để triển khai production.
+
+### Quyết định áp dụng cho Milestone 1
+
+1. **Không nhúng `client_secret` hoặc `app_secret` vào APK.** Client Android chỉ giữ các định danh công
+   khai và token trong secure storage theo quy định của `AGENTS.md`.
+2. **Facebook:** ưu tiên Meta Android SDK. Web OAuth qua BFF chỉ là phương án dự phòng và chưa thuộc phạm
+   vi Android app hiện tại; không tự giả định rằng PKCE thủ công có thể đổi token mà không cần secret.
+3. **LinkedIn:** chỉ dùng Native PKCE nếu Developer Portal xác nhận protocol và redirect tương ứng cho App
+   ID của nhóm. Nếu chưa được cấp, đánh dấu tính năng kết nối LinkedIn là blocked thay vì tự triển khai
+   Standard OAuth bằng custom scheme.
+4. **BFF không thuộc phạm vi của repository Android này.** Các endpoint `/auth/*`, việc lưu
+   `refresh_token` phía server và chính sách logout server phải được thiết kế trong một issue/ repository
+   backend riêng trước khi đưa vào mã Android.
+5. **Không thay đổi chữ ký `core/social/SocialChannelClient` chỉ để phục vụ LinkedIn.** Repository/client
+   phải tra cứu `Comment.remotePostId` để lấy URN bài viết gốc khi trả lời comment; mọi thay đổi contract
+   cần issue `contract` theo `docs/architecture.md`.
+
+### Phân loại độ tin cậy
+
+| Nhãn | Cách sử dụng |
+|---|---|
+| **Đã đối chiếu tài liệu chính thức** | Có thể dùng làm cơ sở thiết kế, nhưng vẫn cần kiểm thử integration trước khi phát hành. |
+| **Cần kiểm thử thực tế** | Chỉ dùng để lập kế hoạch test; không hard-code hành vi thành công. |
+| **Đề xuất/quan sát** | Không xem là giới hạn hoặc capability chính thức cho đến khi có nguồn xác nhận. |
+
 ---
 
 ## 1. Tổng quan & So sánh khả năng (Channel Capabilities)
@@ -59,16 +89,21 @@ enum class ChannelCapability { PUBLISH, READ_COMMENTS, REPLY, MENTION, METRICS }
   - Theo tài liệu chính thức của Meta về [Authentication Versus Data Access](https://developers.facebook.com/documentation/facebook-login/auth-vs-data), khi ứng dụng sử dụng Facebook SDK cho Android, User Access Token mặc định có thời hạn sống **khoảng 60 ngày** và được SDK tự động làm mới ngầm (rolling refresh) mỗi khi người dùng mở ứng dụng.
   - Do trang tài liệu này được Meta cập nhật từ năm 2022, nhóm phát triển vẫn nên kiểm thử thực tế để kiểm chứng hành vi của phiên bản SDK hiện hành.
 
-#### Phương án 2: Tự xây dựng luồng Web OAuth (AppAuth / Custom Tabs) kèm BFF
+#### Phương án 2 — Tài liệu thiết kế tham khảo cho Backend/BFF (Ngoài phạm vi Milestone 1)
 
-Nếu nhóm lựa chọn không nhúng Facebook SDK để giữ app nhẹ và dùng chung kiến trúc AppAuth với LinkedIn:
+> Phần này chỉ mô tả phương án dự phòng cho một repository backend/BFF tương lai.
+> Không triển khai phương án này trong Milestone 1 của ứng dụng Android.
+
+##### Luồng Web OAuth (AppAuth / Custom Tabs) kèm BFF
+
+Nếu sau Milestone 1 nhóm xây dựng một backend/BFF riêng và không nhúng Facebook SDK:
 
 > [!WARNING]
 > **Trạng thái xác minh của Redirect URI đối với Meta Web OAuth:**
-> - **Luồng HTTPS Callback qua BFF (Khuyến nghị chuẩn):** Tuân thủ tài liệu chính thức về [Manual Login Flow](https://developers.facebook.com/documentation/facebook-login/guides/advanced/manual-flow), `redirect_uri` phải nằm trong danh sách *Valid OAuth Redirect URIs* (sử dụng giao thức chuẩn `https://`). Meta chuyển hướng về endpoint HTTPS của máy chủ backend/BFF, sau đó BFF chuyển hướng an toàn về Android App Links.
+> - **Luồng HTTPS Callback qua BFF (thiết kế tham khảo):** Tuân thủ tài liệu chính thức về [Manual Login Flow](https://developers.facebook.com/documentation/facebook-login/guides/advanced/manual-flow), `redirect_uri` phải nằm trong danh sách *Valid OAuth Redirect URIs* (sử dụng giao thức chuẩn `https://`). Meta chuyển hướng về endpoint HTTPS của máy chủ backend/BFF, sau đó BFF chuyển hướng an toàn về Android App Links.
 > - **Luồng Custom Scheme trực tiếp (`com.lttbdd.socialagent://...`):** ⚠️ **Theo quan sát thực tế, chưa xác minh chính thức từ tài liệu Meta**. Tài liệu Meta chưa xác nhận việc hỗ trợ đăng ký Custom Scheme trong danh sách *Valid OAuth Redirect URIs* cho Web Dialog (theo quan sát trên Dashboard, mục này yêu cầu URL HTTPS; custom scheme `fb<APP_ID>://authorize` chỉ được Meta Android SDK sử dụng trong cơ chế App Switch nội bộ).
 
-##### Quy trình triển khai chuẩn qua BFF (Khuyến nghị):
+##### Quy trình tham khảo cho một backend/BFF tương lai:
 
 1. **Khởi tạo ủy quyền & Đăng ký phiên với BFF (App-to-BFF PKCE):**
    - **Tạo bí mật chống chặn bắt Deep Link:** Trước khi mở trình duyệt, Android app sinh chuỗi ngẫu nhiên bảo mật `state` và cặp khóa PKCE nội bộ: `app_code_verifier` (chuỗi ngẫu nhiên bí mật có độ entropy cao, chỉ lưu trong bộ nhớ RAM của app) và `app_code_challenge = BASE64URL(SHA256(app_code_verifier))`.
@@ -147,10 +182,11 @@ Nếu nhóm lựa chọn không nhúng Facebook SDK để giữ app nhẹ và d�
      {
        "access_token": "{user-long-lived-token}",
        "token_type": "bearer",
-       "expires_in": 5184000,
+       "expires_in": 5183944,
        "bff_session_token": "{bff_session_token}"
      }
      ```
+     > *Ghi chú về `expires_in`:* Giá trị `5183944` (~60 ngày) là số giây thực tế mẫu theo tài liệu chính thức của Meta (Meta không trả số tròn chẵn 5184000 do bù trừ độ trễ xử lý). Máy chủ BFF bắt buộc phải **chuyển tiếp nguyên vẹn trường `expires_in` thực tế** nhận được từ Meta về cho App, và App client lưu `expiresAt = System.currentTimeMillis() + (response.expires_in * 1000L)` (tuyệt đối không gán cứng hằng số 60 ngày).
    - **Cơ chế cấp & vai trò của `bff_session_token` phía BFF (BFF không lưu token Facebook trong database):**
      - **Nguyên tắc lưu trữ trên BFF (Stateless OAuth Proxy):** Khác với LinkedIn (cần lưu `refresh_token` trong DB server để chạy job làm mới ngầm), Facebook không có cơ chế refresh token kiểu LinkedIn, và Page Access Token sinh ra từ User Long-lived Token không có thời hạn hết hạn riêng (không có TTL độc lập / `never expires`), do đó BFF không cần duy trì token sau khi hoàn tất phiên ủy quyền. Trong luồng đăng nhập, **BFF chỉ lưu trữ tạm thời token trong bộ nhớ cache tốc độ cao với TTL cực ngắn ($\le 60$ giây, cùng thời hạn với `exchange_code`) gắn liền với `app_code_challenge` để chờ app client gọi đổi mã, và xóa sạch ngay lập tức sau khi đổi thành công**. **Máy chủ BFF tuyệt đối KHÔNG lưu giữ bất kỳ token Facebook nào trong cơ sở dữ liệu lâu dài (persistent database) của server**. Việc quản lý và lưu trữ token thuộc toàn quyền của app client trong `EncryptedSharedPreferences`.
      - **Cách cấp:** BFF sinh mã phiên ngẫu nhiên độ entropy cao (hoặc JWT ký bởi secret server) và gửi trực tiếp cho App trong response body của endpoint `POST /auth/facebook/token` (kênh HTTPS back-channel bảo mật, tuyệt đối không gửi qua URL/Deep Link).
@@ -206,7 +242,7 @@ Nếu Meta hỗ trợ cấu hình custom scheme và bỏ qua secret qua `code_ve
       2. Người dùng chủ động đăng xuất hoặc gỡ quyền của App trong Facebook Settings.
       3. Người dùng bị xóa vai trò quản trị viên hoặc mất quyền (Page Tasks) trên chính Facebook Page đó.
   - **Phương pháp kiểm thử thời hạn Page Token trong giai đoạn Dev (Chỉ dùng khi kiểm thử, không đưa vào App):**
-    - **Cách thức kiểm chứng:** Trong quá trình phát triển và kiểm thử, nhóm sử dụng công cụ **Access Token Debugger** trên Meta Developer Portal (hoặc gọi thủ công endpoint `GET /debug_token?input_token={page_access_token}&access_token={app_access_token}` qua Postman hoặc Graph API Explorer).
+    - **Cách thức kiểm chứng:** Trong quá trình phát triển và kiểm thử, nhóm sử dụng công cụ [Access Token Debugger](https://developers.facebook.com/tools/debug/accesstoken/) trên Meta Developer Portal (hoặc gọi thủ công endpoint `GET /debug_token?input_token={page_access_token}&access_token={app_access_token}` qua Postman hoặc Graph API Explorer).
     - **Kết quả cần tìm:**
       - Trên giao diện web Access Token Debugger: hiển thị dòng **`Expires: Never`**.
       - Trong payload JSON từ `/debug_token`: trường **`data.expires_at: 0`** (xác nhận token không có thời hạn hết hạn).
@@ -215,7 +251,7 @@ Nếu Meta hỗ trợ cấu hình custom scheme và bỏ qua secret qua `code_ve
       - Khi ứng dụng chạy thực tế (Runtime), app tuân thủ nghiêm ngặt nguyên tắc ở mục dưới đây: **không gọi `/debug_token`**, mà kiểm tra trạng thái token trực tiếp bằng cách thực hiện gọi dữ liệu thật tới `GET /v26.0/me` hoặc `GET /v26.0/me/accounts`.
 * **Cơ chế kiểm tra token an toàn & Xử lý lỗi trong App Runtime (F1):**
   - **Lý do ứng dụng client không gọi endpoint `/debug_token` khi chạy thực tế:**
-    - Theo tài liệu Meta về [Debugging Access Tokens](https://developers.facebook.com/docs/facebook-login/guides/access-tokens/debugging), endpoint `GET /debug_token?input_token={input-token}&access_token={access-token}` đòi hỏi một "valid access token" (thường là App Access Token phía server hoặc một token hợp lệ cùng App ID) để kiểm tra metadata.
+    - Theo tài liệu chính thức của Meta về [Access Tokens Guide](https://developers.facebook.com/docs/facebook-login/guides/access-tokens) (và công cụ [Access Token Debugger](https://developers.facebook.com/tools/debug/accesstoken/)), endpoint `GET /debug_token?input_token={input-token}&access_token={access-token}` đòi hỏi một "valid access token" (thường là App Access Token phía server hoặc một token hợp lệ cùng App ID) để kiểm tra metadata.
     - Việc gọi `/debug_token` trên app di động làm phát sinh thêm một network round-trip thừa và đòi hỏi token kiểm tra phụ không cần thiết cho client.
     - Do đó, ứng dụng kiểm tra trạng thái token trực tiếp bằng cách thực hiện gọi dữ liệu thật tới `GET /v26.0/me` hoặc `GET /v26.0/me/accounts` với chính token đang dùng.
   - **Xử lý mã lỗi `OAuthException` (Code `190`) & Phân loại theo `error_subcode`:**
@@ -424,6 +460,9 @@ Nếu Meta hỗ trợ cấu hình custom scheme và bỏ qua secret qua `code_ve
 - **Authorization Endpoint:** `https://www.linkedin.com/oauth/native-pkce/authorization` *(khác với `/oauth/v2/authorization`)*
 - **Token Endpoint:** `https://www.linkedin.com/oauth/v2/accessToken`
 - **Redirect URI:** Bắt buộc dùng **Loopback Interface** (ví dụ: `http://127.0.0.1:{port}` hoặc `http://127.0.0.1:{port}/callback`). Ứng dụng Android khởi tạo một `ServerSocket` cục bộ tạm thời để lắng nghe callback từ Custom Tabs.
+  `ServerSocket` phải được giữ sống trong một coroutine gắn với lifecycle đủ dài hoặc một Foreground
+  Service ngắn; không được phụ thuộc vào Activity đang ở trạng thái foreground, vì Custom Tabs có thể
+  khiến Activity bị pause/stop trên thiết bị RAM thấp trước khi LinkedIn redirect về loopback.
 - **Điều kiện áp dụng bắt buộc:**
   - Mặc định các App tạo trên LinkedIn Developers **chưa được bật cờ Native PKCE**.
   - **Bắt buộc:** Nhóm phát triển phải gửi yêu cầu (ticket) đến **LinkedIn Developer Support** để được bật riêng quyền sử dụng giao thức *Native PKCE Protocol* cho App ID của mình.
@@ -439,7 +478,13 @@ Nếu Meta hỗ trợ cấu hình custom scheme và bỏ qua secret qua `code_ve
   &code_verifier={code_verifier}
   ```
 
-#### Luồng B: Standard OAuth 2.0 (`/oauth/v2/...`) qua Kiến trúc BFF (Backend Proxy)
+#### Luồng B — Tài liệu thiết kế tham khảo cho Backend/BFF (Ngoài phạm vi Milestone 1)
+
+> Phần này chỉ mô tả Standard OAuth 2.0 để tham khảo khi nhóm có backend/BFF riêng.
+> Trong Milestone 1, nếu Native PKCE chưa được LinkedIn bật cho App ID, tính năng LinkedIn
+> được đánh dấu **blocked**; không triển khai Luồng B trong repository Android.
+
+##### Standard OAuth 2.0 (`/oauth/v2/...`) qua Kiến trúc BFF (Backend Proxy)
 Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm:
 - **Authorization Endpoint:** `https://www.linkedin.com/oauth/v2/authorization`
 - **Token Endpoint:** `https://www.linkedin.com/oauth/v2/accessToken`
@@ -518,6 +563,7 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
          "bff_session_token": "{bff_session_token}"
        }
        ```
+       > *Ghi chú về `expires_in`:* Giá trị `5184000` (~60 ngày) là số giây ví dụ minh họa. Máy chủ BFF bắt buộc phải **chuyển tiếp nguyên vẹn trường `expires_in` thực tế** nhận được từ LinkedIn về cho App, và App client lưu `expires_at = System.currentTimeMillis() + (response.expires_in * 1000L)` (tuyệt đối không gán cứng hằng số 60 ngày).
      - **Cơ chế cấp & vai trò của `bff_session_token` phía BFF:**
        - **Cách cấp:** BFF sinh mã phiên ngẫu nhiên độ entropy cao (hoặc JWT ký bởi secret server) và gửi trực tiếp cho App trong response body của endpoint `POST https://api.yourdomain.com/auth/linkedin/token` (kênh HTTPS back-channel bảo mật, tuyệt đối không gửi qua URL/Deep Link).
        - **Vai trò:** `bff_session_token` là khóa định danh phiên bí mật giữa App và BFF. Token này đảm nhận hai vai trò an ninh then chốt:
@@ -525,7 +571,7 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
          2. **Thu hồi phiên & Hủy `refresh_token` khi Ngắt kết nối (`POST /auth/linkedin/logout`):** Khi người dùng bấm "Ngắt kết nối" (F1), app gửi `bff_session_token` lên endpoint `POST /auth/linkedin/logout` để yêu cầu BFF xóa vĩnh viễn `refresh_token` trong DB máy chủ và vô hiệu hóa phiên, ngăn ngừa nguy cơ tồn đọng credential mồ côi trên backend sau khi app đã hủy kết nối.
      - **Quy tắc phân định lưu trữ an toàn phía Client:**
        - **Chỉ lưu Token trong `EncryptedSharedPreferences`:** Toàn bộ token bí mật gồm `access_token`, `refresh_token` (nếu có) và `bff_session_token` được lưu trữ an toàn trong `EncryptedSharedPreferences` bằng Android Keystore (`MasterKey.DEFAULT_AES256_GCM_SPEC`).
-       - **Room Database tuyệt đối KHÔNG lưu token:** Room chỉ lưu trữ metadata phi nhạy cảm của tài khoản (`account_id`, `name`, `avatar_url`, `expires_at`, `connection_status`, `capabilities`). Khi gọi API, Repository sẽ lấy metadata từ Room và truy xuất token từ `EncryptedSharedPreferences`.
+       - **Room Database tuyệt đối KHÔNG lưu token:** Room chỉ lưu trữ metadata phi nhạy cảm của tài khoản (`account_id`, `name`, `avatar_url`, `expires_at`, `connection_status`, `capabilities`). Khi người dùng đăng nhập lần đầu, app đồng thời ghi nhận mốc `refreshTokenIssuedAt = System.currentTimeMillis()` vào Room DB (nếu kích hoạt luồng refresh) để làm căn cứ xác định hạn trần 365 ngày của refresh token. Khi gọi API, Repository sẽ lấy metadata từ Room và truy xuất token từ `EncryptedSharedPreferences`.
 
 #### Bảng so sánh hai luồng OAuth của LinkedIn
 
@@ -542,29 +588,45 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
 > [!CAUTION]
 > **Ràng buộc nền tảng về Programmatic Refresh Token của LinkedIn:**
 > - Scope `offline_access` **không có sẵn cho các ứng dụng Self-service thông thường** (nếu truyền vào request sẽ bị LinkedIn từ chối với lỗi `Unknown scope`).
-> - Quyền cấp **Refresh Token (thời hạn 365 ngày)** để làm mới ngầm qua API là tính năng đặc quyền, **chỉ được cấp khi App được phê duyệt vào chương trình Đối tác Doanh nghiệp chính thức** (Approved Enterprise Partners, ví dụ: Marketing Developer Platform - MDP).
+> - Quyền cấp **Refresh Token (thời hạn 365 ngày)** để làm mới ngầm qua API là tính năng đặc quyền, **chỉ được cấp khi App được phê duyệt vào chương trình Đối tác Doanh nghiệp chính thức** (Approved Enterprise Partners, ví dụ: Marketing Developer Platform - MDP). **Đồ án sinh viên hầu như không đủ điều kiện duyệt MDP**, nên Phương án Dự phòng ở mục 3 bên dưới rất khó áp dụng trong thực tế; nhóm ghi nhận để tham khảo kiến trúc, không nên lập kế hoạch triển khai phụ thuộc vào đây.
 > - **Nguyên tắc thiết kế F1:** Ứng dụng **tuyệt đối không phụ thuộc hoàn toàn vào Refresh Token**, mà phải lấy luồng **Re-authentication định kỳ 60 ngày** làm luồng vận hành chính thức, đảm bảo hệ thống luôn hoạt động ổn định kể cả khi không có quyền đối tác.
 
 1. **Vòng đời Access Token Tiêu chuẩn:** Có thời hạn cố định là **60 ngày**.
 2. **Phương án Xử lý khi Hết hạn Token (Re-authentication Flow — Cho ứng dụng thông thường):**
-   - **Theo dõi thời hạn:** Khi đăng nhập thành công, app lưu `expires_at = System.currentTimeMillis() + (expires_in * 1000L)` vào Room Database.
+   - **Theo dõi thời hạn:** Khi đăng nhập thành công, app lưu `expires_at = System.currentTimeMillis() + (expires_in * 1000L)` vào Room Database (app không suy đoán bằng hằng số 60 ngày mà lưu thời hạn thực tế từ `expires_in`).
    - **Kích hoạt trạng thái hết hạn:** 
-     - Khi thời gian còn lại dưới 3 ngày, hoặc khi nhận mã HTTP `401 Unauthorized` từ bất kỳ request API LinkedIn nào.
+     - Khi thời gian còn lại dưới 3 ngày (72 giờ), hoặc khi nhận mã HTTP `401 Unauthorized` từ bất kỳ request API LinkedIn nào.
      - Repository cập nhật trạng thái kênh trong Room DB thành `ConnectionStatus.TOKEN_EXPIRED`.
    - **Trải nghiệm người dùng (UX):**
      - Màn hình "Kênh của tôi" (F1) và màn hình Soạn bài/Duyệt bài (F4) hiển thị Badge cảnh báo: *"Phiên kết nối LinkedIn đã hết hạn (chu kỳ 60 ngày). Vui lòng kết nối lại"*.
      - Nút "Kết nối lại" (Re-connect) kích hoạt mở lại Custom Tabs. Do trình duyệt hệ thống thường vẫn lưu phiên đăng nhập của người dùng trên web LinkedIn, người dùng chỉ cần xác nhận 1 chạm (Single-tap Consent) để cấp mã `code` mới và nhận lại Access Token 60 ngày mới mà không phải gõ lại mật khẩu.
-3. **Phương án Dự phòng khi được cấp Programmatic Refresh Token (Nếu được duyệt Partner Tier):**
+3. **Phương án Dự phòng khi được cấp Programmatic Refresh Token (Nếu được duyệt Partner Tier — Thực tế rất khó áp dụng với đồ án):**
    > [!IMPORTANT]
    > **Yêu cầu bắt buộc `client_secret` khi Refresh Token:**
    > Theo tài liệu chính thức của LinkedIn OAuth 2.0 (`POST /oauth/v2/accessToken` với `grant_type=refresh_token`), request làm mới token **bắt buộc phải truyền cả `client_id` và `client_secret`**.
    > Vì ứng dụng Android là Public Client không được giữ `client_secret`, **request refresh token này BẮT BUỘC phải do máy chủ BFF thực hiện** (nơi lưu giữ `client_secret` an toàn phía server), tuyệt đối không gọi trực tiếp từ Android client.
 
+   > [!WARNING]
+   > **Phạm vi xung đột với Quy tắc 5 (AGENTS.md) — Rộng hơn chỉ refresh token:**
+   > - **Quy tắc 5 trong `AGENTS.md`:** *"Không bao giờ log, commit hay gửi API key/token lên bất kỳ server nào ngoài nhà cung cấp LLM/mạng xã hội. Key lưu bằng Android Keystore."*
+   > - **Phạm vi mâu thuẫn thực tế:**
+   >   - **Luồng B (LinkedIn) và Phương án 2 (Facebook Web OAuth qua BFF):** Trong cả hai luồng này, access token phải đi qua bộ nhớ cache tạm thời của BFF (TTL ≤ 60 giây) trong bước đổi `exchange_code`. Đây vẫn là "gửi token lên server ngoài nhà cung cấp" theo đúng nghĩa của Quy tắc 5, dù chỉ tạm thời và không ghi vào database lâu dài.
+   >   - **Luồng lưu `refresh_token` vào DB server (nếu được duyệt Partner Tier):** Mức độ vi phạm sâu hơn — token tồn tại lâu dài (365 ngày) trên database máy chủ BFF.
+   > - **Kết luận về phạm vi tuân thủ:**
+   >   - ✅ **Tuân thủ hoàn toàn Quy tắc 5:** **LinkedIn Luồng A (Native PKCE)** + **Facebook Phương án 1 (Meta SDK)** — token không đi qua bất kỳ server trung gian nào của dự án.
+   >   - ⚠️ **Cần ngoại lệ Policy Exception:** **LinkedIn Luồng B** và **Facebook Phương án 2 (Web OAuth qua BFF)** — access token đi qua BFF cache ≤ 60 giây; chấp nhận được về rủi ro kỹ thuật nhưng về chữ nghĩa Quy tắc 5 thì cần nhóm thống nhất.
+   >   - ❌ **Xung đột rõ ràng, cần Policy Exception qua issue `contract`:** Lưu `refresh_token` LinkedIn vào DB server — phương án này thực tế **rất khó áp dụng** với đồ án vì yêu cầu đủ điều kiện MDP Partner.
+   > - **Baseline chính thức cho Milestone 1:** Đồ án chỉ triển khai **Luồng A (Native PKCE)** cho LinkedIn
+   >   khi Developer Portal đã bật protocol, và **Phương án 1 (Meta SDK)** cho Facebook. Nếu LinkedIn
+   >   chưa được bật Native PKCE, tính năng LinkedIn bị đánh dấu **blocked**; không dùng Luồng B/Phương án 2
+   >   làm dự phòng trong repository Android.
+   > - **Điều kiện tiên quyết:** Trước khi triển khai bất kỳ luồng nào qua BFF, **toàn nhóm bắt buộc phải họp thống nhất và ghi nhận phạm vi ngoại lệ (Policy Exception) cho Quy tắc 5 trong `AGENTS.md`** thông qua ticket/issue nhãn `contract`.
+
    - **Thực thi hoàn toàn phía Server/BFF:**
      - **Cơ chế xác thực giữa App và BFF (BFF Session Authentication):**
        - Khi hoàn tất đăng nhập ban đầu, máy chủ BFF lưu trữ `refresh_token` của LinkedIn an toàn trong cơ sở dữ liệu server (được mã hóa at-rest).
        - BFF cấp cho app Android một token phiên nội bộ (**BFF Session Token**, chuỗi ngẫu nhiên độ entropy cao hoặc JWT ký bởi server). App lưu Session Token này riêng biệt trong `EncryptedSharedPreferences`.
-       - Khi token sắp hết hạn (ví dụ trước 7 ngày, phát hiện qua trường `expiresAt` trong Room DB), app Android gửi yêu cầu làm mới ngầm đến server BFF qua kết nối HTTPS:
+       - Khi token sắp hết hạn (thời gian hiệu lực còn lại dưới 3 ngày / 72 giờ, đồng bộ với ngưỡng cảnh báo F1, phát hiện qua trường `expiresAt` trong Room DB), app Android gửi yêu cầu làm mới ngầm đến server BFF qua kết nối HTTPS:
          ```http
          POST https://api.yourdomain.com/auth/linkedin/refresh
          Authorization: Bearer {bff_session_token}
@@ -586,9 +648,34 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
          &client_id={client_id}
          &client_secret={client_secret}
          ```
-     - **Phản hồi và Lưu trữ chuẩn phía Client:**
-       - Server BFF nhận Access Token mới (thời hạn 60 ngày tiếp theo) và trả về an toàn trong JSON response body cho app Android qua kênh HTTPS.
-       - **Lưu trữ chuẩn:** App cập nhật Access Token mới trực tiếp vào **`EncryptedSharedPreferences`**. Room DB **chỉ cập nhật metadata** `expiresAt = now + 60 days` và `ConnectionStatus.CONNECTED` (tuyệt đối không ghi token vào Room).
+     - **Phản hồi, Tính toán Thời hạn Thực tế & Lưu trữ phía Client:**
+       - Server BFF nhận Access Token mới cùng trường `expires_in` biểu thị thời hạn hiệu lực thực tế (số giây còn lại) từ LinkedIn, và chuyển tiếp nguyên vẹn `expires_in` này trong JSON response body cho app Android qua kênh HTTPS bảo mật:
+         ```json
+         {
+           "access_token": "AQXN...",
+           "token_type": "bearer",
+           "expires_in": 5184000
+         }
+         ```
+         > *Ghi chú về `expires_in`:* Giá trị `5184000` (~60 ngày) chỉ là số giây ví dụ minh họa. Máy chủ BFF bắt buộc phải **chuyển tiếp nguyên vẹn trường `expires_in` thực tế** nhận được từ LinkedIn về cho App (không tự ý làm tròn hay gán hằng số).
+       - **Cách tính hạn token sau refresh (Token Expiration Calculation):**
+         - **Nguyên tắc thời hạn kế thừa của LinkedIn ([Programmatic Refresh Tokens](https://learn.microsoft.com/en-us/linkedin/shared/authentication/programmatic-refresh-tokens)):** Theo tài liệu chính thức của LinkedIn, khi refresh, Access Token mới được cấp thời hạn tối đa 60 ngày hoặc bằng **thời gian sống còn lại của Refresh Token**, tùy điều kiện nào ngắn hơn.
+         - **Ví dụ minh họa thực tế từ tài liệu LinkedIn:** Nếu người dùng thực hiện refresh ở **ngày thứ 360** của chu kỳ Refresh Token 365 ngày (khi `refresh_token` chỉ còn đúng 5 ngày hiệu lực), LinkedIn sẽ trả về Access Token mới có `expires_in` **chỉ còn đúng 5 ngày** (`432000` giây), chứ **KHÔNG PHẢI** 60 ngày tiếp theo! Sau 5 ngày này, cả access token lẫn refresh token đều hết hạn, bắt buộc người dùng phải Re-authentication qua trình duyệt.
+         - **App client tính toán động theo `expires_in` thực tế (Tuyệt đối không cộng cố định 60 ngày):**
+           App client không suy hạn bằng hằng số 60 ngày. Mỗi lần nhận token (khi đăng nhập ban đầu hoặc khi refresh), app đều đọc giá trị `expires_in` thực tế do BFF chuyển tiếp từ LinkedIn để tính và lưu vào Room DB:
+           $$\text{expires\_at} = \text{System.currentTimeMillis}() + (\text{response.expires\_in} \times 1000\text{L})$$
+           *(Công thức này đồng bộ chính xác với cách tính hạn ở lần đăng nhập đầu tiên tại mục 2, đảm bảo app phản ánh trung thực hạn token thực tế và hiển thị badge cảnh báo kịp thời kể cả trong các chu kỳ refresh cuối cùng).*
+         - **Mốc 365 ngày của chu kỳ Refresh Token:**
+           - Mốc 365 ngày được xác định và tính toán trực tiếp từ `refreshTokenIssuedAt` (thời điểm người dùng cấp quyền ban đầu qua trình duyệt):
+             $$\text{refreshTokenDeadline} = \text{refreshTokenIssuedAt} + (365\text{L} \times 24 \times 3600 \times 1000\text{L})$$
+           - **Không dựa vào trường `refresh_token_expires_in`:** Tài liệu chính thức của LinkedIn tự mâu thuẫn về trường này (ví dụ mẫu lúc đầu ghi `525600`, sau khi refresh ghi `439200` — dạng số phút tương đương 365 và 305 ngày, không đồng nhất với đơn vị giây của `expires_in`). Do đó, app hoàn toàn không dùng trường này để tính hạn và loại bỏ điều kiện so sánh trường này với `expires_in`.
+         - **Ngưỡng kích hoạt làm mới & Cơ chế chống lặp Refresh vô tận (Infinite Refresh Loop Prevention):**
+           - **Ngưỡng kích hoạt:** Đồng bộ thống nhất với ngưỡng cảnh báo F1 là **dưới 3 ngày (72 giờ)**. Khi thời hạn còn lại của token $\le 3\text{ ngày}$ (phát hiện qua `expiresAt` trong Room DB), app mới kích hoạt request gọi `POST /auth/linkedin/refresh` lên BFF.
+           - **Xử lý nếu `expires_in` sau refresh $\le 3\text{ ngày}$ (ví dụ ở ngày thứ 363–365):**
+             - Nếu sau khi refresh thành công mà `response.expires_in` trả về nhỏ hơn hoặc bằng ngưỡng cảnh báo 3 ngày (do refresh token đã chạm sát mốc 365 ngày), **ứng dụng TUYỆT ĐỐI KHÔNG kích hoạt refresh lặp lại**.
+             - Thay vào đó, Repository ngay lập tức đánh dấu kênh chuyển sang trạng thái `ConnectionStatus.TOKEN_EXPIRED`, vô hiệu hóa cờ auto-refresh ngầm cho tài khoản này, và giao diện F1/F4 sẽ hiển thị Badge cảnh báo: *"Phiên kết nối LinkedIn đã hết hạn chu kỳ 365 ngày. Vui lòng kết nối lại"* để người dùng thực hiện Re-authentication 1 chạm qua trình duyệt.
+           - Sau mốc 365 ngày kể từ `refreshTokenIssuedAt`, mọi yêu cầu làm mới ngầm đều bị chặn; người dùng bắt buộc Re-authentication qua Custom Tabs.
+       - **Lưu trữ chuẩn:** App cập nhật Access Token mới trực tiếp vào **`EncryptedSharedPreferences`**. Room DB **chỉ cập nhật metadata** `expiresAt` (tính theo công thức động ở trên) và `ConnectionStatus.CONNECTED` (tuyệt đối không ghi token vào Room).
    - **Quy trình Thu hồi Phiên & Hủy `refresh_token` trên BFF khi Ngắt kết nối (`POST /auth/linkedin/logout`):**
      - **Rủi ro tồn đọng credential mồ côi (Orphaned Refresh Token Risk):** Khi app được duyệt quyền Partner Tier, máy chủ BFF lưu giữ `refresh_token` (thời hạn 365 ngày) trong cơ sở dữ liệu server để làm mới ngầm. Nếu khi người dùng bấm "Ngắt kết nối" (Disconnect) trên ứng dụng, app chỉ xóa token cục bộ trong `EncryptedSharedPreferences` mà không gửi lệnh hủy lên BFF, thì `refresh_token` vẫn tồn tại hợp lệ trên DB server, gây nguy cơ rò rỉ bảo mật và xung đột trạng thái nếu người dùng kết nối lại sau này.
      - **Cơ chế thu hồi phiên bắt buộc:** Khi người dùng bấm "Ngắt kết nối" (F1) tài khoản LinkedIn, ứng dụng Android gửi request thu hồi phiên lên BFF:
@@ -608,7 +695,7 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
        4. Trả về HTTP 200 OK (hoặc 204 No Content).
      - **Xử lý phía App Client:** Sau khi gửi request logout (theo cơ chế best-effort nếu mất kết nối mạng), app tiến hành xóa sạch `access_token`, `refresh_token` (nếu có), và `bff_session_token` trong `EncryptedSharedPreferences`, đồng thời cập nhật/xóa metadata trong Room DB (chi tiết tại §5.3).
    - **Lưu ý với Client Native thuần túy (không có BFF):** Nếu chạy Luồng A (Native PKCE trực tiếp) mà không có backend server, tính năng programmatic refresh sẽ không thể thực thi do thiếu `client_secret`. Khi đó, hệ thống bắt buộc sử dụng **Phương án 2 (Re-authentication định kỳ 60 ngày)** qua Custom Tabs (người dùng chỉ cần xác nhận 1 chạm).
-   - *Thời hạn tối đa:* Việc refresh chỉ cấp lại access token 60 ngày mới, **không gia hạn** mốc 365 ngày ban đầu của refresh token. Sau 365 ngày, người dùng vẫn bắt buộc phải trải qua luồng Re-authentication qua trình duyệt.
+   - *Thời hạn tối đa:* Việc refresh chỉ cấp lại access token có thời hạn tối đa bằng thời gian sống còn lại của refresh token (ví dụ: refresh ở ngày thứ 360 thì access token chỉ còn sống đúng 5 ngày), **không gia hạn** mốc 365 ngày ban đầu của refresh token. Sau 365 ngày, người dùng bắt buộc phải trải qua luồng Re-authentication qua trình duyệt.
 
 ### 3.2. Danh sách quyền (Permissions / Scopes)
 Đối chiếu trực tiếp với các khả năng trong `ChannelCapability` (`core/model/Channel.kt`) theo chuẩn LinkedIn REST API & Community Management API:
@@ -638,6 +725,39 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
    GET https://api.linkedin.com/v2/userinfo
    Authorization: Bearer {access-token}
    ```
+   **Lấy danh sách Organization Page mà người dùng có quyền quản trị (F1):**
+   *(Scope yêu cầu: `r_organization_admin`)*
+   ```http
+   GET https://api.linkedin.com/rest/organizationAcls?q=roleAssignee
+   Headers:
+     Authorization: Bearer {access-token}
+     Linkedin-Version: 202610
+     X-Restli-Protocol-Version: 2.0.0
+   ```
+   *Nhận về:* danh sách ACL chứa các Organization URN mà người dùng được cấp vai trò.
+   Repository phải lọc các role được hỗ trợ (ví dụ `ADMINISTRATOR` hoặc
+   `CONTENT_ADMINISTRATOR` theo dữ liệu trả về và quyền thực tế của ứng dụng), trích xuất
+   `{org-id}` từ `urn:li:organization:{org-id}`, rồi lưu Organization như một `ChannelAccount`
+   riêng trong Room. `accountId` của account này là Organization ID/URN ổn định, không dùng
+   `urn:li:person:{id}` thay thế.
+
+   Các Organization URN thu được ở bước này là đầu vào cho các endpoint F5, F6 và F7 bên dưới:
+   `author`/`owner` khi đăng hoặc upload ảnh, `targetUrn` khi đọc/trả lời comment,
+   `organizationalEntity` khi lấy metrics và `orgUrn` khi lấy follower count.
+
+   > **Lưu ý quyền:** `organizationAcls` chỉ cho biết các Organization và role mà access token có
+   > thể truy vấn; từng thao tác vẫn phải kiểm tra thêm capability, sản phẩm Community Management
+   > và quyền cụ thể của Organization. Không suy ra rằng có ACL là chắc chắn được đăng bài hoặc
+   > đọc comment.
+
+   > **Ghi chú lấy tên và logo cho UI F1:** `organizationAcls` chỉ trả về Organization URN, không
+   > cung cấp trực tiếp `localizedName` hoặc `logoV2`. Để hiển thị `accountName` và `avatarUrl` trên
+   > màn hình "Kênh của tôi", client cần gọi thêm
+   > `GET https://api.linkedin.com/rest/organizations/{org-id}` với cùng header
+   > `Linkedin-Version: 202610` (hoặc dùng batch lookup
+   > `GET /rest/organizations?ids=List({org-id-1},{org-id-2})`). Các URN trong query `List(...)`
+   > phải tuân theo quy tắc URL encoding của Rest.li 2.0.0 đã nêu ở mục F6/F7.
+
 2. **Khởi tạo và upload ảnh (F5 - Hai bước):**
    - Bước 1: Khởi tạo upload ảnh
      ```http
@@ -724,44 +844,76 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
 5. **Lấy danh sách comment (F6):**
    *(Scope yêu cầu: `r_organization_social_feed` qua Community Management API)*
    ```http
-   GET https://api.linkedin.com/rest/socialActions/{targetUrn}/comments
+   GET https://api.linkedin.com/rest/socialActions/urn%3Ali%3Ashare%3A{share-id}/comments
    Headers:
      Authorization: Bearer {access-token}
      Linkedin-Version: 202610
+     X-Restli-Protocol-Version: 2.0.0
    ```
-6. **Trả lời comment (F6):**
+   *Lưu ý về `{targetUrn}`:* Là URN của **bài viết gốc** (`remotePostId`, ví dụ: `urn:li:share:{share-id}` hoặc `urn:li:ugcPost:{ugcPost-id}`).
+   > **Quy tắc URL Encoding của Rest.li 2.0.0:** URN trên URL path phải được percent-encode
+   > (`:` thành `%3A`, `(` thành `%28`, `)` thành `%29`, `,` thành `%2C` nếu có). Khi dùng Retrofit,
+   > khai báo `@Path(value = "targetUrn", encoded = false)` và truyền URN thô để Retrofit/OkHttp
+   > encode đúng một lần. Không truyền sẵn `%3A` khi `encoded = false`, vì sẽ tạo double-encoding.
+   > Không encode cả chuỗi URL bằng tay sau khi Retrofit đã dựng request.
+
+6. **Trả lời comment (Nested Reply — F6):**
    *(Scope yêu cầu: `w_organization_social_feed` qua Community Management API)*
    ```http
-   POST https://api.linkedin.com/rest/socialActions/{targetUrn}/comments
+   POST https://api.linkedin.com/rest/socialActions/urn%3Ali%3Ashare%3A{share-id}/comments
    Headers:
      Authorization: Bearer {access-token}
      Linkedin-Version: 202610
+     X-Restli-Protocol-Version: 2.0.0
      Content-Type: application/json
 
    {
      "actor": "urn:li:organization:{org-id}",
-     "message": { "text": "Cảm ơn sự đóng góp của bạn!" },
+     "object": "{targetUrn}",
+     "message": {
+       "text": "Cảm ơn sự đóng góp của bạn!"
+     },
      "parentComment": "{parentCommentUrn}"
    }
    ```
+   *Lưu ý kỹ thuật & Hướng dẫn triển khai `SocialChannelClient.reply(commentId, text)` để tránh lỗi nhầm lẫn URN:*
+   - **Phân định rõ `{targetUrn}` trên URL & `"object"` trong body:**
+     - Trong LinkedIn Social Actions API, `{targetUrn}` trên URL path và trường `"object"` trong request body **BẮT BUỘC là URN của bài viết gốc** (`Root Post URN`, ví dụ: `urn:li:share:{share-id}` hoặc `urn:li:ugcPost:{id}`), **TUYỆT ĐỐI KHÔNG TRUYỀN URN của comment** vào `{targetUrn}` trên path URL hay trường `"object"` (nếu truyền nhầm comment URN vào path sẽ bị LinkedIn từ chối với lỗi HTTP 400 Bad Request hoặc 404 Not Found).
+     - Trường `"parentComment"` trong request body là URN của **chính comment cha cần trả lời** (`parentCommentUrn`, ví dụ: `urn:li:comment:(urn:li:share:{share-id},{comment-id})`).
+   - **Khớp nối với Interface Contract của dự án (`SocialChannelClient.reply`):**
+     - Chữ ký hàm trong `core/social/SocialChannelClient.kt` chỉ nhận: `suspend fun reply(commentId: String, text: String)`.
+     - Để lấy được `{targetUrn}` (URN bài viết gốc) khi thực thi cuộc gọi API này trong `LinkedInClient`:
+       1. **Cách 1 (Khuyến nghị theo Data Model F6):** Model `Comment` trong `core/model/Comment.kt` đã lưu sẵn trường `remotePostId` (chính là `{targetUrn}` của bài viết gốc). Khi người dùng bấm trả lời một comment, Repository tra cứu bản ghi `Comment` trong Room DB theo `commentId` để lấy `remotePostId` tương ứng và truyền vào client.
+       2. **Cách 2 (Trích xuất từ Compound URN):** Định dạng comment URN của LinkedIn là URN phức hợp lồng nhau: `urn:li:comment:({targetUrn},{comment-sub-id})`. Lớp `LinkedInClient` có thể parse chuỗi con nằm giữa `urn:li:comment:(` và dấu phẩy `,` để trích xuất ra chính xác `{targetUrn}` của bài viết gốc.
+   - **Header `X-Restli-Protocol-Version: 2.0.0`:** Bắt buộc phải có để LinkedIn Rest.li framework xử lý đúng các ký tự đặc biệt (dấu ngoặc đơn, dấu phẩy) trong Compound URN của `parentComment`.
+   - **Encoding của endpoint reply:** `{targetUrn}` trên path dùng cùng quy tắc như endpoint đọc
+     comment: truyền URN thô qua `@Path(..., encoded = false)` để Retrofit encode một lần. Các URN
+     trong JSON body (`actor`, `object`, `parentComment`) giữ ở dạng URN hợp lệ của JSON; không
+     percent-encode thủ công nội dung body.
 7. **Lấy số liệu bài viết (F7):**
    *(Scope yêu cầu: `rw_organization_admin` kèm vai trò Administrator của Organization)*
    
    Theo tài liệu chính thức về [Share Statistics API](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/organizations/share-statistics), endpoint này cung cấp hai tham số lọc riêng biệt tùy theo định dạng URN của bài viết:
    - **Trường hợp URN dạng Share (`urn:li:share:{id}`):** Dùng tham số `shares=List(...)`:
      ```http
-     GET https://api.linkedin.com/rest/organizationalEntityShareStatistics?q=organizationalEntity&organizationalEntity=urn:li:organization:{org-id}&shares=List({shareUrn})
+     GET https://api.linkedin.com/rest/organizationalEntityShareStatistics?q=organizationalEntity&organizationalEntity=urn%3Ali%3Aorganization%3A{org-id}&shares=List(urn%3Ali%3Ashare%3A{share-id})
      Headers:
        Authorization: Bearer {access-token}
        Linkedin-Version: 202610
      ```
    - **Trường hợp URN dạng UGC Post (`urn:li:ugcPost:{id}`):** Dùng tham số `ugcPosts=List(...)`:
      ```http
-     GET https://api.linkedin.com/rest/organizationalEntityShareStatistics?q=organizationalEntity&organizationalEntity=urn:li:organization:{org-id}&ugcPosts=List({ugcPostUrn})
+     GET https://api.linkedin.com/rest/organizationalEntityShareStatistics?q=organizationalEntity&organizationalEntity=urn%3Ali%3Aorganization%3A{org-id}&ugcPosts=List(urn%3Ali%3AugcPost%3A{ugc-post-id})
      Headers:
        Authorization: Bearer {access-token}
        Linkedin-Version: 202610
      ```
+   > **Quy tắc encode query của Rest.li 2.0.0:** Giá trị URN trong query phải được encode dấu `:`
+   > thành `%3A`, nhưng cấu trúc `List(...)` và dấu phân cách của nó phải giữ nguyên để Rest.li
+   > parse được danh sách. Với Retrofit, có thể truyền toàn bộ giá trị đã encode bằng
+   > `@Query(value = "shares", encoded = true)` hoặc `@Query(value = "ugcPosts", encoded = true)`,
+   > ví dụ `List(urn%3Ali%3Ashare%3A12345)`. Chỉ encode URN, không encode lại `List(`, `)` hoặc
+   > dấu phân cách; tuyệt đối không trộn một phần đã encode với `encoded = false` vì dễ double-encode.
 
    *Quy tắc triển khai & Lưu ý kiểm chứng thực tế:*
    - Bài viết tạo qua endpoint `POST /rest/posts` thường trả về header định danh `x-restli-id` dưới một trong hai dạng URN chính thức: `urn:li:share:...` (Share URN) hoặc `urn:li:ugcPost:...` (UGC Post URN). *(Lưu ý: Tiền tố `urn:li:post:...` không có trong tài liệu Share Statistics chính thức, do đó nhóm chỉ ánh xạ theo hai định dạng chuẩn `share` và `ugcPost` của Microsoft).*
@@ -771,7 +923,7 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
 8. **Lấy số follower (F7):**
    *(Scope yêu cầu: `rw_organization_admin` hoặc `r_organization_social`)*
    ```http
-   GET https://api.linkedin.com/rest/networkSizes/urn:li:organization:{org-id}?edgeType=COMPANY_FOLLOWED_BY_MEMBER
+   GET https://api.linkedin.com/rest/networkSizes/urn%3Ali%3Aorganization%3A{org-id}?edgeType=COMPANY_FOLLOWED_BY_MEMBER
    Headers:
      Authorization: Bearer {access-token}
      Linkedin-Version: 202610
@@ -844,13 +996,17 @@ Thay vì xem trường hợp không gọi được API là lỗi thất bại (`
 
 1. **Sao chép nội dung vào Clipboard:** Tự động sao chép toàn bộ text bài viết (kèm hashtag và link nếu có) vào `android.content.ClipboardManager`.
 2. **Chia sẻ qua Android Share Intent (`Intent.ACTION_SEND` / `Intent.ACTION_SEND_MULTIPLE`):**
-   - Hỗ trợ cả text và file ảnh (thông qua `androidx.core.content.FileProvider` để cấp quyền đọc Uri tạm thời):
+   - Hỗ trợ cả text và file ảnh. `draft.imageUri` phải là `content://` URI do
+     `FileProvider.getUriForFile(...)` tạo ra; không được truyền trực tiếp `file://` hoặc đường dẫn
+     `/data/user/0/...`, vì Android 7.0+ có thể ném `FileUriExposedException`. URI phải trỏ tới file
+     nằm trong các path đã khai báo cho `FileProvider`.
    - **Bài viết text hoặc kèm 1 ảnh đơn (`Intent.ACTION_SEND` — chuẩn `Draft` Milestone 1):**
      ```kotlin
      val shareIntent = Intent(Intent.ACTION_SEND).apply {
          type = if (draft.imageUri != null) "image/*" else "text/plain"
          putExtra(Intent.EXTRA_TEXT, draft.text)
          draft.imageUri?.let { uriStr ->
+            // uriStr là content:// URI đã được cấp bởi FileProvider.
             putExtra(Intent.EXTRA_STREAM, Uri.parse(uriStr))
          }
          addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -872,7 +1028,11 @@ Thay vì xem trường hợp không gọi được API là lỗi thất bại (`
      ```
 3. **Cập nhật trạng thái & Phản hồi UX:** 
    - Đánh dấu trạng thái bài viết là `PostStatus.HANDED_OFF` trong Room Database.
-   - Hiển thị Snackbar hoặc Dialog hướng dẫn: *"Nội dung bài viết đã được sao chép vào bộ nhớ tạm. Hãy dán vào ứng dụng mạng xã hội để hoàn tất đăng bài."*
+   - Trước khi gọi `startActivity(chooser)`, chỉ hiển thị `Toast` ngắn hoặc để Android tự hiển thị
+     clipboard preview; không mở Dialog/Snackbar đè lên Share Sheet. Trên Android 13+ (API 33+),
+     Clipboard Overlay và Share Sheet có thể che khuất hoặc cạnh tranh với UI của app.
+   - Khi người dùng quay lại app, có thể hiển thị Snackbar: *"Nội dung bài viết đã được sao chép vào
+     bộ nhớ tạm. Hãy dán vào ứng dụng mạng xã hội để hoàn tất đăng bài."*
    - Giữ nguyên thông tin bài đăng, cho phép người dùng xem lại lịch sử các bài đã bàn giao.
 
 ---
@@ -944,6 +1104,15 @@ Thay vì lưu `client_secret`, ứng dụng chỉ quản lý các **Public Clien
        - Tất cả token đều được mã hóa bằng Android Keystore (`MasterKey.DEFAULT_AES256_GCM_SPEC`).
      - **Room Database tuyệt đối KHÔNG lưu plaintext token:** Room chỉ lưu trữ các metadata phi nhạy cảm của tài khoản và kênh/Page: `accountId`, `channelType`, `accountName`, `avatarUrl`, `expiresAt`, `connectionStatus`, `capabilities`. Khi gọi API, Repository sẽ lấy metadata từ Room và truy xuất token (hoặc Page token tương ứng theo `page_id`) từ `EncryptedSharedPreferences`.
    - Không ghi log token ra Logcat, không đính kèm token trong thông báo lỗi hoặc crash report.
+   - **Phạm vi xung đột với Quy tắc 5 (AGENTS.md) — Xem chi tiết tại §3.1:**
+      - Quy tắc 5 trong `AGENTS.md` quy định: *"Không bao giờ log, commit hay gửi API key/token lên bất kỳ server nào ngoài nhà cung cấp LLM/mạng xã hội. Key lưu bằng Android Keystore."*
+      - **Phạm vi mâu thuẫn đầy đủ** (không chỉ riêng refresh token):
+        - ✅ **Tuân thủ hoàn toàn:** LinkedIn Luồng A (Native PKCE) + Facebook Phương án 1 (Meta SDK).
+        - ⚠️ **Cần nhóm thống nhất ngoại lệ:** LinkedIn Luồng B + Facebook Phương án 2 (Web OAuth qua BFF) — access token đi qua BFF cache ≤ 60 giây khi đổi `exchange_code`.
+        - ❌ **Xung đột rõ ràng, yêu cầu Policy Exception qua issue `contract`:** Lưu `refresh_token` LinkedIn vào DB server (thực tế rất khó áp dụng với đồ án vì đòi hỏi điều kiện đối tác MDP).
+      - **Baseline chính thức Milestone 1:** Chỉ triển khai Luồng A (LinkedIn Native PKCE khi đã được
+        bật) và Phương án 1 (Facebook Meta SDK). Luồng B/Phương án 2 cùng mọi endpoint BFF nằm ngoài
+        phạm vi Milestone 1 và không được dùng làm fallback trong repository Android.
    - **Quy trình bảo mật khi "Ngắt kết nối" (Disconnect Flow — F1):**
      Khi người dùng bấm ngắt kết nối một tài khoản hoặc kênh trên ứng dụng:
      - **Đối với Kênh Facebook:**
@@ -954,9 +1123,89 @@ Thay vì lưu `client_secret`, ứng dụng chỉ quản lý các **Public Clien
        - *Bắt buộc thu hồi phía BFF (`POST /auth/linkedin/logout`):* Đối với các phiên kết nối qua BFF (đặc biệt khi BFF lưu trữ `refresh_token` 365 ngày trên server DB phục vụ làm mới ngầm khi được duyệt Partner Tier), app **bắt buộc gửi request `POST /auth/linkedin/logout`** kèm header `Authorization: Bearer {bff_session_token}` và `account_id`. Máy chủ BFF sẽ lập tức **xóa bỏ hoàn toàn `refresh_token` khỏi database server** và vô hiệu hóa `bff_session_token`. Thao tác này ngăn chặn triệt để tình trạng `refresh_token` vẫn tồn đọng mồ côi trên máy chủ sau khi người dùng đã ngắt kết nối trên thiết bị di động.
        - *Dọn dẹp phía Client:* Xóa sạch `access_token`, `refresh_token` (nếu có), và `bff_session_token` khỏi `EncryptedSharedPreferences`; cập nhật trạng thái kênh trong Room DB thành `ConnectionStatus.DISCONNECTED` (hoặc xóa tài khoản/kênh khỏi Room DB).
 
+### 5.4. Kiến trúc tích hợp và bài toán đa tài khoản
+
+#### Vấn đề cần giải quyết
+
+`SocialChannelClient` hiện định danh implementation bằng `ChannelType`, trong khi token thực tế
+được cấp cho từng tài khoản hoặc Page. Vì vậy, chỉ inject một client cố định theo `FACEBOOK` hoặc
+`LINKEDIN` là chưa đủ để xử lý các trường hợp sau:
+
+- Người dùng kết nối nhiều Facebook Page dưới cùng một tài khoản Facebook.
+- Người dùng kết nối đồng thời LinkedIn Member và LinkedIn Organization.
+- Một bài viết, comment hoặc số liệu phải được gọi đúng bằng token của `accountId` tương ứng.
+
+Nếu chọn token chỉ theo `ChannelType`, request có thể dùng nhầm Page Access Token. Hậu quả là bài
+viết được đăng lên sai Page, comment không đọc được hoặc số liệu bị gán nhầm tài khoản. `accountId`
+phải được coi là một phần của ngữ cảnh gọi API, không phải dữ liệu chỉ dùng để hiển thị trên UI.
+
+#### Phương án được đề xuất
+
+Mở một issue nhãn `contract` để thiết kế factory/context theo hướng:
+
+```kotlin
+interface SocialChannelClientFactory {
+    fun create(accountId: String): SocialChannelClient
+}
+```
+
+Đây chỉ là **đề xuất thiết kế**, chưa phải contract được phép thêm vào `core/`. Trước khi mở rộng
+interface, nhóm cần thống nhất:
+
+1. `accountId` là ID ổn định của Page/Organization/Member và phải khác với `ChannelType`.
+2. Factory phải kiểm tra metadata trong Room để xác định `ChannelType`, trạng thái kết nối và
+   capability trước khi tạo client.
+3. Client chỉ lấy token sau khi đã có `accountId`; token được tra cứu từ
+   `EncryptedSharedPreferences` bằng key có namespace và account ID, ví dụ
+   `fb_page_token_{accountId}`. Không lưu token plaintext trong Room.
+4. `publish`, `fetchComments`, `reply` và `fetchMetrics` phải dùng cùng account context trong
+   toàn bộ một thao tác. Không suy ra account từ `remotePostId` hoặc từ client mặc định.
+5. Khi `accountId` không tồn tại, đã ngắt kết nối, hết hạn token hoặc thiếu capability, factory/
+   repository phải trả lỗi rõ ràng; không được fallback im lặng sang tài khoản khác.
+6. Với LinkedIn, `Comment.remotePostId` vẫn được dùng để lấy URN bài viết gốc khi reply, còn
+   `accountId` quyết định Organization/Member token dùng cho request. Hai loại định danh này không
+   được trộn lẫn.
+
+#### Trình tự gọi dự kiến
+
+```text
+UI/ViewModel
+    -> Repository(accountId)
+    -> SocialChannelClientFactory.create(accountId)
+    -> Client lấy token theo accountId từ secure storage
+    -> API của Facebook Page hoặc LinkedIn Member/Organization
+```
+
+#### Phạm vi và tiêu chí chấp nhận
+
+- Không thay đổi chữ ký hiện tại của `SocialChannelClient` trong issue nghiên cứu này.
+- Issue contract phải bao gồm migration cho Hilt, Repository, fake client và test đa tài khoản.
+- Test bắt buộc chứng minh hai `accountId` dùng hai token và endpoint context khác nhau; không chỉ
+  kiểm tra khác `ChannelType`.
+- Phải có test khi một account bị disconnect/expired để bảo đảm request bị từ chối rõ ràng và không
+  rơi sang account khác.
+
 ---
 
-## 6. Tóm tắt nội dung dùng cho Slide Báo cáo (Research Presentation)
+## 6. Checklist trước khi triển khai
+
+Các mục dưới đây phải được xác nhận bằng tài liệu portal hoặc integration test trước khi chuyển từ
+`FakeSocialChannelClient` sang client thật:
+
+- [ ] Meta Developer Portal xác nhận loại Login đang bật, `config_id` (nếu dùng Login for Business),
+      redirect URI và các quyền cần App Review.
+- [ ] Facebook Page test xác nhận các thao tác đăng bài, đọc/trả lời comment và lấy metrics bằng token
+      Page thật; không suy luận capability chỉ từ HTTP status.
+- [ ] Xác nhận metric insights và field follower đang khả dụng trên version Graph API được App cấp.
+- [ ] LinkedIn xác nhận sản phẩm Community Management, quyền Organization và định dạng URN trả về từ
+      endpoint đăng bài.
+- [ ] LinkedIn xác nhận Native PKCE cho App ID; nếu chưa có, mở issue backend/BFF riêng trước khi triển
+      khai Standard OAuth.
+- [ ] Kiểm thử retry, rate limit, token revoked/expired và fallback `HANDED_OFF` trên môi trường Development.
+- [ ] Kiểm tra disconnect xóa token cục bộ; nếu có BFF thì phải có quy trình thu hồi server-side trước khi
+      coi kết nối đã ngắt hoàn toàn.
+
+## 7. Tóm tắt nội dung dùng cho Slide Báo cáo (Research Presentation)
 
 Dưới đây là dàn ý nội dung được thiết kế sẵn theo từng slide (kèm gợi ý hình ảnh/sơ đồ và lời thuyết trình) giúp nhóm dễ dàng đưa vào PowerPoint / Google Slides:
 
@@ -973,15 +1222,24 @@ Dưới đây là dàn ý nội dung được thiết kế sẵn theo từng sli
 ### 🔐 Slide 2: Kiến trúc Xác thực An toàn — Public Client Không Giữ Secret
 * **Ý chính trình chiếu:**
   * **Chuẩn bảo mật Native (RFC 8252 & RFC 6750):** Ứng dụng Android là Public Client $\rightarrow$ Loại bỏ hoàn toàn `client_secret` khỏi APK và mã nguồn. Tuyệt đối không truyền `access_token` trong URL/Deep Link.
-  * **Cơ chế bảo vệ mã ủy quyền:** Tích hợp `AppAuth-Android` qua Android Custom Tabs với PKCE S256 (`code_verifier` + `code_challenge`) và xác thực `state` chống CSRF.
+  * **Cơ chế bảo vệ mã ủy quyền trong Milestone 1:** Facebook dùng Meta Android SDK; LinkedIn dùng
+    Native PKCE qua Loopback Redirect (`127.0.0.1`) nếu Developer Portal đã bật protocol, kèm
+    xác thực `state` chống CSRF. AppAuth/Custom Tabs + BFF chỉ là thiết kế tham khảo ngoài phạm vi.
   * **Định danh ứng dụng an toàn:**
-    * *Facebook:* Meta Android SDK (App ID + Package Name + SHA-1 Key Hash) hoặc Web OAuth qua BFF (Android App Links + PKCE-for-BFF).
-    * *LinkedIn:* Client ID công khai + luồng Native PKCE (`/oauth/native-pkce/`) qua Loopback Redirect không giữ secret (hoặc qua BFF với Android App Links HTTPS, cấp mã exchange dùng 1 lần và đổi token qua POST back-channel kèm `code_verifier`).
+    * *Facebook:* Meta Android SDK (App ID + Package Name + SHA-1 Key Hash). Web OAuth qua BFF
+      chỉ nằm trong tài liệu tham khảo ngoài phạm vi.
+    * *LinkedIn:* Client ID công khai + luồng Native PKCE (`/oauth/native-pkce/`) qua Loopback Redirect
+      không giữ secret. Standard OAuth qua BFF chỉ là phương án backend tham khảo.
   * **Vòng đời & Lưu trữ Token an toàn:** 
-    * *Facebook:* Với Meta SDK, User Token (~60 ngày) tự động làm mới ngầm khi mở app (Page Token kiểm thử qua `debug_token`); với Web OAuth, đổi qua BFF lấy Page Access Token vĩnh viễn (Never Expires).
-    * *LinkedIn:* Access Token 60 ngày $\rightarrow$ Luồng Re-authentication 1 chạm khi hết hạn (kèm cơ chế Auto-refresh 365 ngày qua BFF nếu được duyệt quyền Programmatic Refresh).
-    * *Lưu trữ & Ngắt kết nối:* Mọi token nhạy cảm (`access_token`, `refresh_token`, `bff_session_token`, cùng Page Access Token tra cứu theo `page_id`) chỉ lưu trong `EncryptedSharedPreferences` (Keystore); Room DB tuyệt đối không lưu token mà chỉ quản lý metadata phi nhạy cảm; ngắt kết nối kích hoạt `POST logout` lên BFF để hủy phiên (Facebook) và xóa sạch `refresh_token` trên database server (LinkedIn), đồng thời dọn sạch mọi token client (kể cả Page tokens).
-* **Gợi ý Visual:** Sơ đồ luồng OAuth 2.0 PKCE không `client_secret` đối chiếu giữa Custom Tabs và Token Endpoint / BFF Back-Channel.
+    * *Facebook:* Với Meta SDK, User Token (~60 ngày) tự động làm mới ngầm khi mở app; Page Token
+    phải được kiểm thử trên Page development.
+    * *LinkedIn:* Access Token 60 ngày $\rightarrow$ Re-authentication 1 chạm khi hết hạn. Nếu Native
+    PKCE chưa được cấp, tính năng bị blocked trong Milestone 1.
+    * *Lưu trữ:* Token nhạy cảm chỉ lưu trong `EncryptedSharedPreferences` (Keystore); Room DB chỉ
+    quản lý metadata phi nhạy cảm. Luồng logout BFF và `bff_session_token` chỉ thuộc thiết kế backend
+    tham khảo.
+* **Gợi ý Visual:** Sơ đồ Meta SDK và LinkedIn Native PKCE Loopback cho Milestone 1; phần BFF chỉ
+  được trình bày như phương án tương lai ngoài phạm vi.
 
 ---
 
@@ -1015,8 +1273,14 @@ Dưới đây là dàn ý nội dung được thiết kế sẵn theo từng sli
 
 ### 🚀 Slide 5: Kiến nghị Contract & Lộ trình Milestone 1
 * **Ý chính trình chiếu:**
-  * **Kiến nghị Contract (`SocialChannelClient`):** Đề xuất mở Issue nhãn `contract` để bổ sung `SocialChannelClientFactory` giải quyết ngữ cảnh đa tài khoản/đa Page (`accountId`).
+  * **Kiến nghị Contract (`SocialChannelClient`):** Như phân tích tại §5.4, đề xuất mở Issue nhãn
+    `contract` để bổ sung `SocialChannelClientFactory`, giúp mỗi lệnh gọi gắn với đúng `accountId`
+    (Facebook Page, LinkedIn Member hoặc LinkedIn Organization). Đây là đề xuất, chưa thay đổi
+    `SocialChannelClient` hiện tại.
   * **Kế hoạch triển khai:**
-    * *Tuần 1:* Họp nhóm chốt contract interface `SocialChannelClientFactory` & hoàn thiện cấu hình Developer Portals.
-    * *Tuần 2:* Triển khai thư viện AppAuth, màn hình "Kênh của tôi" (F1), tích hợp EncryptedSharedPreferences lưu token an toàn và Room DB quản lý metadata.
+    * *Tuần 1:* Họp nhóm chốt contract/context đa tài khoản, tiêu chí test tại §5.4 và hoàn thiện cấu
+      hình Developer Portals; xác nhận LinkedIn Native PKCE được bật cho App ID.
+    * *Tuần 2:* Triển khai Meta Android SDK cho Facebook và LinkedIn Native PKCE Loopback (`127.0.0.1`);
+      tích hợp secure storage lưu token theo `accountId` và Room DB quản lý metadata. Không triển khai
+      AppAuth/BFF trong Milestone 1.
 * **Gợi ý Visual:** Timeline lộ trình thực hiện theo tuần của Milestone 1.

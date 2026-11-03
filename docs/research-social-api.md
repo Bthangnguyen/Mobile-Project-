@@ -197,13 +197,13 @@ GET https://graph.facebook.com/v20.0/oauth/access_token
 Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm:
 - **Authorization Endpoint:** `https://www.linkedin.com/oauth/v2/authorization`
 - **Token Endpoint:** `https://www.linkedin.com/oauth/v2/accessToken`
-- **Redirect URI đăng ký với LinkedIn:** Bắt buộc là **URL HTTPS hợp lệ trỏ về máy chủ backend/BFF** (ví dụ: `https://api.yourdomain.com/auth/linkedin/callback` hoặc endpoint Cloudflare Worker).
+- **Redirect URI đăng ký với LinkedIn:** Bắt buộc là **URL HTTPS hợp lệ trỏ trực tiếp về máy chủ backend/BFF** (ví dụ: `https://api.yourdomain.com/auth/linkedin/callback` hoặc endpoint Cloudflare Worker).
   > [!IMPORTANT]
   > **Yêu cầu Callback HTTPS của Standard OAuth:**
-  > Theo tài liệu chính thức của LinkedIn OAuth 2.0, Developer Portal **chỉ chấp nhận callback giao thức HTTPS** cho luồng Standard Web OAuth (hoàn toàn không hỗ trợ đăng ký Custom Scheme như `com.lttbdd.socialagent://...` trên LinkedIn Portal).
+  > Theo tài liệu chính thức của LinkedIn OAuth 2.0, Developer Portal **chỉ chấp nhận callback giao thức HTTPS** làm Redirect URI cho luồng Standard Web OAuth (hoàn toàn không cho phép đăng ký trực tiếp Custom Scheme như `com.lttbdd.socialagent://...` làm callback trên LinkedIn Developer Portal).
 - **Ràng buộc kỹ thuật:** Luồng standard này **bắt buộc phải có `client_secret`** khi gọi token endpoint.
 - **Quy trình hoạt động hoàn chỉnh của Kiến trúc BFF (Backend-For-Frontend):**
-  1. **Khởi tạo ủy quyền:** Android app mở Custom Tabs điều hướng tới `https://www.linkedin.com/oauth/v2/authorization` với `redirect_uri=https://api.yourdomain.com/auth/linkedin/callback` và tham số `state` (để chống tấn công CSRF).
+  1. **Khởi tạo ủy quyền:** Android app mở Custom Tabs điều hướng tới `https://www.linkedin.com/oauth/v2/authorization` với `redirect_uri=https://api.yourdomain.com/auth/linkedin/callback` (HTTPS URL tới BFF) và tham số `state` (để chống tấn công CSRF).
   2. **Callback HTTPS từ LinkedIn về BFF:** Người dùng đăng nhập và xác nhận cấp quyền trên trình duyệt. Máy chủ xác thực LinkedIn chuyển hướng (redirect) trình duyệt trực tiếp về endpoint HTTPS của BFF kèm mã:
      `https://api.yourdomain.com/auth/linkedin/callback?code={authorization_code}&state={state}`
   3. **BFF đổi Token với LinkedIn (Server-to-Server):** Server BFF (nơi lưu giữ `LINKEDIN_CLIENT_SECRET` an toàn trong biến môi trường server, tuyệt đối không đưa vào client/APK) gửi request POST trực tiếp lên máy chủ LinkedIn:
@@ -217,16 +217,16 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
      &client_id={client_id}
      &client_secret={client_secret}
      ```
-  4. **Chuyển giao Token về Android App:** Sau khi nhận token thành công từ LinkedIn, server BFF chuyển giao token về app Android:
-     - Máy chủ BFF phản hồi HTTP 302 Redirect chuyển hướng trình duyệt về ứng dụng Android qua Deep Link / Custom Scheme (ví dụ: `com.lttbdd.socialagent://auth/linkedin/callback?token={access_token}&state={state}`) hoặc qua Android App Links (`https://socialagent.app/auth/linkedin/callback?...`).
-     - Trình duyệt Custom Tabs bắt Intent deep link và đưa app trở lại foreground. Repository lưu access token vào Android Keystore / Room DB an toàn.
+  4. **Chuyển giao Token từ BFF về Android App (Nội bộ):** Sau khi BFF nhận token thành công từ LinkedIn, server BFF chuyển giao token về app Android qua cơ chế Deep Link nội bộ (BFF phản hồi HTTP 302 Redirect về `com.lttbdd.socialagent://auth/linkedin/callback?token={access_token}&state={state}` hoặc Android App Links `https://socialagent.app/auth/linkedin/callback?...`).
+     *Lưu ý kỹ thuật:* Deep Link / Custom Scheme ở bước này là cơ chế giao tiếp nội bộ giữa BFF server và App Android, **không phải** là Callback Redirect URI đăng ký trên LinkedIn Portal.
+  5. **Lưu trữ bảo mật:** Trình duyệt Custom Tabs bắt Intent deep link và đưa app trở lại foreground. Repository lưu access token vào Android Keystore / Room DB an toàn.
 
 #### Bảng so sánh hai luồng OAuth của LinkedIn
 
 | Tiêu chí | Luồng A: Native PKCE (`/oauth/native-pkce/`) | Luồng B: Standard OAuth (`/oauth/v2/`) qua BFF |
 |---|---|---|
 | **Endpoint cấp mã** | `https://www.linkedin.com/oauth/native-pkce/authorization` | `https://www.linkedin.com/oauth/v2/authorization` |
-| **Kiểu Redirect URI** | Loopback IP (`http://127.0.0.1:{port}/callback`) | URL HTTPS về server BFF (`https://api.yourdomain.com/.../callback`) *(App nhận token từ BFF qua Deep Link ở bước kết thúc)* |
+| **Kiểu Redirect URI** | Loopback IP (`http://127.0.0.1:{port}/callback`) | URL HTTPS về server BFF (`https://api.yourdomain.com/.../callback`) *(App nhận token từ BFF qua Deep Link ở bước kết thúc nội bộ)* |
 | **Yêu cầu Client Secret** | ❌ **Không** (Trao đổi bằng `code_verifier`) | ✅ **Bắt buộc** (Phải ủy quyền và giữ secret tại Backend/BFF) |
 | **Điều kiện kích hoạt** | Cần liên hệ **LinkedIn Support duyệt bật cờ Native PKCE** | Kích hoạt sẵn ngay khi tạo App trên Developer Portal |
 | **Phù hợp đồ án** | Tối ưu khi đã được LinkedIn duyệt cờ Native PKCE | Dùng dự phòng nếu chưa kịp duyệt cờ PKCE từ LinkedIn |
@@ -249,13 +249,16 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
      - Màn hình "Kênh của tôi" (F1) và màn hình Soạn bài/Duyệt bài (F4) hiển thị Badge cảnh báo: *"Phiên kết nối LinkedIn đã hết hạn (chu kỳ 60 ngày). Vui lòng kết nối lại"*.
      - Nút "Kết nối lại" (Re-connect) kích hoạt mở lại Custom Tabs. Do trình duyệt hệ thống thường vẫn lưu phiên đăng nhập của người dùng trên web LinkedIn, người dùng chỉ cần xác nhận 1 chạm (Single-tap Consent) để cấp mã `code` mới và nhận lại Access Token 60 ngày mới mà không phải gõ lại mật khẩu.
 3. **Phương án Dự phòng khi được cấp Programmatic Refresh Token (Nếu được duyệt Partner Tier):**
-   - **Ràng buộc Client Secret bắt buộc:** Theo tài liệu chính thức của LinkedIn OAuth 2.0, endpoint làm mới token (`POST /oauth/v2/accessToken`) khi dùng `grant_type=refresh_token` **bắt buộc phải có cả `client_id` và `client_secret`**.
+   > [!IMPORTANT]
+   > **Yêu cầu bắt buộc `client_secret` khi Refresh Token:**
+   > Theo tài liệu chính thức của LinkedIn OAuth 2.0 (`POST /oauth/v2/accessToken` với `grant_type=refresh_token`), request làm mới token **bắt buộc phải truyền cả `client_id` và `client_secret`**.
+   > Vì ứng dụng Android là Public Client không được giữ `client_secret`, **request refresh token này BẮT BUỘC phải do máy chủ BFF thực hiện** (nơi lưu giữ `client_secret` an toàn phía server), tuyệt đối không gọi trực tiếp từ Android client.
+
    - **Thực thi hoàn toàn phía Server/BFF:**
-     - Vì ứng dụng Android là Public Client và không được giữ `client_secret`, **app Android tuyệt đối không tự gọi trực tiếp endpoint refresh của LinkedIn**.
-     - **BFF đảm nhiệm request này:** Khi token sắp hết hạn (ví dụ trước 7 ngày), app Android gửi yêu cầu làm mới ngầm đến server BFF (ví dụ: `POST https://api.yourdomain.com/auth/linkedin/refresh`) kèm định danh phiên hoặc refresh token mã hóa.
+     - Khi token sắp hết hạn (ví dụ trước 7 ngày), app Android gửi yêu cầu làm mới ngầm đến server BFF (ví dụ: `POST https://api.yourdomain.com/auth/linkedin/refresh`) kèm định danh phiên hoặc refresh token mã hóa.
      - Server BFF thực hiện POST request trực tiếp lên LinkedIn với `client_secret` được giữ an toàn phía server:
        ```http
-       POST https://www.linkedin.com/oauth/v2/accessToken
+       POST https://api.linkedin.com/oauth/v2/accessToken
        Content-Type: application/x-www-form-urlencoded
 
        grant_type=refresh_token

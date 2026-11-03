@@ -16,14 +16,16 @@ enum class ChannelCapability { PUBLISH, READ_COMMENTS, REPLY, MENTION, METRICS }
 
 ### Bảng ma trận khả năng của từng kênh (Capability Matrix)
 
-| Khả năng (`ChannelCapability`) | Facebook Page (Meta Graph API v20.0+) | LinkedIn Organization (Company Page) | LinkedIn Member (Trang cá nhân) |
+> *Ghi chú về định nghĩa:* `ChannelCapability` bao gồm 5 giá trị: `PUBLISH`, `READ_COMMENTS`, `REPLY`, `MENTION`, `METRICS`. Số lượng người theo dõi (`followersCount`) là trường dữ liệu được gán kèm trong thông tin tài khoản hoặc truy vấn qua `METRICS`, không phải một hằng số enum riêng biệt.
+
+| Khả năng (`ChannelCapability`) | Facebook Page (Meta Graph API v26.0) | LinkedIn Organization (Company Page) | LinkedIn Member (Trang cá nhân) |
 |---|---|---|---|
-| **`PUBLISH` (Đăng bài)** | ✅ **Có** (Text, ảnh đơn/đa ảnh, link) qua Page Access Token | ✅ **Có** (Text, ảnh, article link, media URN) qua Org API | ✅ **Có** (Text, ảnh, article link) qua Share on LinkedIn |
+| **`PUBLISH` (Đăng bài)** | ✅ **Có** (Text, link, ảnh đơn qua `/{page-id}/photos`, đa ảnh qua `attached_media`) | ✅ **Có** (Text, link, ảnh đơn & đa ảnh `multiImage` qua Posts API) | ✅ **Có** (Text, link, ảnh đơn qua Share on LinkedIn) |
 | **`READ_COMMENTS` (Đọc comment)** | ✅ **Có** (Comment cấp 1, reply cấp 2, paging limit/offset) | ✅ **Có** (Đọc comment và reaction qua Community Management API) | ❌ **Không** (Không khả dụng với quyền hiện có của app; quyền đọc comment của member bị hạn chế) |
 | **`REPLY` (Trả lời comment)** | ✅ **Có** (Gửi reply comment dưới tư cách Page) | ✅ **Có** (Gửi reply comment dưới tư cách Organization URN) | ❌ **Không** (Không khả dụng với quyền hiện có của app; phụ thuộc quyền đọc comment) |
 | **`MENTION` (Nhắc tên)** | ⚠️ **Một phần** (Chỉ mention được các **Page khác** qua cú pháp `@[page_id]`; Meta cấm mention trang cá nhân) | ✅ **Có** (Hỗ trợ mention cả Organization `@[Tên Org](urn:li:organization:{id})` và Member `@[Tên](urn:li:person:{id})` khi có URN hợp lệ) | ✅ **Có** (Hỗ trợ chèn Organization và Member URN tương tự khi đăng bài cá nhân) |
 | **`METRICS` (Số liệu)** | ✅ **Có** (Reactions, Comments, Shares, Impressions từ Insights) | ✅ **Có** (Likes, Comments, Shares, Impressions, Clicks, Engagement Rate) | ⚠️ **Hạn chế** (Chỉ số liệu tương tác bề mặt cơ bản) |
-| **`FOLLOWER_COUNT`** | ✅ `followers_count` & `fan_count` qua `/{page-id}` | ✅ `firstDegreeSize` qua `/networkSizes` | ⚠️ Lấy qua `connectionsSummary` (yêu cầu quyền) |
+| **Số follower (`followersCount`)** *(Dữ liệu kèm `METRICS`)* | ✅ `followers_count` & `fan_count` qua `/{page-id}` | ✅ `firstDegreeSize` qua `/networkSizes` | ❌ **Không hỗ trợ** (LinkedIn không mở API công khai đọc follower cá nhân; số kết nối không tương đương follower và API kết nối bị khóa cho Compliance) |
 | **Idempotency native** | ❌ Không hỗ trợ native (App tự quản lý qua Room DB) | ✅ Có hỗ trợ qua header `X-RestLi-Idempotency-Key` | ✅ Có hỗ trợ qua header `X-RestLi-Idempotency-Key` |
 | **Tập hợp gán cho `ChannelAccount.capabilities` (F1)** | `setOf(PUBLISH, READ_COMMENTS, REPLY, MENTION, METRICS)` | `setOf(PUBLISH, READ_COMMENTS, REPLY, MENTION, METRICS)` | `setOf(PUBLISH, MENTION)` |
 
@@ -31,43 +33,97 @@ enum class ChannelCapability { PUBLISH, READ_COMMENTS, REPLY, MENTION, METRICS }
 
 ## 2. Kênh Facebook Page (Meta Graph API)
 
-### 2.1. Luồng OAuth 2.0 trên Android & Quản lý Token (Public Client không giữ Secret)
+> [!IMPORTANT]
+> **Chính sách Phiên bản & Vòng đời Meta Graph API (Version Sunset Policy):**
+> - Meta áp dụng chu kỳ phát hành phiên bản Graph API định kỳ khoảng 6 tháng một lần, mỗi phiên bản có thời gian hỗ trợ chính thức tối đa khoảng **2 năm (24 tháng)** trước khi bị ngừng hoạt động (sunset).
+> - **Tình trạng v20.0:** Graph API `v20.0` (phát hành ngày 21/05/2024) đã chính thức **hết hạn (sunset) vào ngày 24/09/2026**. Sau ngày này, các request gửi tới `/v20.0/` sẽ bị Meta từ chối hoặc cưỡng chế nâng lên phiên bản mặc định còn hiệu lực của App.
+> - **Phiên bản áp dụng chuẩn hóa:** Toàn bộ tài liệu được kiểm tra và đồng bộ vào ngày **03/11/2026** với phiên bản mới nhất đang Active là **`v26.0`** (phát hành ngày 29/07/2026).
+> - **Thay đổi kỹ thuật quan trọng trên v26.0:** Các chỉ số insights cũ như `post_engaged_users` và `post_impressions` đã bị gỡ bỏ hoàn toàn (gây lỗi HTTP 400 Bad Request nếu cố gọi); hệ thống chuyển sang sử dụng metric hợp lệ mới **`post_media_view`** và các summary connection trực tiếp (`reactions.summary`, `comments.summary`, `shares`).
+> - **Quy ước triển khai:** Trong mã nguồn Kotlin của Mảng B, version này cần được định nghĩa thành hằng số tập trung (ví dụ: `private const val FACEBOOK_GRAPH_API_VERSION = "v26.0"`) để dễ bảo trì và nâng cấp định kỳ.
+
+### 2.1. Luồng OAuth 2.0 trên Android & Quản lý Token (Kiến trúc Public Client)
+
 - **Chuẩn kiến trúc:** Tuân thủ RFC 8252 (OAuth 2.0 for Native Apps) — ứng dụng Android là **Public Client**, **tuyệt đối không nhúng `client_secret` (App Secret)** vào app hay APK.
-- **Thư viện đề xuất:** `net.openid:appauth:0.11.1` (AppAuth-Android) chạy trên Android Custom Tabs (trình duyệt hệ thống), bảo mật và an toàn hơn WebView nhúng.
-- **Cơ chế bảo vệ:** PKCE (Proof Key for Code Exchange) với `code_challenge_method = S256` kết hợp cùng **Android Key Hash (SHA-1 fingerprint)** và Package Name đăng ký trên Meta Developer Portal để định danh app.
-- **Endpoints:**
-  - Authorization Endpoint: `https://www.facebook.com/v20.0/dialog/oauth`
-  - Token Endpoint: `https://graph.facebook.com/v20.0/oauth/access_token`
-  - Redirect URI: `com.lttbdd.socialagent://oauth/facebook` (hoặc `fb<APP_ID>://authorize`)
+- **Trạng thái xác minh của luồng Custom Tabs + PKCE thủ công:**
+  > [!WARNING]
+  > **Trạng thái: Chưa xác minh chính thức từ tài liệu Meta Graph API (Cần kiểm thử thực tế)**
+  > - Theo tài liệu chính thức của Meta về [Manual Login Flow](https://developers.facebook.com/documentation/facebook-login/guides/advanced/manual-flow), endpoint đổi token `GET /oauth/access_token` tiêu chuẩn yêu cầu bắt buộc phải có `client_secret` bên cạnh `code`.
+  > - Mặc dù thư viện `AppAuth-Android` hỗ trợ PKCE ở phía client, tài liệu Graph API hiện hành chưa xác nhận chính thức việc chấp nhận bỏ qua `client_secret` chỉ bằng `code_verifier` cho ứng dụng di động thông thường mà không có backend hỗ trợ.
+  > - Do đó, nhóm phân tích rõ hai phương án triển khai khả thi dưới đây:
 
-#### Trao đổi Token bằng PKCE (Không dùng Client Secret):
-```http
-GET https://graph.facebook.com/v20.0/oauth/access_token
-    ?client_id={app-id}
-    &redirect_uri={redirect-uri}
-    &code={authorization-code}
-    &code_verifier={code-verifier}
-```
-*Ghi chú:* Meta Graph API hỗ trợ xác thực mã ủy quyền trực tiếp qua `code_verifier` của PKCE mà không yêu cầu `client_secret` đối với các client native/mobile.
+#### Phương án 1 (Khuyến nghị chuẩn của Meta): Sử dụng Meta Android SDK (`com.facebook.android:facebook-login`)
+Đây là phương án được Meta hỗ trợ chính thức và an toàn nhất cho nền tảng Android:
+- **Cơ chế xác thực không Secret:** Meta SDK không sử dụng `client_secret`. Thay vào đó, Meta xác thực danh tính ứng dụng thông qua **App ID + Package Name (`com.lttbdd.socialagent`) + Android Key Hash (SHA-1 fingerprint)** đã đăng ký trên Meta App Dashboard.
+- **Trải nghiệm đăng nhập (UX):** Tự động kích hoạt App Switch (mở trực tiếp app Facebook đã cài sẵn trên máy) hoặc mở Chrome Custom Tabs nếu máy chưa cài app, giúp người dùng đăng nhập 1 chạm.
+- **Tự động quản lý vòng đời Token:** Meta SDK tự động lưu cache an toàn và thực hiện làm mới ngầm (rolling refresh) cho Access Token khi người dùng mở app trong chu kỳ 90 ngày, **hoàn toàn không cần gọi thủ công endpoint `fb_exchange_token`**.
 
-#### Vòng đời Token (Token Lifecycle):
+#### Phương án 2: Tự xây dựng luồng Web OAuth (AppAuth / Custom Tabs) kèm BFF
+
+Nếu nhóm lựa chọn không nhúng Facebook SDK để giữ app nhẹ và dùng chung kiến trúc AppAuth với LinkedIn:
+
+1. **Khởi tạo ủy quyền (Authorization Request):**
+   App mở Android Custom Tabs điều hướng tới Meta Dialog OAuth với đầy đủ tham số và mã ngẫu nhiên `state` chống tấn công CSRF:
+   ```http
+   GET https://www.facebook.com/v26.0/dialog/oauth?
+       client_id={app-id}
+       &redirect_uri=com.lttbdd.socialagent://oauth/facebook
+       &response_type=code
+       &scope=public_profile,pages_show_list,pages_manage_posts,pages_read_engagement,pages_manage_engagement,pages_read_user_content,read_insights
+       &state={secure-random-state}
+       &code_challenge={code-challenge}
+       &code_challenge_method=S256
+   ```
+2. **Xử lý Callback & Kiểm tra State (Validation):**
+   - Trình duyệt chuyển hướng về Custom Scheme: `com.lttbdd.socialagent://oauth/facebook?code={authorization-code}&state={returned-state}`.
+   - **Bắt buộc:** App kiểm tra `returned-state == secure-random-state`. Nếu không khớp hoặc thiếu `state`, app hủy bỏ phiên đăng nhập ngay lập tức để ngăn ngừa tấn công chiếm quyền mã ủy quyền.
+3. **Trao đổi Token (Token Exchange):**
+   - *Luồng qua BFF (Khuyến nghị bảo mật):* App gửi `code` về máy chủ BFF qua HTTPS. Server BFF giữ `client_secret` trong biến môi trường, gọi `https://graph.facebook.com/v26.0/oauth/access_token` để lấy User Access Token và nâng cấp thành Long-lived Token, sau đó cấp phát an toàn về cho app qua kênh back-channel.
+   - *Luồng PKCE trực tiếp (Thử nghiệm):* Nếu Meta Developer App hỗ trợ PKCE trực tiếp mà không cần secret:
+     ```http
+     GET https://graph.facebook.com/v26.0/oauth/access_token
+         ?client_id={app-id}
+         &redirect_uri=com.lttbdd.socialagent://oauth/facebook
+         &code={authorization-code}
+         &code_verifier={code-verifier}
+     ```
+
+#### So sánh Vòng đời Token giữa 2 Phương án (Token Lifecycle):
+
+**1. Đối với Phương án 1 (Meta Android SDK — Tự động hoàn toàn phía Client):**
 ```
-[User Login trên Custom Tabs]
+[User Login qua Meta SDK (App Switch / Custom Tabs)]
        │
-       ▼ (Trả authorization code)
-[App đổi lấy User Short-lived Access Token bằng PKCE code_verifier] (~1 - 2 giờ)
+       ▼ (SDK tự xử lý xác thực qua App ID + Key Hash, trả AccessToken object)
+[User Access Token] (Quản lý ngầm bởi SDK Tracker, tự động rolling refresh đến 90 ngày khi mở app)
        │
-       ▼ (Gọi /oauth/access_token?grant_type=fb_exchange_token&client_id={app-id}&fb_exchange_token=...)
-[User Long-lived Access Token] (~60 ngày)
-       │
-       ▼ (Gọi GET /me/accounts với User Long-lived Token)
+       ▼ (Gọi GET /v26.0/me/accounts trực tiếp từ App với User Access Token)
 [Page Access Token (Long-lived / Never-expiring)]
 ```
-* **Page Access Token:** Khi sinh ra từ một *User Long-lived Token*, Page Access Token này **không có thời hạn hết hạn (never expires)**, trừ khi:
+> *Ghi chú:* Khi sử dụng Meta SDK, token cấp cho app di động mặc định đã là Long-lived Token (~60 ngày) và được SDK tự động làm mới ngầm khi người dùng tương tác trong vòng 90 ngày. Ứng dụng **hoàn toàn không cần gọi endpoint `fb_exchange_token`** và không cần phụ thuộc vào máy chủ trung gian BFF.
+
+**2. Đối với Phương án 2 (Web OAuth thủ công qua Custom Tabs + BFF):**
+```
+[User Login trên Chrome Custom Tabs]
+       │
+       ▼ (Trình duyệt chuyển hướng về com.lttbdd.socialagent://oauth/facebook)
+[Mã Authorization Code] (App gửi code về máy chủ BFF qua HTTPS back-channel)
+       │
+       ▼ (BFF gọi GET /v26.0/oauth/access_token với client_secret để đổi code)
+[User Short-lived Access Token] (~1 - 2 giờ)
+       │
+       ▼ (BFF gọi GET /v26.0/oauth/access_token?grant_type=fb_exchange_token&client_secret=... nâng cấp)
+[User Long-lived Access Token] (~60 ngày)
+       │
+       ▼ (BFF hoặc App gọi GET /v26.0/me/accounts với User Long-lived Token)
+[Page Access Token (Long-lived / Never-expiring)]
+```
+> *Ghi chú:* Sơ đồ có bước gọi `fb_exchange_token` **chỉ áp dụng cho Phương án 2**. Do tham số `grant_type=fb_exchange_token` yêu cầu bắt buộc phải có `client_secret`, các bước từ đổi code đến nâng cấp token phải được thực hiện trên máy chủ BFF để đảm bảo bí mật không bị lộ ra file APK.
+
+* **Đặc tính của Page Access Token:** Khi sinh ra từ một *User Long-lived Token* (cả 2 phương án), Page Access Token này **không có thời hạn hết hạn (never expires)**, trừ khi:
   1. Người dùng đổi mật khẩu tài khoản Facebook.
   2. Người dùng gỡ quyền của App trong trang Cài đặt bảo mật Facebook.
   3. Người dùng bị xóa vai trò quản trị viên (Admin/Editor) khỏi Page.
-* **Cơ chế kiểm tra & làm mới an toàn (F1):**
+* **Cơ chế kiểm tra an toàn (F1):**
   - **Không gọi endpoint `/debug_token`** vì endpoint này yêu cầu App Secret (`app_id|app_secret`).
   - Thay vào đó, app kiểm tra token bằng cách gọi trực tiếp `GET /me?access_token={token}` hoặc `GET /me/accounts?access_token={token}`.
   - Khi token hết hạn hoặc quyền bị thu hồi, Graph API sẽ trả về lỗi HTTP 401 kèm mã lỗi `OAuthException` (mã lỗi `190` - Invalid/Expired Token).
@@ -88,11 +144,11 @@ GET https://graph.facebook.com/v20.0/oauth/access_token
 ### 2.3. Các Endpoint chính
 1. **Lấy danh sách Page và Page Token (F1):**
    ```http
-   GET https://graph.facebook.com/v20.0/me/accounts?fields=id,name,access_token,category,tasks
+   GET https://graph.facebook.com/v26.0/me/accounts?fields=id,name,access_token,category,tasks
    ```
 2. **Đăng bài viết kèm nội dung văn bản (F5):**
    ```http
-   POST https://graph.facebook.com/v20.0/{page-id}/feed
+   POST https://graph.facebook.com/v26.0/{page-id}/feed
    Content-Type: application/json
 
    {
@@ -100,9 +156,9 @@ GET https://graph.facebook.com/v20.0/oauth/access_token
      "access_token": "{page-access-token}"
    }
    ```
-3. **Đăng bài viết kèm ảnh (F5):**
+3. **Đăng bài viết kèm ảnh đơn (F5):**
    ```http
-   POST https://graph.facebook.com/v20.0/{page-id}/photos
+   POST https://graph.facebook.com/v26.0/{page-id}/photos
    Content-Type: multipart/form-data
 
    message="Nội dung bài viết kèm ảnh..."
@@ -110,6 +166,35 @@ GET https://graph.facebook.com/v20.0/oauth/access_token
    access_token={page-access-token}
    ```
    *Trả về:* `{"id": "photo_id", "post_id": "{page-id}_{post-id}"}`.
+
+4. **Đăng bài viết đa ảnh (Multi-photo Post — F5):**
+   - **Bước 1: Tải từng ảnh ở chế độ chưa công khai (`published=false`):**
+     ```http
+     POST https://graph.facebook.com/v26.0/{page-id}/photos
+     Content-Type: multipart/form-data
+
+     published=false
+     source=@/path/to/image1.png
+     access_token={page-access-token}
+     ```
+     *Nhận về:* `{"id": "{photo_id_1}"}`. Lặp lại cho từng ảnh để thu thập danh sách `[photo_id_1, photo_id_2, ...]`.
+   - **Bước 2: Tạo bài post trên Feed đính kèm mảng `attached_media`:**
+     ```http
+     POST https://graph.facebook.com/v26.0/{page-id}/feed
+     Content-Type: application/json
+
+     {
+       "message": "Nội dung bài viết kèm album ảnh...",
+       "attached_media": [
+         {"media_fbid": "{photo_id_1}"},
+         {"media_fbid": "{photo_id_2}"}
+       ],
+       "access_token": "{page-access-token}"
+     }
+     ```
+     *Nhận về:* `{"id": "{page-id}_{post-id}"}`.
+   - *Lưu ý kỹ thuật:* Tối đa khoảng 30 ảnh trong một bài post; dung lượng mỗi file ảnh tối đa 4 MB (multipart upload). Trong Milestone 1, model `PostDraft` ưu tiên hỗ trợ `imageUri` (ảnh đơn), quy trình đa ảnh được chuẩn hóa sẵn sàng cho giai đoạn mở rộng tiếp theo.
+
    > [!WARNING]
    > **F5 — Idempotency phía app (Facebook không có header native) và lỗ hổng bản giả**
    >
@@ -121,13 +206,14 @@ GET https://graph.facebook.com/v20.0/oauth/access_token
    > 3. Cùng một key: cả hai vẫn đi qua `delay` như thể đăng hai lần; `getOrPut` chỉ giữ một entry nên unit test gọi **nối tiếp** vẫn xanh.
    >
    > Khi sửa: `Mutex` + double-check key trong lock; cấp `remoteId` bằng bộ đếm nguyên tử (không dùng `size + 1`); thêm test `async` cùng key và khác key với `latencyMillis > 0`.
-4. **Lấy danh sách comment của bài viết (F6):**
+
+5. **Lấy danh sách comment của bài viết (F6):**
    ```http
-   GET https://graph.facebook.com/v20.0/{post-id}/comments?fields=id,from,message,created_time,comment_count,parent&limit=50&access_token={page-access-token}
+   GET https://graph.facebook.com/v26.0/{post-id}/comments?fields=id,from,message,created_time,comment_count,parent&limit=50&access_token={page-access-token}
    ```
-5. **Trả lời comment (F6):**
+6. **Trả lời comment (F6):**
    ```http
-   POST https://graph.facebook.com/v20.0/{comment-id}/comments
+   POST https://graph.facebook.com/v26.0/{comment-id}/comments
    Content-Type: application/json
 
    {
@@ -135,13 +221,17 @@ GET https://graph.facebook.com/v20.0/oauth/access_token
      "access_token": "{page-access-token}"
    }
    ```
-6. **Lấy số liệu bài viết (F7):**
+7. **Lấy số liệu bài viết (F7):**
    ```http
-   GET https://graph.facebook.com/v20.0/{post-id}?fields=shares,comments.summary(true),reactions.summary(true),insights.metric(post_impressions,post_engaged_users)&access_token={page-access-token}
+   GET https://graph.facebook.com/v26.0/{post-id}?fields=shares,comments.summary(total_count),reactions.summary(total_count),insights.metric(post_media_view)&access_token={page-access-token}
    ```
-7. **Lấy số follower của Page (F7):**
+   *Lưu ý thay đổi trường dữ liệu trên Graph API v26.0:*
+   - Các chỉ số insights cũ như `post_engaged_users` và `post_impressions` đã chính thức bị **deprecated và gỡ bỏ hoàn toàn** trên Graph API v21+ đến v26.0. Nếu gửi request chứa các metric cũ này, Meta sẽ trả về lỗi HTTP 400 Bad Request: `(#100) The value must be a valid insights metric` làm thất bại toàn bộ cuộc gọi.
+   - Để lấy số lượt hiển thị/xem trên v26.0, sử dụng metric thay thế chuẩn là **`post_media_view`**.
+   - Các tương tác like/reaction, comment, share được lấy trực tiếp và chính xác qua summary connection: `reactions.summary(total_count)`, `comments.summary(total_count)` và `shares`.
+8. **Lấy số follower của Page (F7):**
    ```http
-   GET https://graph.facebook.com/v20.0/{page-id}?fields=followers_count,fan_count&access_token={page-access-token}
+   GET https://graph.facebook.com/v26.0/{page-id}?fields=followers_count,fan_count&access_token={page-access-token}
    ```
 
 ### 2.4. Giới hạn & Quy định kiểm duyệt (App Review)
@@ -150,18 +240,22 @@ GET https://graph.facebook.com/v20.0/oauth/access_token
   - Upload trực tiếp file binary (multipart upload): Tối đa **4 MB**.
   - Upload qua URL ảnh công khai: Tối đa **10 MB**.
   - Định dạng hỗ trợ: JPEG, PNG, GIF, WebP.
-- **Rate Limit (Giới hạn tần suất gọi):** Áp dụng cơ chế **Business Use Case (BUC) Rate Limiting**:
-  - $4.800$ cuộc gọi API / mỗi Page / mỗi giờ.
-  - Header phản hồi: `X-Business-Use-Case-Usage` hoặc `X-App-Usage` (chứa tỉ lệ % `call_count`, `cpu_time`, `total_time`).
-  - Mã lỗi khi chạm trần: Mã `4` (App rate limit) hoặc `17` (User rate limit) $\rightarrow$ Map sang `PublishResult.RetryableError` kèm thuật toán Exponential Backoff.
+- **Rate Limit (Giới hạn tần suất gọi):** Áp dụng cơ chế **Business Use Case (BUC) Rate Limiting** (và Platform Rate Limiting theo token):
+  - **Bản chất giới hạn động (Dynamic Threshold):** Theo tài liệu chính thức của Meta về [Graph API Rate Limiting](https://developers.facebook.com/docs/graph-api/overview/rate-limiting/), không có hạn ngạch cuộc gọi cố định cho tất cả các Page. Ngưỡng giới hạn được tính toán linh hoạt theo cửa sổ trượt (rolling window) dựa trên số lượng người dùng tương tác với Page (Page Engaged Users) và loại use-case cụ thể.
+  - **Cơ chế theo dõi tài nguyên:** Ứng dụng theo dõi trực tiếp mức tiêu thụ tài nguyên qua header HTTP trả về:
+    - `X-Business-Use-Case-Usage`: Chứa đối tượng JSON biểu thị tỉ lệ % đã sử dụng (`call_count`, `cpu_time`, `total_time` tính trên ngưỡng 100%) và thời gian chờ phục hồi (`estimated_time_to_regain_access`).
+    - `X-App-Usage`: Biểu diễn % tài nguyên cấp độ ứng dụng.
+  - **Mã lỗi khi chạm trần:** Trả về HTTP 403 / 400 kèm mã lỗi `4` (App rate limit), `17` (User/Page rate limit) hoặc mã `32` $\rightarrow$ Map sang `PublishResult.RetryableError` kèm thuật toán Exponential Backoff và thời gian chờ theo header phản hồi.
 - **Quyền nào cần App Review (Meta App Review):**
   - *Default Access (Tự động có, không cần review):* Chỉ có `public_profile` và `email`.
   - *Advanced Access (BẮT BUỘC App Review nếu dùng công chúng):* Tất cả các quyền phục vụ tính năng chính: `pages_show_list`, `pages_manage_posts`, `pages_read_engagement`, `pages_read_user_content`, `pages_manage_engagement`, `read_insights`.
   - *Điều kiện qua App Review:* Bắt buộc phải có **Business Verification** (Xác minh giấy phép doanh nghiệp) và video screencast chứng minh luồng ứng dụng thực tế.
 - **Chế độ Development dùng được tới đâu:**
-  - **Phạm vi hoạt động:** Ở chế độ **Development Mode**, mọi quyền nâng cao (`pages_manage_posts`, `read_insights`, v.v.) hoạt động **100% đầy đủ và bình thường**, hoàn toàn **KHÔNG cần kiểm duyệt App Review hay xác minh doanh nghiệp**.
-  - **Giới hạn người dùng:** Chỉ các tài khoản Facebook có vai trò trong ứng dụng (*Administrators*, *Developers*, hoặc *Testers* trong mục *App Roles* trên Meta Dashboard) và các Page do các tài khoản này sở hữu mới có thể đăng nhập và gọi API. Người dùng vãng lai ngoài danh sách sẽ bị Meta chặn đăng nhập.
-  - **Kết luận cho đồ án:** Nhóm hoàn thành toàn bộ đồ án ở **Development Mode** bằng cách thêm tài khoản Facebook của các thành viên nhóm vào danh sách Testers/Developers.
+  - **Phạm vi và Điều kiện hoạt động:** Ở chế độ **Development Mode**, các quyền nâng cao (`pages_manage_posts`, `read_insights`, v.v.) chỉ hoạt động **trong phạm vi tài khoản nội bộ và có điều kiện ràng buộc**, cụ thể:
+    1. **Ràng buộc tài khoản (App Roles):** Chỉ các tài khoản Facebook có vai trò chính thức trong mục *App Roles* trên Meta Dashboard (*Administrators*, *Developers*, hoặc *Testers*) mới có thể đăng nhập và cấp quyền. Người dùng vãng lai bên ngoài sẽ bị Meta từ chối.
+    2. **Ràng buộc vai trò trên Page (Page Tasks):** Tài khoản thử nghiệm phải nắm vai trò quản trị hoặc nhiệm vụ phân quyền cụ thể (*Page Tasks*: ví dụ `CREATE_CONTENT`, `MANAGE`) trên chính Facebook Page được thử nghiệm.
+    3. **Ràng buộc kích hoạt tính năng:** Sản phẩm/tính năng tương ứng (ví dụ: *Pages API* hoặc *Facebook Login for Business*) phải được cấu hình trong App Dashboard.
+    4. **Giới hạn cần lưu ý:** Một số quyền nhạy cảm cao (như Live Video hoặc dữ liệu cá nhân chi tiết) vẫn có thể đòi hỏi xác minh doanh nghiệp ngay trong Development Mode. Với phạm vi đồ án (F1, F5, F6, F7 trên Page thử nghiệm của nhóm), chế độ Development Mode đáp ứng đủ yêu cầu phát triển mà chưa cần mở công chúng.
 
 ---
 
@@ -217,16 +311,44 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
      &client_id={client_id}
      &client_secret={client_secret}
      ```
-  4. **Chuyển giao Token từ BFF về Android App (Nội bộ):** Sau khi BFF nhận token thành công từ LinkedIn, server BFF chuyển giao token về app Android qua cơ chế Deep Link nội bộ (BFF phản hồi HTTP 302 Redirect về `com.lttbdd.socialagent://auth/linkedin/callback?token={access_token}&state={state}` hoặc Android App Links `https://socialagent.app/auth/linkedin/callback?...`).
-     *Lưu ý kỹ thuật:* Deep Link / Custom Scheme ở bước này là cơ chế giao tiếp nội bộ giữa BFF server và App Android, **không phải** là Callback Redirect URI đăng ký trên LinkedIn Portal.
-  5. **Lưu trữ bảo mật:** Trình duyệt Custom Tabs bắt Intent deep link và đưa app trở lại foreground. Repository lưu access token vào Android Keystore / Room DB an toàn.
+  4. **BFF chuyển hướng về App bằng Mã Xác thực Dùng một lần (One-Time Exchange Code):**
+     > [!CAUTION]
+     > **Nguyên tắc bảo vệ Bearer Token (RFC 6750):**
+     > Tuyệt đối **KHÔNG truyền `access_token` hoặc `refresh_token` trong URL / Query Parameters của Deep Link** (`?token=...`). Việc để bearer token trong URL sẽ làm lộ token vào log hệ thống Android (Logcat), lịch sử trình duyệt, telemetry hoặc có thể bị các ứng dụng độc hại khác cài trên thiết bị đánh cắp khi đăng ký trùng Custom Scheme.
+     
+     - Sau khi nhận và lưu trữ tạm thời phiên token từ LinkedIn, máy chủ BFF sinh một mã dùng một lần (**One-Time Exchange Code** / `exchange_code`), có thời gian sống cực ngắn (TTL $\le 60$ giây) và được gắn chặt với tham số `state` / session ID của người dùng.
+     - Server BFF phản hồi HTTP 302 Redirect chuyển hướng trình duyệt về ứng dụng Android qua Deep Link nội bộ:
+       `com.lttbdd.socialagent://oauth/linkedin/callback?exchange_code={one_time_code}&state={state}`
+       (hoặc Android App Links `https://socialagent.app/oauth/linkedin/callback?exchange_code={one_time_code}&state={state}`).
+     - *Lưu ý kỹ thuật:* Deep Link ở bước này là cơ chế điều hướng nội bộ giữa BFF server và App Android, **không phải** là Callback Redirect URI đăng ký trên LinkedIn Portal.
+  5. **Đổi Token an toàn qua Kênh Bảo mật Back-Channel (App ↔ BFF) & Lưu trữ:**
+     - Trình duyệt Custom Tabs nhận redirect và đóng lại; hệ điều hành Android kích hoạt Activity xử lý callback của app.
+     - App kiểm tra đối chiếu tham số `state` nhận được với `state` đã lưu cục bộ trước khi mở browser để ngăn chặn tấn công CSRF.
+     - Nếu `state` hợp lệ, App gửi ngay một request `POST` qua kết nối bảo mật HTTPS trực tiếp tới endpoint trao đổi của BFF:
+       ```http
+       POST https://api.yourdomain.com/auth/linkedin/token
+       Content-Type: application/json
+
+       {
+         "exchange_code": "{one_time_code}",
+         "state": "{state}"
+       }
+       ```
+     - Máy chủ BFF kiểm tra `exchange_code`, thu hồi (hủy) ngay mã này để đảm bảo chỉ dùng đúng 1 lần (replay attack prevention), và trả về payload JSON chứa access token qua HTTPS response body:
+       ```json
+       {
+         "access_token": "AQXN...",
+         "expires_in": 5184000
+       }
+       ```
+     - Repository lưu access token vào Android Keystore / Room DB an toàn thông qua `EncryptedSharedPreferences`.
 
 #### Bảng so sánh hai luồng OAuth của LinkedIn
 
 | Tiêu chí | Luồng A: Native PKCE (`/oauth/native-pkce/`) | Luồng B: Standard OAuth (`/oauth/v2/`) qua BFF |
 |---|---|---|
 | **Endpoint cấp mã** | `https://www.linkedin.com/oauth/native-pkce/authorization` | `https://www.linkedin.com/oauth/v2/authorization` |
-| **Kiểu Redirect URI** | Loopback IP (`http://127.0.0.1:{port}/callback`) | URL HTTPS về server BFF (`https://api.yourdomain.com/.../callback`) *(App nhận token từ BFF qua Deep Link ở bước kết thúc nội bộ)* |
+| **Kiểu Redirect URI** | Loopback IP (`http://127.0.0.1:{port}/callback`) | URL HTTPS về server BFF (`https://api.yourdomain.com/.../callback`) *(App nhận mã `exchange_code` tạm thời qua Deep Link rồi gọi POST HTTPS lấy token)* |
 | **Yêu cầu Client Secret** | ❌ **Không** (Trao đổi bằng `code_verifier`) | ✅ **Bắt buộc** (Phải ủy quyền và giữ secret tại Backend/BFF) |
 | **Điều kiện kích hoạt** | Cần liên hệ **LinkedIn Support duyệt bật cờ Native PKCE** | Kích hoạt sẵn ngay khi tạo App trên Developer Portal |
 | **Phù hợp đồ án** | Tối ưu khi đã được LinkedIn duyệt cờ Native PKCE | Dùng dự phòng nếu chưa kịp duyệt cờ PKCE từ LinkedIn |
@@ -258,7 +380,7 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
      - Khi token sắp hết hạn (ví dụ trước 7 ngày), app Android gửi yêu cầu làm mới ngầm đến server BFF (ví dụ: `POST https://api.yourdomain.com/auth/linkedin/refresh`) kèm định danh phiên hoặc refresh token mã hóa.
      - Server BFF thực hiện POST request trực tiếp lên LinkedIn với `client_secret` được giữ an toàn phía server:
        ```http
-       POST https://api.linkedin.com/oauth/v2/accessToken
+       POST https://www.linkedin.com/oauth/v2/accessToken
        Content-Type: application/x-www-form-urlencoded
 
        grant_type=refresh_token
@@ -316,7 +438,7 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
      ```
      *Nhận về:* `uploadUrl` và `image` (URN: `urn:li:image:{image-id}`).
    - Bước 2: Tải file binary ảnh lên `uploadUrl` bằng HTTP PUT (`Content-Type: image/jpeg` hoặc `image/png`).
-3. **Đăng bài viết (F5 - Hỗ trợ Idempotency native & Mention cú pháp chuẩn):**
+3. **Đăng bài viết kèm ảnh đơn (F5 - Hỗ trợ Idempotency native & Mention cú pháp chuẩn):**
    ```http
    POST https://api.linkedin.com/rest/posts
    Headers:
@@ -343,7 +465,45 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
      "lifecycleState": "PUBLISHED"
    }
    ```
-4. **Lấy danh sách comment (F6):**
+
+4. **Đăng bài viết đa ảnh (Multi-image Post — F5):**
+   - **Quy trình tải lên:** Khởi tạo `initializeUpload` và tải dữ liệu nhị phân lên `uploadUrl` cho từng ảnh (tương tự quy trình ảnh đơn) để thu thập danh sách Media URN: `[urn:li:image:{id1}, urn:li:image:{id2}, ...]`.
+   - **Đăng bài bằng thuộc tính `multiImage`:**
+     ```http
+     POST https://api.linkedin.com/rest/posts
+     Headers:
+       Authorization: Bearer {access-token}
+       Linkedin-Version: 202610
+       X-RestLi-Idempotency-Key: {idempotencyKey}
+       Content-Type: application/json
+
+     {
+       "author": "urn:li:organization:{org-id}",
+       "commentary": "Nội dung bài viết kèm nhiều hình ảnh...",
+       "visibility": "PUBLIC",
+       "distribution": {
+         "feedDistribution": "MAIN_FEED",
+         "targetEntities": [],
+         "thirdPartyDistributionChannels": []
+       },
+       "content": {
+         "multiImage": {
+           "images": [
+             { "id": "urn:li:image:{image-id-1}", "altText": "Mô tả ảnh 1" },
+             { "id": "urn:li:image:{image-id-2}", "altText": "Mô tả ảnh 2" }
+           ]
+         }
+       },
+       "lifecycleState": "PUBLISHED"
+     }
+     ```
+   - *Giới hạn kỹ thuật & Ràng buộc (theo tài liệu chính thức [Multi-image Post API](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/multiimage-post-api)):*
+     - **Số lượng ảnh:** Bắt buộc **tối thiểu 2 ảnh và tối đa 20 ảnh** (tài liệu phiên bản cũ 2023 từng giới hạn 2–9 ảnh, tài liệu phiên bản hiện hành đã nâng mức trần lên tối đa 20 ảnh).
+     - **Độ phân giải & Định dạng:** Tài liệu Images API quy định tổng độ phân giải **dưới 36.152.320 pixel** (chiều rộng $\times$ chiều cao); định dạng hỗ trợ gồm JPG, GIF, PNG.
+     - **Dung lượng file:** Con số "8 MB/ảnh" không có trong tài liệu chính thức của Images API (trạng thái: *Chưa xác minh trong tài liệu*; khuyến nghị thực tế nên giữ file dưới 8 MB - 10 MB để đảm bảo hiệu năng tải lên từ thiết bị di động).
+     - *Phạm vi Milestone 1:* Model `PostDraft` hiện ưu tiên hỗ trợ `imageUri` (ảnh đơn), cấu trúc `multiImage` được chuẩn hóa sẵn sàng cho giai đoạn mở rộng tiếp theo.
+
+5. **Lấy danh sách comment (F6):**
    *(Scope yêu cầu: `r_organization_social_feed` qua Community Management API)*
    ```http
    GET https://api.linkedin.com/rest/socialActions/{targetUrn}/comments
@@ -351,7 +511,7 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
      Authorization: Bearer {access-token}
      Linkedin-Version: 202610
    ```
-5. **Trả lời comment (F6):**
+6. **Trả lời comment (F6):**
    *(Scope yêu cầu: `w_organization_social_feed` qua Community Management API)*
    ```http
    POST https://api.linkedin.com/rest/socialActions/{targetUrn}/comments
@@ -366,7 +526,7 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
      "parentComment": "{parentCommentUrn}"
    }
    ```
-6. **Lấy số liệu bài viết (F7):**
+7. **Lấy số liệu bài viết (F7):**
    *(Scope yêu cầu: `rw_organization_admin` kèm vai trò Administrator của Organization)*
    ```http
    GET https://api.linkedin.com/rest/organizationalEntityShareStatistics?q=organizationalEntity&organizationalEntity=urn:li:organization:{org-id}&shares=List({postUrn})
@@ -375,21 +535,26 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
      Linkedin-Version: 202610
    ```
    *Trả về:* `likeCount`, `commentCount`, `shareCount`, `impressionCount`, `clickCount`.
-7. **Lấy số follower (F7):**
+8. **Lấy số follower (F7):**
    *(Scope yêu cầu: `rw_organization_admin` hoặc `r_organization_social`)*
    ```http
-   GET https://api.linkedin.com/rest/networkSizes/urn:li:organization:{org-id}?edgeType=CompanyFollowedByMember
+   GET https://api.linkedin.com/rest/networkSizes/urn:li:organization:{org-id}?edgeType=COMPANY_FOLLOWED_BY_MEMBER
    Headers:
      Authorization: Bearer {access-token}
      Linkedin-Version: 202610
    ```
    *Trả về:* `firstDegreeSize`.
+   
+   *Lưu ý về tham số `edgeType`:*
+   - Kể từ phiên bản API `202305` trở đi (bao gồm bản `202610`), LinkedIn chuyển đổi định dạng enum `edgeType` sang chuẩn **`UPPER_SNAKE_CASE`**: bắt buộc dùng **`COMPANY_FOLLOWED_BY_MEMBER`**.
+   - Giá trị dạng camelCase cũ (`CompanyFollowedByMember`) chỉ áp dụng cho các phiên bản cũ $\le 202304$ và sẽ bị từ chối trên các versioned REST API hiện hành.
 
 ### 3.4. Giới hạn (Rate Limits) & Quy định kiểm duyệt
 - **Độ dài bài viết tối đa:** `3,000` ký tự (khớp cấu hình trong `ChannelType.LINKEDIN(maxChars = 3_000)`).
 - **Kích thước ảnh & Định dạng:**
-  - Tối đa **8 MB** cho ảnh bài đăng thông thường.
-  - Tỉ lệ khuyến nghị: `1.91:1` (ngang: 1200 x 627 px) hoặc `1:1` (vuông: 1200 x 1200 px). Định dạng: PNG, JPEG, GIF.
+  - **Giới hạn pixel (Chính thức theo Images API):** Tổng độ phân giải mỗi ảnh phải **dưới 36.152.320 pixel** (chiều rộng $\times$ chiều cao). Định dạng hỗ trợ: JPG/JPEG, GIF, PNG.
+  - **Dung lượng file:** Trạng thái: *Chưa xác minh mức trần cụ thể trong tài liệu Images API* (con số 8 MB là khuyến nghị thực tế để tránh timeout khi tải lên di động).
+  - Tỉ lệ khuyến nghị: `1.91:1` (ngang: 1200 x 627 px) hoặc `1:1` (vuông: 1200 x 1200 px).
 - **Hạn ngạch & Giới hạn tần suất gọi (Rate Limits & Quotas theo Product / Tier):**
   - **Sản phẩm Share on LinkedIn (Đăng bài cá nhân):**
     - **Hạn ngạch thành viên (Member Throttle):** Tối đa **150 requests / member / ngày** (chu kỳ 24 giờ).
@@ -412,7 +577,8 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
       - Hạn ngạch Production được cấp riêng dựa trên phê duyệt use-case thực tế sau khi nộp đơn (Access Request Form) và video demo luồng hoạt động; thông số áp dụng theo thỏa thuận SLA của từng ứng dụng.
   - **Cơ chế xử lý khi vượt ngưỡng:** Trả về HTTP `429 Too Many Requests` (kèm header `Retry-After`) $\rightarrow$ Map sang `PublishResult.RetryableError` với thuật toán Exponential Backoff.
 - **Theo dõi Quota & Usage thực tế theo từng endpoint trên LinkedIn Developer Portal:**
-  - Do hạn ngạch thực tế có thể được LinkedIn tự động điều chỉnh theo từng sản phẩm, gói dịch vụ hoặc từng phiên bản API, **cách kiểm tra chính xác nhất hạn ngạch còn lại tại thời điểm chạy thực tế là theo dõi trực tiếp trên tab Analytics**:
+  - Theo tài liệu chính thức từ LinkedIn về [API Rate Limits](https://learn.microsoft.com/en-us/linkedin/shared/api-guide/concepts/rate-limits), LinkedIn **không công bố một hạn mức chuẩn chung phổ quát** cho tất cả các endpoint, mà rate limit được thiết lập riêng biệt theo từng API Product, từng endpoint và cấp độ ứng dụng.
+  - Do đó, **tài liệu ưu tiên phương pháp đối chiếu và kiểm tra trực tiếp hạn ngạch theo từng endpoint trên tab Analytics của Developer Portal**:
     1. Đăng nhập [LinkedIn Developer Portal](https://developer.linkedin.com/), chọn ứng dụng `SocialAgent App`.
     2. Chọn tab **Analytics** trên thanh menu điều hướng của ứng dụng.
     3. Chọn xem theo bộ lọc **Application Quota** hoặc **Member Quota** để theo dõi số lượng call đã thực hiện và hạn ngạch còn lại trong ngày theo từng endpoint.
@@ -479,11 +645,14 @@ Thay vì xem trường hợp không gọi được API là lỗi thất bại (`
 - **Trạng thái:** `In Development` (Chế độ phát triển)
 - **App ID (Public Identifier):** Đã tạo và cấu hình Android Platform:
   - Package Name: `com.lttbdd.socialagent`
-  - Key Hash: Tạo từ debug keystore SHA-1 fingerprint.
-- **Cơ chế xác thực không dùng App Secret:**
-  - Meta xác thực ứng dụng Android thông qua sự kết hợp giữa **App ID + Package Name + Android Key Hash** (chữ ký số của ứng dụng).
-  - Trao đổi token bằng PKCE (`code_verifier`), không dùng `app_secret`.
-  - App chỉ gọi các endpoint công khai và kiểm tra token qua `GET /me` (không gọi các endpoint quản trị `/debug_token` đòi hỏi secret).
+  - Key Hash: Tạo từ debug keystore SHA-1 fingerprint (chỉ áp dụng cho Phương án 1 — Meta Android SDK).
+- **Cơ chế xác thực không dùng App Secret (Đối chiếu kiến trúc §2.1):**
+  - **Phương án 1 (Meta Android SDK — Khuyến nghị):** Meta xác thực danh tính ứng dụng thông qua bộ ba **App ID + Package Name + Android Key Hash**. Cơ chế này do SDK đảm nhiệm, không cần `app_secret` trong ứng dụng.
+  - **Phương án 2 (Web OAuth qua AppAuth / Custom Tabs):**
+    - ⚠️ **Trạng thái: Chưa xác minh chính thức từ Meta Graph API (thử nghiệm)**. Việc trao đổi token bằng PKCE (`code_verifier`) trực tiếp mà không cần `app_secret` chưa có căn cứ chính thức từ tài liệu Graph API cho ứng dụng di động thông thường.
+    - Android Key Hash đã cấu hình trên Portal **chỉ áp dụng cho Phương án 1 (SDK), không áp dụng cho Phương án 2 (Web OAuth)**.
+    - Nếu Meta từ chối đổi token không secret, bắt buộc phải chuyển mã ủy quyền qua máy chủ BFF để đổi token với `app_secret` lưu an toàn ở backend; ứng dụng Android tuyệt đối không nhúng `app_secret`.
+  - **Kiểm tra Token an toàn:** App chỉ gọi endpoint công khai `GET /v26.0/me` với Access Token (không gọi endpoint quản trị `/debug_token` đòi hỏi App Secret / App Access Token).
 - **Thành viên có quyền thử nghiệm:** Thêm tài khoản Facebook của 4 thành viên nhóm vào danh sách **Developers / Testers** trong mục *App Roles*.
 
 ### 5.2. LinkedIn Developers
@@ -526,7 +695,7 @@ Dưới đây là dàn ý nội dung được thiết kế sẵn theo từng sli
 ### 🎯 Slide 1: So sánh khả năng kênh & Đối chiếu Kiến trúc (Channel Capabilities)
 * **Ý chính trình chiếu:**
   * Đối chiếu trực tiếp với `enum class ChannelCapability`: `PUBLISH`, `READ_COMMENTS`, `REPLY`, `MENTION`, `METRICS`.
-  * **Facebook Page:** Hỗ trợ toàn diện 5 capabilities dưới tư cách Page; không hỗ trợ native Idempotency $\rightarrow$ Quản lý qua Room DB cục bộ.
+  * **Facebook Page:** Hỗ trợ toàn diện 5 capabilities dưới tư cách Page (Graph API v26.0); không hỗ trợ native Idempotency $\rightarrow$ Quản lý qua Room DB cục bộ.
   * **LinkedIn Organization:** Hỗ trợ đầy đủ cho Company Page; hỗ trợ native header `X-RestLi-Idempotency-Key`.
   * **LinkedIn Member (Cá nhân):** Chỉ hỗ trợ đăng bài cơ bản; quyền đọc/trả lời comment không khả dụng với quyền hiện có của app.
 * **Gợi ý Visual:** Bảng ma trận so sánh 3 cột (Facebook Page | LinkedIn Org | LinkedIn Member) với các icon tick xanh ✅ và cảnh báo ⚠️.
@@ -535,28 +704,28 @@ Dưới đây là dàn ý nội dung được thiết kế sẵn theo từng sli
 
 ### 🔐 Slide 2: Kiến trúc Xác thực An toàn — Public Client Không Giữ Secret
 * **Ý chính trình chiếu:**
-  * **Chuẩn bảo mật Native (RFC 8252):** Ứng dụng Android là Public Client $\rightarrow$ Loại bỏ hoàn toàn `client_secret` khỏi APK và mã nguồn (tránh nguy cơ dịch ngược APK).
-  * **Cơ chế bảo vệ mã ủy quyền:** Tích hợp `AppAuth-Android` qua Android Custom Tabs với PKCE S256 (`code_verifier` + `code_challenge`).
+  * **Chuẩn bảo mật Native (RFC 8252 & RFC 6750):** Ứng dụng Android là Public Client $\rightarrow$ Loại bỏ hoàn toàn `client_secret` khỏi APK và mã nguồn. Tuyệt đối không truyền `access_token` trong URL/Deep Link.
+  * **Cơ chế bảo vệ mã ủy quyền:** Tích hợp `AppAuth-Android` qua Android Custom Tabs với PKCE S256 (`code_verifier` + `code_challenge`) và xác thực `state` chống CSRF.
   * **Định danh ứng dụng an toàn:**
-    * *Facebook:* App ID công khai + Xác thực Android Key Hash (SHA-1) trên Meta Portal.
-    * *LinkedIn:* Client ID công khai + luồng Native PKCE (`/oauth/native-pkce/`) qua Loopback Redirect không giữ secret (hoặc qua BFF với callback HTTPS và giữ `client_secret` phía server).
+    * *Facebook:* Meta Android SDK (App ID + Package Name + SHA-1 Key Hash) hoặc Web OAuth qua BFF.
+    * *LinkedIn:* Client ID công khai + luồng Native PKCE (`/oauth/native-pkce/`) qua Loopback Redirect không giữ secret (hoặc qua BFF với callback HTTPS, cấp mã exchange dùng 1 lần và đổi token qua POST back-channel).
   * **Vòng đời Token:** 
-    * *Facebook:* Đổi User Token lấy Page Access Token vĩnh viễn (Never Expires).
+    * *Facebook:* Với Meta SDK, token tự làm mới rolling 90 ngày trực tiếp trên app; với Web OAuth, đổi qua BFF lấy Page Access Token vĩnh viễn (Never Expires).
     * *LinkedIn:* Access Token 60 ngày $\rightarrow$ Luồng Re-authentication 1 chạm khi hết hạn (kèm cơ chế Auto-refresh 365 ngày qua BFF nếu được duyệt quyền Programmatic Refresh).
-* **Gợi ý Visual:** Sơ đồ luồng OAuth 2.0 PKCE không `client_secret` đối chiếu giữa Custom Tabs và Token Endpoint.
+* **Gợi ý Visual:** Sơ đồ luồng OAuth 2.0 PKCE không `client_secret` đối chiếu giữa Custom Tabs và Token Endpoint / BFF Back-Channel.
 
 ---
 
 ### ⚙️ Slide 3: Endpoints Cốt lõi & Giới hạn Kỹ thuật (Technical Specs)
 * **Ý chính trình chiếu:**
   * **Đăng bài có ảnh (F5):**
-    * *Facebook:* 1 bước qua `POST /{page-id}/photos` (`multipart/form-data`).
-    * *LinkedIn:* 2 bước qua `initializeUpload` $\rightarrow$ PUT binary $\rightarrow$ Đăng bài với Image URN.
-  * **Tương tác & Số liệu (F6, F7):** Đọc comment phân cấp, reply theo ID/URN, lấy insights và follower count.
+    * *Facebook:* 1 bước qua `POST /{page-id}/photos` (ảnh đơn) hoặc 2 bước qua `attached_media` (đa ảnh).
+    * *LinkedIn:* 2 bước qua `initializeUpload` $\rightarrow$ PUT binary $\rightarrow$ Đăng bài với Image URN (ảnh đơn) hoặc `multiImage` (tối thiểu 2 ảnh, tối đa 20 ảnh; < 36.152.320 px/ảnh).
+  * **Tương tác & Số liệu (F6, F7):** Đọc comment phân cấp, reply theo ID/URN, lấy insights (sử dụng metric `post_media_view` chuẩn trên Graph API v26.0) và follower count.
   * **Giới hạn kiểm soát:**
     * *Độ dài bài:* Facebook (63.206 ký tự) vs LinkedIn (3.000 ký tự) $\rightarrow$ Đã cấu hình cứng trong `ChannelType`.
-    * *Kích thước ảnh:* Facebook (4 MB multipart) vs LinkedIn (8 MB).
-    * *Rate limit:* Facebook (4.800 req/Page/giờ) vs LinkedIn Community Management Dev Tier (500 req/app, 100 req/member/ngày UTC) & Share on LinkedIn (150 req/member/ngày; kiểm tra hạn ngạch endpoint thực tế trên Portal Analytics).
+    * *Kích thước ảnh:* Facebook (4 MB multipart) vs LinkedIn (dưới 36.152.320 pixel/ảnh).
+    * *Rate limit:* Facebook (giới hạn động theo BUC / Page Engaged Users) vs LinkedIn Community Management Dev Tier (500 req/app, 100 req/member/ngày UTC) & Share on LinkedIn (150 req/member/ngày; ưu tiên theo dõi hạn ngạch thực tế theo endpoint trên Portal Analytics).
 * **Gợi ý Visual:** Bảng so sánh 2 cột trực quan các chỉ số dung lượng, ký tự và Rate Limit.
 
 ---
@@ -567,7 +736,7 @@ Dưới đây là dàn ý nội dung được thiết kế sẵn theo từng sli
     1. Meta cấm bên thứ ba đăng bài lên Facebook cá nhân (đóng quyền `publish_actions` từ 2018).
     2. Meta cấm mention profile cá nhân (LinkedIn hỗ trợ mention member khi có URN hợp lệ: `@[Tên](urn:li:person:{id})`).
     3. Rào cản kiểm duyệt App Review khắt khe (đòi hỏi giấy phép kinh doanh).
-  * **Giải pháp 1 (Nội bộ):** Chạy ứng dụng ở **Development Mode** $\rightarrow$ Dùng đủ 100% mọi quyền nâng cao cho các tài khoản Tester/Developer trong nhóm.
+  * **Giải pháp 1 (Nội bộ):** Chạy ứng dụng ở **Development Mode** $\rightarrow$ Dành cho tài khoản được gán vai trò Tester/Developer trong App Roles và có Page Tasks quản trị trên Facebook Page thử nghiệm.
   * **Giải pháp 2 (Dự phòng F5 - `HANDED_OFF`):** 
     * Khi không thể gọi API: Tự động copy text vào Clipboard $\rightarrow$ Kích hoạt Android Share Intent native $\rightarrow$ Cập nhật trạng thái `PostStatus.HANDED_OFF`.
     * Đảm bảo luồng trải nghiệm không bao giờ đứt gãy.

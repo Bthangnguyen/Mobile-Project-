@@ -110,6 +110,17 @@ GET https://graph.facebook.com/v20.0/oauth/access_token
    access_token={page-access-token}
    ```
    *Trả về:* `{"id": "photo_id", "post_id": "{page-id}_{post-id}"}`.
+   > [!WARNING]
+   > **F5 — Idempotency phía app (Facebook không có header native) và lỗ hổng bản giả**
+   >
+   > Meta Graph API **không** có `X-RestLi-Idempotency-Key`. App phải tự chống đăng trùng: cùng `idempotencyKey` thì `SocialChannelClient.publish` trả kết quả lần đăng trước, không tạo bài mới (Room DB khi có client thật; `publishedByKey` khi còn `FakeSocialChannelClient`).
+   >
+   > `FakeSocialChannelClient.publish` hiện **chưa an toàn khi hai coroutine gọi song song**:
+   > 1. Cả hai miss cache, cùng `delay`, rồi mới ghi map.
+   > 2. `remoteId` lấy từ `publishedByKey.size + 1` **trước** khi insert → hai key khác nhau có thể ra cùng `remotePostId` (F6 comment / F7 metrics đụng id).
+   > 3. Cùng một key: cả hai vẫn đi qua `delay` như thể đăng hai lần; `getOrPut` chỉ giữ một entry nên unit test gọi **nối tiếp** vẫn xanh.
+   >
+   > Khi sửa: `Mutex` + double-check key trong lock; cấp `remoteId` bằng bộ đếm nguyên tử (không dùng `size + 1`); thêm test `async` cùng key và khác key với `latencyMillis > 0`.
 4. **Lấy danh sách comment của bài viết (F6):**
    ```http
    GET https://graph.facebook.com/v20.0/{post-id}/comments?fields=id,from,message,created_time,comment_count,parent&limit=50&access_token={page-access-token}
@@ -186,19 +197,37 @@ GET https://graph.facebook.com/v20.0/oauth/access_token
 Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm:
 - **Authorization Endpoint:** `https://www.linkedin.com/oauth/v2/authorization`
 - **Token Endpoint:** `https://www.linkedin.com/oauth/v2/accessToken`
-- **Redirect URI:** Sử dụng Custom Scheme `com.lttbdd.socialagent://oauth/linkedin`.
+- **Redirect URI đăng ký với LinkedIn:** Bắt buộc là **URL HTTPS hợp lệ trỏ về máy chủ backend/BFF** (ví dụ: `https://api.yourdomain.com/auth/linkedin/callback` hoặc endpoint Cloudflare Worker).
+  > [!IMPORTANT]
+  > **Yêu cầu Callback HTTPS của Standard OAuth:**
+  > Theo tài liệu chính thức của LinkedIn OAuth 2.0, Developer Portal **chỉ chấp nhận callback giao thức HTTPS** cho luồng Standard Web OAuth (hoàn toàn không hỗ trợ đăng ký Custom Scheme như `com.lttbdd.socialagent://...` trên LinkedIn Portal).
 - **Ràng buộc kỹ thuật:** Luồng standard này **bắt buộc phải có `client_secret`** khi gọi token endpoint.
-- **Giải pháp bảo mật (BFF - Backend-For-Frontend):**
-  - Tuyệt đối **không đưa `client_secret` vào mã nguồn Android hay APK**.
-  - App nhận authorization code từ Custom Tabs, sau đó gửi `code` về một server trung gian (BFF hoặc Cloudflare Worker / Serverless function do nhóm dựng). Server này giữ `client_secret` an toàn, thực hiện đổi token với LinkedIn và trả access token an toàn về cho app.
+- **Quy trình hoạt động hoàn chỉnh của Kiến trúc BFF (Backend-For-Frontend):**
+  1. **Khởi tạo ủy quyền:** Android app mở Custom Tabs điều hướng tới `https://www.linkedin.com/oauth/v2/authorization` với `redirect_uri=https://api.yourdomain.com/auth/linkedin/callback` và tham số `state` (để chống tấn công CSRF).
+  2. **Callback HTTPS từ LinkedIn về BFF:** Người dùng đăng nhập và xác nhận cấp quyền trên trình duyệt. Máy chủ xác thực LinkedIn chuyển hướng (redirect) trình duyệt trực tiếp về endpoint HTTPS của BFF kèm mã:
+     `https://api.yourdomain.com/auth/linkedin/callback?code={authorization_code}&state={state}`
+  3. **BFF đổi Token với LinkedIn (Server-to-Server):** Server BFF (nơi lưu giữ `LINKEDIN_CLIENT_SECRET` an toàn trong biến môi trường server, tuyệt đối không đưa vào client/APK) gửi request POST trực tiếp lên máy chủ LinkedIn:
+     ```http
+     POST https://www.linkedin.com/oauth/v2/accessToken
+     Content-Type: application/x-www-form-urlencoded
+
+     grant_type=authorization_code
+     &code={authorization_code}
+     &redirect_uri=https://api.yourdomain.com/auth/linkedin/callback
+     &client_id={client_id}
+     &client_secret={client_secret}
+     ```
+  4. **Chuyển giao Token về Android App:** Sau khi nhận token thành công từ LinkedIn, server BFF chuyển giao token về app Android:
+     - Máy chủ BFF phản hồi HTTP 302 Redirect chuyển hướng trình duyệt về ứng dụng Android qua Deep Link / Custom Scheme (ví dụ: `com.lttbdd.socialagent://auth/linkedin/callback?token={access_token}&state={state}`) hoặc qua Android App Links (`https://socialagent.app/auth/linkedin/callback?...`).
+     - Trình duyệt Custom Tabs bắt Intent deep link và đưa app trở lại foreground. Repository lưu access token vào Android Keystore / Room DB an toàn.
 
 #### Bảng so sánh hai luồng OAuth của LinkedIn
 
 | Tiêu chí | Luồng A: Native PKCE (`/oauth/native-pkce/`) | Luồng B: Standard OAuth (`/oauth/v2/`) qua BFF |
 |---|---|---|
 | **Endpoint cấp mã** | `https://www.linkedin.com/oauth/native-pkce/authorization` | `https://www.linkedin.com/oauth/v2/authorization` |
-| **Kiểu Redirect URI** | Loopback IP (`http://127.0.0.1:{port}/callback`) | Custom Scheme (`com.lttbdd.socialagent://oauth/linkedin`) |
-| **Yêu cầu Client Secret** | ❌ **Không** (Trao đổi bằng `code_verifier`) | ✅ **Bắt buộc** (Phải ủy quyền qua Backend/BFF) |
+| **Kiểu Redirect URI** | Loopback IP (`http://127.0.0.1:{port}/callback`) | URL HTTPS về server BFF (`https://api.yourdomain.com/.../callback`) *(App nhận token từ BFF qua Deep Link ở bước kết thúc)* |
+| **Yêu cầu Client Secret** | ❌ **Không** (Trao đổi bằng `code_verifier`) | ✅ **Bắt buộc** (Phải ủy quyền và giữ secret tại Backend/BFF) |
 | **Điều kiện kích hoạt** | Cần liên hệ **LinkedIn Support duyệt bật cờ Native PKCE** | Kích hoạt sẵn ngay khi tạo App trên Developer Portal |
 | **Phù hợp đồ án** | Tối ưu khi đã được LinkedIn duyệt cờ Native PKCE | Dùng dự phòng nếu chưa kịp duyệt cờ PKCE từ LinkedIn |
 
@@ -220,17 +249,23 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
      - Màn hình "Kênh của tôi" (F1) và màn hình Soạn bài/Duyệt bài (F4) hiển thị Badge cảnh báo: *"Phiên kết nối LinkedIn đã hết hạn (chu kỳ 60 ngày). Vui lòng kết nối lại"*.
      - Nút "Kết nối lại" (Re-connect) kích hoạt mở lại Custom Tabs. Do trình duyệt hệ thống thường vẫn lưu phiên đăng nhập của người dùng trên web LinkedIn, người dùng chỉ cần xác nhận 1 chạm (Single-tap Consent) để cấp mã `code` mới và nhận lại Access Token 60 ngày mới mà không phải gõ lại mật khẩu.
 3. **Phương án Dự phòng khi được cấp Programmatic Refresh Token (Nếu được duyệt Partner Tier):**
-   - Nếu response đổi token có trả về trường `refresh_token` (hạn tối đa 365 ngày), app lưu an toàn vào Android Keystore.
-   - Định kỳ trước khi token 60 ngày hết hạn 7 ngày, app gửi request làm mới ngầm bằng `grant_type=refresh_token`:
-     ```http
-     POST https://www.linkedin.com/oauth/v2/accessToken
-     Content-Type: application/x-www-form-urlencoded
+   - **Ràng buộc Client Secret bắt buộc:** Theo tài liệu chính thức của LinkedIn OAuth 2.0, endpoint làm mới token (`POST /oauth/v2/accessToken`) khi dùng `grant_type=refresh_token` **bắt buộc phải có cả `client_id` và `client_secret`**.
+   - **Thực thi hoàn toàn phía Server/BFF:**
+     - Vì ứng dụng Android là Public Client và không được giữ `client_secret`, **app Android tuyệt đối không tự gọi trực tiếp endpoint refresh của LinkedIn**.
+     - **BFF đảm nhiệm request này:** Khi token sắp hết hạn (ví dụ trước 7 ngày), app Android gửi yêu cầu làm mới ngầm đến server BFF (ví dụ: `POST https://api.yourdomain.com/auth/linkedin/refresh`) kèm định danh phiên hoặc refresh token mã hóa.
+     - Server BFF thực hiện POST request trực tiếp lên LinkedIn với `client_secret` được giữ an toàn phía server:
+       ```http
+       POST https://www.linkedin.com/oauth/v2/accessToken
+       Content-Type: application/x-www-form-urlencoded
 
-     grant_type=refresh_token
-     &refresh_token={refresh_token}
-     &client_id={client_id}
-     ```
-   - *Lưu ý:* Việc refresh token không kéo dài thời hạn 365 ngày ban đầu của Refresh Token. Sau 365 ngày, người dùng vẫn bắt buộc phải trải qua luồng Re-authentication qua trình duyệt.
+       grant_type=refresh_token
+       &refresh_token={refresh_token}
+       &client_id={client_id}
+       &client_secret={client_secret}
+       ```
+     - Server BFF nhận Access Token mới (thời hạn 60 ngày tiếp theo) và trả về an toàn cho app Android lưu vào Android Keystore / Room DB.
+   - **Lưu ý với Client Native thuần túy (không có BFF):** Nếu chạy Luồng A (Native PKCE trực tiếp) mà không có backend server, tính năng programmatic refresh sẽ không thể thực thi do thiếu `client_secret`. Khi đó, hệ thống bắt buộc sử dụng **Phương án 2 (Re-authentication định kỳ 60 ngày)** qua Custom Tabs (người dùng chỉ cần xác nhận 1 chạm).
+   - *Thời hạn tối đa:* Việc refresh chỉ cấp lại access token 60 ngày mới, **không gia hạn** mốc 365 ngày ban đầu của refresh token. Sau 365 ngày, người dùng vẫn bắt buộc phải trải qua luồng Re-authentication qua trình duyệt.
 
 ### 3.2. Danh sách quyền (Permissions / Scopes)
 Đối chiếu trực tiếp với các khả năng trong `ChannelCapability` (`core/model/Channel.kt`) theo chuẩn LinkedIn REST API & Community Management API:
@@ -243,7 +278,7 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
 | **`REPLY` (Trả lời comment)** | `w_organization_social_feed` | Gửi bình luận trả lời (`POST /rest/socialActions/{targetUrn}/comments`) dưới danh nghĩa `urn:li:organization:{org-id}`. **Yêu cầu:** Sản phẩm Community Management API. |
 | **`MENTION` (Nhắc tên)** | `w_organization_social` *(kèm URN)* | Hỗ trợ mention cả Organization `@[Tên Tổ chức](urn:li:organization:{id})` và Member `@[Tên Hiển thị](urn:li:person:{id})` trong nội dung bài đăng. **Điều kiện:** Phải có Person/Org URN hợp lệ (lấy từ OIDC `sub` claim, danh sách quản trị hoặc tương tác trước đó). LinkedIn không cung cấp API tìm kiếm profile URN tự do cho app thông thường (cần tier Đối tác Quảng cáo/Tuyển dụng). |
 | **`METRICS` (Số liệu)** | `rw_organization_admin`, `r_organization_social` | Đọc số liệu tương tác (`likeCount`, `commentCount`, `shareCount`, `impressionCount`, `clickCount`) qua `GET /rest/organizationalEntityShareStatistics` và số người theo dõi (`firstDegreeSize`) qua `GET /rest/networkSizes/{orgUrn}`. **Lưu ý:** Endpoint thống kê yêu cầu bắt buộc scope quản trị `rw_organization_admin` và người dùng ủy quyền phải nắm vai trò `ADMINISTRATOR` của Organization. |
-| **Làm mới ngầm (F1 - Tùy chọn)** | `offline_access` *(Yêu cầu quyền Partner)* | Chỉ cấp cho app được duyệt **Programmatic Refresh (MDP)** để cấp refresh token 365 ngày. App thông thường dùng luồng Re-authentication định kỳ 60 ngày. |
+| **Làm mới ngầm (F1 - Tùy chọn)** | `offline_access` *(Yêu cầu quyền Partner)* | Chỉ cấp cho app được duyệt **Programmatic Refresh (MDP)** để cấp refresh token 365 ngày (request refresh bắt buộc thực thi qua BFF server kèm `client_secret`). App thông thường dùng luồng Re-authentication định kỳ 60 ngày. |
 
 ### 3.3. Các Endpoint chính (LinkedIn Versioned REST API)
 
@@ -354,21 +389,31 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
   - Tỉ lệ khuyến nghị: `1.91:1` (ngang: 1200 x 627 px) hoặc `1:1` (vuông: 1200 x 1200 px). Định dạng: PNG, JPEG, GIF.
 - **Hạn ngạch & Giới hạn tần suất gọi (Rate Limits & Quotas theo Product / Tier):**
   - **Sản phẩm Share on LinkedIn (Đăng bài cá nhân):**
-    - Hạn ngạch tác giả: Tối đa $100$ bài đăng / mỗi tác giả / ngày (chu kỳ 24h).
-    - Hạn ngạch toàn ứng dụng: Tối đa $100.000$ request / ngày toàn app.
+    - **Hạn ngạch thành viên (Member Throttle):** Tối đa **150 requests / member / ngày** (chu kỳ 24 giờ).
+      - *Trạng thái:* Đã xác minh theo tài liệu chính thức của LinkedIn.
+      - *Nguồn chính thức:* Microsoft Learn — [Share on LinkedIn: Rate Limits](https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/share-on-linkedin#rate-limits) & [LinkedIn API Rate Limits Overview](https://learn.microsoft.com/en-us/linkedin/shared/api-guide/concepts/rate-limits).
+    - **Hạn ngạch toàn ứng dụng (Application Throttle):** Tối đa **100.000 requests / app / ngày**.
+    - **Phân biệt rõ giữa "Request API" và "Số bài đăng":**
+      - Hạn mức của LinkedIn tính theo **số lần gọi API (API requests)**, KHÔNG đồng nhất với số bài đăng thực tế.
+      - *Bài đăng văn bản thuần (Text-only) hoặc chia sẻ URL:* Mỗi bài tốn đúng **1 request** (`POST /rest/posts`) $\rightarrow$ Thành viên có thể đăng tối đa đến 150 bài text/ngày nếu không gọi endpoint nào khác.
+      - *Bài đăng kèm hình ảnh (Media Image):* Quy trình chuẩn của LinkedIn Versioned REST API tốn từ **2 - 3 requests** (1 request `initializeUpload` để đăng ký upload, 1 request PUT binary lên uploadUrl, và 1 request `POST /rest/posts` chứa image URN). Do đó, hạn mức 150 requests/ngày thực tế tương ứng với khoảng **50 - 75 bài đăng kèm ảnh / member / ngày**.
   - **Sản phẩm Community Management API (Page Công ty — F6/F7):**
     - **Development Tier (Hạn ngạch giai đoạn phát triển & thử nghiệm):**
+      - *Trạng thái:* Đã xác minh qua thực tế đo lường trên tab Analytics của LinkedIn Developer Portal.
       - **Application Throttle (Toàn ứng dụng):** Tối đa **500 API calls / app / 24 giờ (UTC)**.
       - **Member Throttle (Mỗi thành viên):** Tối đa **100 API calls / member / 24 giờ (UTC)**.
       - *Phạm vi áp dụng:* Tính gộp cho toàn bộ các endpoint thuộc sản phẩm: đọc/trả lời comment (`socialActions/comments`), truy vấn số liệu tương tác (`organizationalEntityShareStatistics`) và số follower (`networkSizes`).
       - *Chu kỳ làm mới:* Tự động reset hàng ngày vào lúc **00:00 UTC** (tức 07:00 sáng theo giờ Việt Nam).
-    - **Standard Tier (Production):** Cần nộp đơn yêu cầu (Access Request Form) kèm video screencast chứng minh use-case thực tế để được nâng hạn ngạch production.
+    - **Standard Tier (Production):** 
+      - *Trạng thái:* Chưa xác minh cụ thể (chờ cấp phép).
+      - Hạn ngạch Production được cấp riêng dựa trên phê duyệt use-case thực tế sau khi nộp đơn (Access Request Form) và video demo luồng hoạt động; thông số áp dụng theo thỏa thuận SLA của từng ứng dụng.
   - **Cơ chế xử lý khi vượt ngưỡng:** Trả về HTTP `429 Too Many Requests` (kèm header `Retry-After`) $\rightarrow$ Map sang `PublishResult.RetryableError` với thuật toán Exponential Backoff.
-- **Hướng dẫn Kiểm tra Quota & Usage thực tế trên LinkedIn Developer Portal:**
-  1. Đăng nhập [LinkedIn Developer Portal](https://developer.linkedin.com/), chọn ứng dụng `SocialAgent App`.
-  2. Chọn tab **Analytics** trên thanh menu điều hướng của ứng dụng.
-  3. Chọn xem theo bộ lọc **Application Quota** hoặc **Member Quota** để theo dõi số lượng call đã thực hiện và hạn ngạch còn lại trong ngày theo từng endpoint.
-  4. **Lưu ý kỹ thuật ("First Call Rule"):** Tab *Analytics* chỉ hiển thị các endpoint mà app đã gửi **ít nhất 1 request hợp lệ trong ngày UTC hiện tại**. Nếu một endpoint chưa từng được gọi, nó sẽ không xuất hiện trên biểu đồ. Để kiểm tra hạn ngạch của endpoint mới (ví dụ `socialActions` hoặc `networkSizes`), app cần gửi 1 request test, sau đó refresh trang Analytics.
+- **Theo dõi Quota & Usage thực tế theo từng endpoint trên LinkedIn Developer Portal:**
+  - Do hạn ngạch thực tế có thể được LinkedIn tự động điều chỉnh theo từng sản phẩm, gói dịch vụ hoặc từng phiên bản API, **cách kiểm tra chính xác nhất hạn ngạch còn lại tại thời điểm chạy thực tế là theo dõi trực tiếp trên tab Analytics**:
+    1. Đăng nhập [LinkedIn Developer Portal](https://developer.linkedin.com/), chọn ứng dụng `SocialAgent App`.
+    2. Chọn tab **Analytics** trên thanh menu điều hướng của ứng dụng.
+    3. Chọn xem theo bộ lọc **Application Quota** hoặc **Member Quota** để theo dõi số lượng call đã thực hiện và hạn ngạch còn lại trong ngày theo từng endpoint.
+    4. **Lưu ý kỹ thuật ("First Call Rule"):** Tab *Analytics* chỉ hiển thị các endpoint mà app đã gửi **ít nhất 1 request hợp lệ trong ngày UTC hiện tại**. Nếu một endpoint chưa từng được gọi, nó sẽ không xuất hiện trên biểu đồ. Để kiểm tra hạn ngạch của endpoint mới (ví dụ `socialActions` hoặc `networkSizes`), app cần gửi 1 request test, sau đó refresh trang Analytics.
 - **Quyền nào cần App Review / Phê duyệt Sản phẩm (Products):**
   - *Sản phẩm Share on LinkedIn & Sign In with OpenID Connect (Không cần duyệt phức tạp):* Cấp tự động các quyền cơ bản `openid`, `profile`, `w_member_social`. Cho phép đăng bài lên trang cá nhân ngay lập tức.
   - *Sản phẩm Community Management API (Cần đăng ký & duyệt):* Bắt buộc để cấp các quyền thao tác trên Page công ty: `w_organization_social`, `r_organization_social_feed`, `w_organization_social_feed`, `rw_organization_admin`, `r_organization_admin`.
@@ -450,7 +495,7 @@ Thay vì xem trường hợp không gọi được API là lỗi thất bại (`
   - Nhóm gửi ticket đến LinkedIn Developer Support để yêu cầu bật cờ giao thức **Native PKCE Protocol** cho App ID.
   - Redirect URLs đã đăng ký trên Portal:
     - Cho Luồng Native PKCE Loopback: `http://127.0.0.1:{port}/callback` (hoặc port cố định trong dải dev).
-    - Cho Luồng Standard qua BFF: `com.lttbdd.socialagent://oauth/linkedin`.
+    - Cho Luồng Standard qua BFF: Bắt buộc dùng URL HTTPS trỏ về máy chủ backend/BFF (ví dụ: `https://api.yourdomain.com/auth/linkedin/callback` hoặc Cloudflare Worker endpoint). LinkedIn yêu cầu redirect URL chuẩn HTTPS đối với Standard OAuth, không cho phép đăng ký trực tiếp custom scheme.
 
 ### 5.3. Hướng dẫn Cấu hình Định danh Cục bộ (Public Client IDs Configuration)
 Thay vì lưu `client_secret`, ứng dụng chỉ quản lý các **Public Client IDs**:
@@ -491,10 +536,10 @@ Dưới đây là dàn ý nội dung được thiết kế sẵn theo từng sli
   * **Cơ chế bảo vệ mã ủy quyền:** Tích hợp `AppAuth-Android` qua Android Custom Tabs với PKCE S256 (`code_verifier` + `code_challenge`).
   * **Định danh ứng dụng an toàn:**
     * *Facebook:* App ID công khai + Xác thực Android Key Hash (SHA-1) trên Meta Portal.
-    * *LinkedIn:* Client ID công khai + luồng Native PKCE (`/oauth/native-pkce/`) qua Loopback Redirect không giữ secret (hoặc qua BFF).
+    * *LinkedIn:* Client ID công khai + luồng Native PKCE (`/oauth/native-pkce/`) qua Loopback Redirect không giữ secret (hoặc qua BFF với callback HTTPS và giữ `client_secret` phía server).
   * **Vòng đời Token:** 
     * *Facebook:* Đổi User Token lấy Page Access Token vĩnh viễn (Never Expires).
-    * *LinkedIn:* Access Token 60 ngày $\rightarrow$ Luồng Re-authentication 1 chạm khi hết hạn (kèm cơ chế Auto-refresh 365 ngày nếu được duyệt quyền Programmatic Refresh).
+    * *LinkedIn:* Access Token 60 ngày $\rightarrow$ Luồng Re-authentication 1 chạm khi hết hạn (kèm cơ chế Auto-refresh 365 ngày qua BFF nếu được duyệt quyền Programmatic Refresh).
 * **Gợi ý Visual:** Sơ đồ luồng OAuth 2.0 PKCE không `client_secret` đối chiếu giữa Custom Tabs và Token Endpoint.
 
 ---
@@ -508,7 +553,7 @@ Dưới đây là dàn ý nội dung được thiết kế sẵn theo từng sli
   * **Giới hạn kiểm soát:**
     * *Độ dài bài:* Facebook (63.206 ký tự) vs LinkedIn (3.000 ký tự) $\rightarrow$ Đã cấu hình cứng trong `ChannelType`.
     * *Kích thước ảnh:* Facebook (4 MB multipart) vs LinkedIn (8 MB).
-    * *Rate limit:* Facebook (4.800 req/Page/giờ) vs LinkedIn Community Management Dev Tier (500 req/app, 100 req/member/ngày UTC).
+    * *Rate limit:* Facebook (4.800 req/Page/giờ) vs LinkedIn Community Management Dev Tier (500 req/app, 100 req/member/ngày UTC) & Share on LinkedIn (150 req/member/ngày; kiểm tra hạn ngạch endpoint thực tế trên Portal Analytics).
 * **Gợi ý Visual:** Bảng so sánh 2 cột trực quan các chỉ số dung lượng, ký tự và Rate Limit.
 
 ---

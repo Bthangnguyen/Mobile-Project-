@@ -61,31 +61,57 @@ enum class ChannelCapability { PUBLISH, READ_COMMENTS, REPLY, MENTION, METRICS }
 
 Nếu nhóm lựa chọn không nhúng Facebook SDK để giữ app nhẹ và dùng chung kiến trúc AppAuth với LinkedIn:
 
+> [!WARNING]
+> **Trạng thái xác minh của Redirect URI đối với Meta Web OAuth:**
+> - **Luồng HTTPS Callback qua BFF (Khuyến nghị chuẩn):** Tuân thủ chính sách bảo mật của Meta (*Valid OAuth Redirect URIs* trên App Dashboard bắt buộc phải dùng giao thức `https://`). Meta chỉ hỗ trợ chuyển hướng về endpoint HTTPS của máy chủ backend/BFF, sau đó BFF trả mã trao đổi dùng một lần về app qua deep link.
+> - **Luồng Custom Scheme trực tiếp (`com.lttbdd.socialagent://...`):** ⚠️ **Chưa xác minh chính thức từ tài liệu Meta**. Meta Dialog OAuth cho web không chấp nhận đăng ký custom scheme trong danh sách Valid OAuth Redirect URIs (custom scheme `fb<APP_ID>://authorize` chỉ dành riêng cho cơ chế nội bộ của Meta SDK).
+
+##### Quy trình triển khai chuẩn qua BFF (Khuyến nghị):
+
 1. **Khởi tạo ủy quyền (Authorization Request):**
-   App mở Android Custom Tabs điều hướng tới Meta Dialog OAuth với đầy đủ tham số và mã ngẫu nhiên `state` chống tấn công CSRF:
+   App mở Android Custom Tabs điều hướng tới Meta Dialog OAuth, sử dụng **HTTPS Redirect URI** trỏ về máy chủ BFF và mã ngẫu nhiên `state` chống tấn công CSRF:
    ```http
    GET https://www.facebook.com/v26.0/dialog/oauth?
        client_id={app-id}
-       &redirect_uri=com.lttbdd.socialagent://oauth/facebook
+       &redirect_uri=https://api.yourdomain.com/auth/facebook/callback
        &response_type=code
        &scope=public_profile,pages_show_list,pages_manage_posts,pages_read_engagement,pages_manage_engagement,pages_read_user_content,read_insights
        &state={secure-random-state}
-       &code_challenge={code-challenge}
-       &code_challenge_method=S256
    ```
-2. **Xử lý Callback & Kiểm tra State (Validation):**
-   - Trình duyệt chuyển hướng về Custom Scheme: `com.lttbdd.socialagent://oauth/facebook?code={authorization-code}&state={returned-state}`.
-   - **Bắt buộc:** App kiểm tra `returned-state == secure-random-state`. Nếu không khớp hoặc thiếu `state`, app hủy bỏ phiên đăng nhập ngay lập tức để ngăn ngừa tấn công chiếm quyền mã ủy quyền.
-3. **Trao đổi Token (Token Exchange):**
-   - *Luồng qua BFF (Khuyến nghị bảo mật):* App gửi `code` về máy chủ BFF qua HTTPS. Server BFF giữ `client_secret` trong biến môi trường, gọi `https://graph.facebook.com/v26.0/oauth/access_token` để lấy User Access Token và nâng cấp thành Long-lived Token, sau đó cấp phát an toàn về cho app qua kênh back-channel.
-   - *Luồng PKCE trực tiếp (Thử nghiệm):* Nếu Meta Developer App hỗ trợ PKCE trực tiếp mà không cần secret:
-     ```http
-     GET https://graph.facebook.com/v26.0/oauth/access_token
-         ?client_id={app-id}
-         &redirect_uri=com.lttbdd.socialagent://oauth/facebook
-         &code={authorization-code}
-         &code_verifier={code-verifier}
+2. **Xử lý Callback trên BFF & Chuyển tiếp về Android:**
+   - Meta chuyển hướng trình duyệt về endpoint BFF: `https://api.yourdomain.com/auth/facebook/callback?code={authorization-code}&state={returned-state}`.
+   - Server BFF xác thực `returned-state == secure-random-state`.
+   - Server BFF giữ `client_secret` an toàn trong biến môi trường, lập tức gọi Meta Graph API để đổi `code` lấy User Access Token và nâng cấp thành Long-lived Token qua `grant_type=fb_exchange_token`.
+   - **Chống lộ Token qua URL:** Tương tự LinkedIn, BFF **tuyệt đối không truyền access token trong URL**. Thay vào đó, BFF tạo một **mã trao đổi dùng một lần** (`exchange_code`, thời hạn hiệu lực ngắn $\le 60$ giây) gắn liền với phiên đăng nhập, rồi chuyển hướng trình duyệt về ứng dụng Android qua deep link:
      ```
+     com.lttbdd.socialagent://oauth/facebook/callback?exchange_code={one-time-exchange-code}&state={secure-random-state}
+     ```
+3. **App đổi mã nhận Token qua kênh Back-Channel:**
+   - Ứng dụng Android bắt deep link `oauth/facebook/callback`, kiểm tra tính toàn vẹn của `state`.
+   - App gửi request HTTPS trực tiếp (`POST`) từ repository tới BFF:
+     ```http
+     POST https://api.yourdomain.com/auth/facebook/token
+     Content-Type: application/json
+
+     {
+       "exchange_code": "{one-time-exchange-code}",
+       "state": "{secure-random-state}"
+     }
+     ```
+   - Server BFF xác thực `exchange_code`, hủy mã ngay lập tức (one-time use) và trả token an toàn trong JSON response body:
+     ```json
+     {
+       "access_token": "{user-long-lived-token}",
+       "token_type": "bearer",
+       "expires_in": 5184000
+     }
+     ```
+
+##### Luồng PKCE trực tiếp với Custom Scheme (⚠️ Thử nghiệm — Chưa xác minh):
+Nếu Meta hỗ trợ cấu hình custom scheme và bỏ qua secret qua `code_verifier`:
+- Request: `redirect_uri=com.lttbdd.socialagent://oauth/facebook` kèm `code_challenge`.
+- Trao đổi: `GET https://graph.facebook.com/v26.0/oauth/access_token` kèm `code_verifier`.
+*(Lưu ý: Luồng này không khuyến nghị cho bản release vì rào cản chính sách Valid OAuth Redirect URIs của Meta và thiếu tài liệu xác nhận).*
 
 #### So sánh Vòng đời Token giữa 2 Phương án (Token Lifecycle):
 
@@ -105,16 +131,13 @@ Nếu nhóm lựa chọn không nhúng Facebook SDK để giữ app nhẹ và d�
 ```
 [User Login trên Chrome Custom Tabs]
        │
-       ▼ (Trình duyệt chuyển hướng về com.lttbdd.socialagent://oauth/facebook)
-[Mã Authorization Code] (App gửi code về máy chủ BFF qua HTTPS back-channel)
+       ▼ (Meta chuyển hướng HTTPS về BFF Server với authorization_code)
+[BFF Server nhận code] (BFF đổi code lấy Short-lived Token & gọi fb_exchange_token lấy Long-lived Token)
        │
-       ▼ (BFF gọi GET /v26.0/oauth/access_token với client_secret để đổi code)
-[User Short-lived Access Token] (~1 - 2 giờ)
+       ▼ (BFF chuyển hướng về App qua Deep Link với exchange_code một lần & state)
+[App nhận exchange_code] (App gọi POST /auth/facebook/token qua HTTPS back-channel để nhận Long-lived Token)
        │
-       ▼ (BFF gọi GET /v26.0/oauth/access_token?grant_type=fb_exchange_token&client_secret=... nâng cấp)
-[User Long-lived Access Token] (~60 ngày)
-       │
-       ▼ (BFF hoặc App gọi GET /v26.0/me/accounts với User Long-lived Token)
+       ▼ (Gọi GET /v26.0/me/accounts với User Long-lived Token)
 [Page Access Token (Long-lived / Never-expiring)]
 ```
 > *Ghi chú:* Sơ đồ có bước gọi `fb_exchange_token` **chỉ áp dụng cho Phương án 2**. Do tham số `grant_type=fb_exchange_token` yêu cầu bắt buộc phải có `client_secret`, các bước từ đổi code đến nâng cấp token phải được thực hiện trên máy chủ BFF để đảm bảo bí mật không bị lộ ra file APK.
@@ -646,12 +669,15 @@ Thay vì xem trường hợp không gọi được API là lỗi thất bại (`
 - **App ID (Public Identifier):** Đã tạo và cấu hình Android Platform:
   - Package Name: `com.lttbdd.socialagent`
   - Key Hash: Tạo từ debug keystore SHA-1 fingerprint (chỉ áp dụng cho Phương án 1 — Meta Android SDK).
+- **Cấu hình Valid OAuth Redirect URIs (trong Facebook Login Settings):**
+  - **Phương án 1 (SDK):** Không cần đăng ký Redirect URI cho web dialog vì SDK dùng cơ chế App Switch / Key Hash nội bộ.
+  - **Phương án 2 (Web OAuth qua BFF):** Bắt buộc đăng ký URL HTTPS của máy chủ backend (ví dụ: `https://api.yourdomain.com/auth/facebook/callback`). Meta **không cho phép** đăng ký custom scheme (`com.lttbdd.socialagent://...`) trong danh sách Valid OAuth Redirect URIs cho Web OAuth.
 - **Cơ chế xác thực không dùng App Secret (Đối chiếu kiến trúc §2.1):**
   - **Phương án 1 (Meta Android SDK — Khuyến nghị):** Meta xác thực danh tính ứng dụng thông qua bộ ba **App ID + Package Name + Android Key Hash**. Cơ chế này do SDK đảm nhiệm, không cần `app_secret` trong ứng dụng.
   - **Phương án 2 (Web OAuth qua AppAuth / Custom Tabs):**
-    - ⚠️ **Trạng thái: Chưa xác minh chính thức từ Meta Graph API (thử nghiệm)**. Việc trao đổi token bằng PKCE (`code_verifier`) trực tiếp mà không cần `app_secret` chưa có căn cứ chính thức từ tài liệu Graph API cho ứng dụng di động thông thường.
+    - ⚠️ **Trạng thái: Chưa xác minh chính thức từ Meta Graph API (thử nghiệm)**. Việc dùng Custom Scheme trực tiếp làm `redirect_uri` hoặc trao đổi token bằng PKCE (`code_verifier`) không secret chưa có căn cứ chính thức từ tài liệu Graph API cho ứng dụng di động thông thường.
     - Android Key Hash đã cấu hình trên Portal **chỉ áp dụng cho Phương án 1 (SDK), không áp dụng cho Phương án 2 (Web OAuth)**.
-    - Nếu Meta từ chối đổi token không secret, bắt buộc phải chuyển mã ủy quyền qua máy chủ BFF để đổi token với `app_secret` lưu an toàn ở backend; ứng dụng Android tuyệt đối không nhúng `app_secret`.
+    - Nếu sử dụng Phương án 2, luồng triển khai chuẩn là Meta redirect HTTPS về máy chủ BFF; server BFF giữ bí mật `app_secret` để đổi mã ủy quyền lấy Long-lived Token và cấp mã trao đổi dùng một lần (`exchange_code`) về app Android qua back-channel; file APK tuyệt đối không nhúng `app_secret`.
   - **Kiểm tra Token an toàn:** App chỉ gọi endpoint công khai `GET /v26.0/me` với Access Token (không gọi endpoint quản trị `/debug_token` đòi hỏi App Secret / App Access Token).
 - **Thành viên có quyền thử nghiệm:** Thêm tài khoản Facebook của 4 thành viên nhóm vào danh sách **Developers / Testers** trong mục *App Roles*.
 
@@ -707,7 +733,7 @@ Dưới đây là dàn ý nội dung được thiết kế sẵn theo từng sli
   * **Chuẩn bảo mật Native (RFC 8252 & RFC 6750):** Ứng dụng Android là Public Client $\rightarrow$ Loại bỏ hoàn toàn `client_secret` khỏi APK và mã nguồn. Tuyệt đối không truyền `access_token` trong URL/Deep Link.
   * **Cơ chế bảo vệ mã ủy quyền:** Tích hợp `AppAuth-Android` qua Android Custom Tabs với PKCE S256 (`code_verifier` + `code_challenge`) và xác thực `state` chống CSRF.
   * **Định danh ứng dụng an toàn:**
-    * *Facebook:* Meta Android SDK (App ID + Package Name + SHA-1 Key Hash) hoặc Web OAuth qua BFF.
+    * *Facebook:* Meta Android SDK (App ID + Package Name + SHA-1 Key Hash) hoặc Web OAuth qua BFF (Redirect HTTPS + Exchange Code).
     * *LinkedIn:* Client ID công khai + luồng Native PKCE (`/oauth/native-pkce/`) qua Loopback Redirect không giữ secret (hoặc qua BFF với callback HTTPS, cấp mã exchange dùng 1 lần và đổi token qua POST back-channel).
   * **Vòng đời Token:** 
     * *Facebook:* Với Meta SDK, token tự làm mới rolling 90 ngày trực tiếp trên app; với Web OAuth, đổi qua BFF lấy Page Access Token vĩnh viễn (Never Expires).

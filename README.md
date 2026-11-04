@@ -27,10 +27,10 @@ Chi tiết yêu cầu: [docs/requirements.md](docs/requirements.md)
 
 | Thành viên | GitHub | Mảng phụ trách |
 |---|---|---|
-| _(A)_ | @… | Core, DB, CI, F5 Đăng bài, F9 Cài đặt |
-| _(B)_ | @… | F1 Kết nối kênh, client Facebook/LinkedIn, F6 Comment, thu thập số liệu |
-| _(C)_ | @… | F8 BYOK, F2 AI Agent |
-| _(D)_ | @… | UI chung, F3 Nhập topic, F4 Duyệt bài, F7 Dashboard |
+| Nguyễn Quang Thắng (A) | [@Bthangnguyen](https://github.com/Bthangnguyen) | Core, DB, CI, F5 Đăng bài, F9 Cài đặt |
+| Đặng Hồng Minh (B) | [@dhminh678](https://github.com/dhminh678) | F1 Kết nối kênh, client Facebook/LinkedIn, F6 Comment, thu thập số liệu |
+| Đặng Quang Sang (C) | [@sangcotdo2407](https://github.com/sangcotdo2407) | F8 BYOK, F2 AI Agent |
+| Lưu Đình Quân (D) | [@quaanluuw0210](https://github.com/quaanluuw0210) | UI chung, F3 Nhập topic, F4 Duyệt bài, F7 Dashboard |
 
 ## Tech stack
 

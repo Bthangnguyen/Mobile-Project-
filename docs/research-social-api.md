@@ -53,14 +53,14 @@ enum class ChannelCapability { PUBLISH, READ_COMMENTS, REPLY, MENTION, METRICS }
 
 | Khả năng (`ChannelCapability`) | Facebook Page (Meta Graph API, ví dụ `v26.0`) | LinkedIn Organization (Company Page) | LinkedIn Member (Trang cá nhân) |
 |---|---|---|---|
-| **`PUBLISH` (Đăng bài)** | ✅ **Có** (Text, link, ảnh đơn qua `/{page-id}/photos`, đa ảnh qua `attached_media`) | ✅ **Có điều kiện** (Text, link, ảnh đơn; `multiImage` chỉ dùng khi product/quyền của app hỗ trợ, giới hạn phải đối chiếu tài liệu version hiện hành) | ✅ **Có điều kiện** (Text, link, ảnh đơn khi app được cấp scope/product đăng bài phù hợp; không coi việc bật sản phẩm là tự động cấp quyền cho mọi app) |
-| **`READ_COMMENTS` (Đọc comment)** | ✅ **Có** (Comment cấp 1, reply cấp 2, paging limit/offset) | ✅ **Có điều kiện** (Đọc comment và reaction khi product, scope và role của app được cấp) | ❌ **Không khả dụng** (Tài liệu Social Metadata API quy định `r_member_social` là Closed Permission — quyền đóng, hiện không nhận đơn truy cập; không hỗ trợ đọc comment Member qua API, kích hoạt `HANDED_OFF`) |
-| **`REPLY` (Trả lời comment)** | ✅ **Có** (Gửi reply comment dưới tư cách Page) | ✅ **Có điều kiện** (Gửi reply khi product, scope và role của app được cấp) | ⚠️ **Bị hạn chế / Cần kiểm tra Portal** (Từ 06/2023, tài liệu Social Actions liệt kê scope mới `w_member_social_feed` thay cho `w_member_social`; cần kiểm tra trên Developer Portal xem app có được cấp không, nếu không thì kích hoạt `HANDED_OFF`) |
-| **`MENTION` (Nhắc tên)** | ⚠️ **Chưa coi là capability mặc định** (Chỉ bật sau khi tài liệu của endpoint/version và Page task xác nhận cú pháp, định danh Page-scoped ID và quyền tương ứng; không suy ra có API mention tự do mọi hồ sơ cá nhân.) | ⚠️ **Cần kiểm thử theo endpoint/product** (Có thể dùng Organization hoặc Member URN hợp lệ nếu Posts API và quyền của app hỗ trợ; không coi cú pháp mention là capability được bảo đảm chung.) | ⚠️ **Cần kiểm thử theo endpoint/product** (Có thể dùng Organization hoặc Member URN hợp lệ nếu Posts API và quyền của app hỗ trợ; không coi cú pháp mention là capability được bảo đảm chung.) |
-| **`METRICS` (Số liệu)** | ✅ **Có** (Reactions, Comments, Shares, và metric Insights được version hiện hành hỗ trợ) | ✅ **Có điều kiện** (Organization Share Statistics và follower statistics khi product, scope và role của app được cấp) | ❌ **Không khả dụng** (Do `r_member_social` là Closed Permission, API không hỗ trợ đọc thống kê bài viết Member; kích hoạt `HANDED_OFF`) |
+| **`PUBLISH` (Đăng bài)** | ✅ **Có** (Text, link qua `/{page-id}/feed` [docs/references/meta/pages-api-posts.md], ảnh đơn qua `/{page-id}/photos` [docs/references/meta/page-photos.md], đa ảnh qua `attached_media`) | ✅ **Có điều kiện** (Text, link, ảnh đơn; `multiImage` chỉ dùng khi product/quyền của app hỗ trợ [docs/references/linkedin/multiimage-post-api.md], giới hạn phải đối chiếu tài liệu version hiện hành) | ✅ **Có điều kiện** (Text, link, ảnh đơn khi app được cấp scope/product đăng bài phù hợp; không coi việc bật sản phẩm là tự động cấp quyền cho mọi app [docs/references/linkedin/posts-api.md]) |
+| **`READ_COMMENTS` (Đọc comment)** | ✅ **Có** (Comment cấp 1, reply đa cấp qua `filter=stream` hoặc trường `order` [docs/references/meta/graph-comments-edge.md], cấu trúc phân trang nhận về qua con trỏ `cursors` trong response [docs/references/meta/pages-api-comments-mentions.md]) | ✅ **Có điều kiện** (Đọc comment và reaction khi product, scope và role của app được cấp [docs/references/linkedin/comments-api.md]) | ⚠️ **Bị hạn chế / Cần kiểm tra Portal** (Tài liệu Comments và Social Metadata quy định quyền đọc comment cá nhân `r_member_social_feed` chỉ cấp cho developer được chọn lọc — *granted to select developers only* [docs/references/linkedin/comments-api.md, docs/references/linkedin/social-metadata-api.md]; nếu app không được cấp thì kích hoạt `HANDED_OFF`) |
+| **`REPLY` (Trả lời comment)** | ✅ **Có** (Gửi reply comment dưới tư cách Page [docs/references/meta/graph-comments-edge.md, docs/references/meta/pages-api-comments-mentions.md]) | ✅ **Có điều kiện** (Gửi reply khi product, scope và role của app được cấp [docs/references/linkedin/comments-api.md]) | ⚠️ **Bị hạn chế / Cần kiểm tra Portal** (Tài liệu Network Update Social Actions và Comments liệt kê scope `w_member_social_feed` cho hành động tương tác cá nhân [docs/references/linkedin/network-update-social-actions.md, docs/references/linkedin/comments-api.md]; cần kiểm tra trên Developer Portal xem app có được cấp không, nếu không thì kích hoạt `HANDED_OFF`) |
+| **`MENTION` (Nhắc tên)** | ⚠️ **Chưa coi là capability mặc định** (Tài liệu Comments & Mentions [docs/references/meta/pages-api-comments-mentions.md] chỉ hướng dẫn mention trong comment/reply khi Page có feature "Page Mentioning", bật "Others Tagging this Page" và có PSID của người đã tương tác; tài liệu Posts [docs/references/meta/pages-api-posts.md] không hướng dẫn tag tự do khi đăng feed $\rightarrow$ Fallback về `HANDED_OFF`) | ⚠️ **Khả thi qua Little Text Format nếu có URN** (Hỗ trợ cú pháp chính thức `@[Tên](urn:li:organization:...)` hoặc `urn:li:person:...` trong `commentary` bài viết [docs/references/linkedin/little-text-format.md], nhưng app không có API tìm kiếm URN tự do; nếu không có URN thì fallback về `HANDED_OFF`) | ⚠️ **Khả thi qua Little Text Format nếu có URN** (Cần URN người/tổ chức cụ thể [docs/references/linkedin/little-text-format.md]; nếu không có URN thì fallback về `HANDED_OFF`) |
+| **`METRICS` (Số liệu)** | ✅ **Có** (Reactions, Comments, Shares, và metric Insights được version hiện hành hỗ trợ [docs/references/meta/page-insights-deprecated.md, docs/references/meta/changelog-v25.md]) | ✅ **Có điều kiện** (Organization Share Statistics và follower statistics khi product, scope và role của app được cấp [docs/references/linkedin/share-statistics.md, docs/references/linkedin/follower-statistics.md]) | ⚠️ **Bị hạn chế / Cần kiểm tra Portal** (Community Management API hỗ trợ `r_member_postAnalytics` để đọc tương tác bài viết Member, nhưng cần đăng ký xét duyệt sản phẩm [docs/references/linkedin/increasing-access.md]; nếu chưa được cấp thì kích hoạt `HANDED_OFF`) |
 | **Số follower (`followersCount`)** *(Dữ liệu kèm `METRICS`)* | ⚠️ Dùng field `followers_count` nếu field và quyền được version hiện hành cho phép; không dùng metric Insights `page_fans` đã deprecated | ⚠️ `firstDegreeSize` qua `networkSizes` chỉ khi endpoint, scope, role và product hiện hành cho phép | ❌ **Không hỗ trợ mặc định** (Không suy ra follower cá nhân từ số kết nối; chỉ dùng endpoint/member permission nếu LinkedIn cấp rõ ràng) |
 | **Idempotency native** | ❌ Không hỗ trợ native (App tự quản lý qua Room DB) | ❌ **Không hỗ trợ native** (Tài liệu Posts API không công bố header idempotency chung; app tự quản lý chống trùng lặp qua Room DB) | ❌ **Không hỗ trợ native** (Tài liệu Posts API không công bố header idempotency chung; app tự quản lý chống trùng lặp qua Room DB) |
-| **Tập hợp gán cho `ChannelAccount.capabilities` (F1)** | `setOf(PUBLISH, READ_COMMENTS, REPLY, METRICS)`; chỉ thêm `MENTION` sau khi Page feature/task và endpoint được xác nhận | `setOf(PUBLISH, READ_COMMENTS, REPLY, METRICS)`; chỉ thêm `MENTION` sau khi product/version xác nhận | Chỉ thêm `PUBLISH` sau khi token có scope/product đăng bài thực tế; không thêm `READ_COMMENTS`, `REPLY`, `METRICS` hoặc `MENTION` nếu chưa được cấp và kiểm thử |
+| **Tập hợp gán cho `ChannelAccount.capabilities` (F1)** | Gán theo Page Tasks thực tế của tài khoản (Theo tài liệu Posts API [docs/references/meta/pages-api-posts.md], bài feed yêu cầu các Page task `CREATE_CONTENT`, `MANAGE` và `MODERATE` — tài liệu dùng liên từ "and", cần kiểm thử xem có chấp nhận riêng task `CREATE_CONTENT` không; riêng ảnh yêu cầu cụ thể task `CREATE_CONTENT` [docs/references/meta/page-photos.md]; `MODERATE` cho `READ_COMMENTS` và `MODERATE` + `CREATE_CONTENT` cho `REPLY` [docs/references/meta/pages-api-comments-mentions.md]; `ANALYZE` cho `METRICS` [docs/references/meta/page-insights.md]); chỉ thêm `MENTION` sau khi Page feature/task và endpoint được xác nhận [docs/references/meta/pages-api-overview.md, docs/references/meta/page-insights.md] | Chỉ gán các capability khi token có scope, product (ví dụ Community Management API cho `READ_COMMENTS`/`REPLY`, `rw_organization_admin` — cần kiểm thử kèm `r_organization_social` [TEST-05] — cho `METRICS`) và role tương ứng [docs/references/linkedin/comments-api.md, docs/references/linkedin/share-statistics.md]; chỉ thêm `MENTION` sau khi product/version xác nhận | Chỉ thêm `PUBLISH` sau khi token có scope/product đăng bài thực tế [docs/references/linkedin/posts-api.md]; không thêm `READ_COMMENTS`, `REPLY`, `METRICS` hoặc `MENTION` nếu chưa được cấp và kiểm thử |
 
 ---
 
@@ -68,19 +68,23 @@ enum class ChannelCapability { PUBLISH, READ_COMMENTS, REPLY, MENTION, METRICS }
 
 > [!IMPORTANT]
 > **Chính sách Phiên bản & Vòng đời Meta Graph API (Version Sunset Policy):**
-> - **Chu kỳ phát hành & Vòng đời:** Meta phát hành phiên bản Graph API định kỳ khoảng **4–5 tháng một lần**, mỗi phiên bản có thời gian hỗ trợ chính thức **tối thiểu 2 năm** (thực tế kéo dài khoảng 2 năm 4 tháng đến 2 năm 5 tháng theo bảng versions của Meta, ví dụ: v24.0 ra mắt 08/10/2025 hết hạn 18/02/2028 ~ 28 tháng; v25.0 ra mắt 18/02/2026 hết hạn 29/07/2028 ~ 29 tháng) trước khi bị ngừng hoạt động (sunset).
+> - **Chu kỳ phát hành & Vòng đời (Theo bảng Versions [docs/references/meta/graph-changelog.md]):** Theo bảng danh sách phiên bản của Meta, các phiên bản Graph API thường có khoảng cách ra mắt vài tháng (ví dụ: v24.0 ra mắt 08/10/2025, v25.0 ra mắt 18/02/2026, v26.0 ra mắt 29/07/2026). Thời hạn hỗ trợ có sự phân hóa theo từng sản phẩm: Graph API cốt lõi thường kéo dài ~28-29 tháng (ví dụ: v24.0 hết hạn 18/02/2028 ~ 28 tháng; v25.0 hết hạn 29/07/2028 ~ 29 tháng), nhưng các API chuyên biệt như Marketing API phiên bản v24.0 chỉ có thời hạn hỗ trợ **12 tháng** (08/10/2025 đến 06/10/2026 theo [docs/references/meta/graph-changelog.md dòng 60]). Meta không công bố một cam kết cố định về chu kỳ hay thời gian hỗ trợ tối thiểu chung cho mọi loại API; ngày sunset cụ thể phải luôn được xác nhận trên bảng versioning/changelog hiện hành.
 > - **Tình trạng version cũ:** Không hard-code ngày sunset của một version trong tài liệu triển khai; trước khi gọi API phải kiểm tra changelog/versioning chính thức của Meta vì version cũ có thể bị từ chối hoặc không còn được hỗ trợ.
 > - **Phiên bản áp dụng chuẩn hóa:** Tài liệu dùng `v26.0` (phát hành ngày 29/07/2026) làm ví dụ kiểm thử tại thời điểm cập nhật. Trước khi triển khai, phải xác nhận version đang Active và ngày sunset trên changelog/versioning chính thức của Meta.
 > - **Thay đổi kỹ thuật quan trọng & Metric Deprecation:**
 >   - **Gỡ bỏ metric hàng loạt:** Meta đã deprecated nhiều metric Insights cho mọi Graph API version. Theo tài liệu chính thức:
->     - Các mốc deprecate trước đó: `page_impressions_unique` và `post_impressions_unique` từ **15/06/2025**, nhóm `page_fans` và nhiều metric impressions từ **15/11/2025**. *(Lưu ý về mâu thuẫn tài liệu Meta: Trang Page Insights Reference ghi "By June 15, 2026", trong khi trang Deprecated Metrics List ghi mốc "June 15, 2025"; tài liệu Meta tự mâu thuẫn giữa 2 trang này. Đồ án tuân theo danh sách có ngày cụ thể đã phát sinh hiệu lực năm 2025 để đảm bảo an toàn).*
->     - **Deprecate bổ sung trên v26.0 (theo Changelog v25.0):** Meta công bố khi `v26.0` phát hành, các metric sau bị **gỡ bỏ hoàn toàn cho mọi version**: **`page_reach`**, **`page_post_reach`**, **`video_impressions`** và **`story_impressions`**.
->   - **Danh sách metric TUYỆT ĐỐI TRÁNH DÙNG:** `post_impressions`, `post_impressions_unique`, `page_impressions`, `page_impressions_unique`, `page_fans`, `page_reach`, `page_post_reach`, `video_impressions`, `story_impressions`.
+>     - Các metric reach và impressions truyền thống đã bị gỡ bỏ hoàn toàn trên các version hiện hành: `post_impressions`, `post_impressions_unique`, `page_impressions`, `page_impressions_unique`, cùng nhóm `page_fans`. *(Lưu ý: Các nguồn tài liệu chính thức của Meta từng nêu mốc thời gian mâu thuẫn nhau giữa tháng 06/2025 và tháng 06/2026, tuy nhiên tại thời điểm hiện tại thì trên mọi version hiện hành các metric này đều đã bị deprecate hoàn toàn).*
+>     - **Deprecate bổ sung trên v26.0 (theo Changelog v25.0 [docs/references/meta/changelog-v25.md]):** Meta công bố khi `v26.0` phát hành, các metric reach và impressions cụ thể sau bị **gỡ bỏ hoàn toàn cho mọi version**:
+>       - Nhóm Page: `page_impressions_unique`, `page_impressions_paid_unique`, `page_impressions_viral_unique`, `page_impressions_nonviral_unique`, `page_posts_impressions`, `page_posts_impressions_unique`, `page_posts_impressions_paid`, `page_posts_impressions_paid_unique`, `page_posts_impressions_organic_unique`, `page_posts_served_impressions_organic_unique`, `page_posts_impressions_viral`, `page_posts_impressions_viral_unique`, `page_posts_impressions_nonviral`, `page_posts_impressions_nonviral_unique`, `page_video_views_unique`.
+>       - Nhóm Post: `post_impressions_unique`, `post_impressions_paid_unique`, `post_impressions_fan_unique`, `post_impressions_organic_unique`, `post_impressions_viral_unique`, `post_impressions_nonviral_unique`, `post_video_views_organic_unique`, `post_video_views_paid_unique`, `post_video_views_unique`.
+>       - Nhóm Video: `post_impressions_unique`, `total_video_impressions`, `total_video_impressions_unique`, `total_video_impressions_paid_unique`, `total_video_impressions_paid`, `total_video_impressions_organic_unique`, `total_video_impressions_organic`, `total_video_impressions_viral_unique`, `total_video_impressions_viral`, `total_video_impressions_fan_unique`, `total_video_impressions_fan`, `total_video_impressions_fan_paid_unique`, `total_video_impressions_fan_paid`, `total_video_views_organic_unique`, `total_video_views_paid_unique`, `total_video_views_unique`.
+>       - Nhóm Story: `PAGE_STORY_IMPRESSIONS_BY_STORY_ID`, `PAGE_STORY_IMPRESSIONS_BY_STORY_ID_UNIQUE`.
+>   - **Danh sách metric TUYỆT ĐỐI TRÁNH DÙNG (tên metric cụ thể theo Changelog v25.0 [docs/references/meta/changelog-v25.md]):** Toàn bộ các metric liệt kê ở trên cùng nhóm `page_impressions`, `post_impressions`, `page_fans` (theo Changelog v25.0 [docs/references/meta/changelog-v25.md], các metric này sẽ bị gỡ bỏ và trả về lỗi trên mọi version; mã lỗi thường gặp theo [docs/references/meta/page-insights.md] khi gọi metric không hợp lệ là *invalid metric error* mã `100`).
 >   - **Metric thay thế chính thức (Alternatives):**
 >     - Lượt xem/hiển thị bài viết: dùng **`post_media_view`** (hoặc `post_total_media_view_unique` cho lượt xem duy nhất).
 >     - Lượt xem Page: `page_media_view` (hoặc `page_total_media_view_unique`).
 >     - Số lượng follower/fan: dùng field `followers_count` của Page node hoặc metric `page_follows`.
->     - Các tương tác phản hồi: lấy trực tiếp qua summary connection (`reactions.summary(total_count)`, `comments.summary(total_count)`, `shares`).
+>     - Các tương tác phản hồi: `comments.summary(true)` (trả về `summary.total_count` theo [docs/references/meta/graph-comments-edge.md]); trường `shares` và `reactions` tóm tắt cần kiểm thử thực tế trên Post node (⚠️ Cần kiểm thử thực tế vì bộ tài liệu tham chiếu `docs/references/meta/` không bao gồm tài liệu Reference cho Post node mà chỉ có edge `/comments`).
 > - **Quy ước triển khai:** Trong mã nguồn Kotlin của Mảng B, version này cần được định nghĩa thành hằng số tập trung (ví dụ: `private const val FACEBOOK_GRAPH_API_VERSION = "v26.0"`) để dễ bảo trì và nâng cấp định kỳ.
 
 ### 2.1. Luồng OAuth 2.0 trên Android & Quản lý Token (Kiến trúc Public Client)
@@ -143,6 +147,7 @@ Nếu sau Milestone 1 nhóm xây dựng một backend/BFF riêng và không nhú
        &scope=public_profile,pages_show_list,pages_manage_posts,pages_read_engagement,pages_read_user_engagement,pages_manage_engagement
        &state={secure-random-state}
    ```
+   *(Lưu ý về danh sách scope: Hướng dẫn Posts/Comments ghi `pages_read_user_engagement`, nhưng từ điển quyền `permissions-reference.md` chỉ có `pages_read_user_content`; nếu Developer Portal từ chối `pages_read_user_engagement`, thay thế bằng `pages_read_user_content` [docs/references/meta/permissions-reference.md]).*
    `read_insights` chỉ được thêm nếu App Dashboard và endpoint/version Insights thực tế của ứng dụng
    yêu cầu quyền này; không chép nguyên một bộ scope vào production khi chưa kiểm tra trạng thái cấp quyền.
 
@@ -158,8 +163,8 @@ Nếu sau Milestone 1 nhóm xây dựng một backend/BFF riêng và không nhú
    ```
 
    > ⚠️ **Lưu ý kiểm tra Dashboard:** Nhóm cần kiểm tra trực tiếp trên Meta App Dashboard xem sản phẩm kích hoạt là **Facebook Login cổ điển** hay **Facebook Login for Business**:
-   > - Ví dụ `scope=...` chỉ có hiệu lực với Facebook Login cổ điển.
-   > - Nếu Dashboard yêu cầu dùng Facebook Login for Business, bắt buộc phải tạo Configuration và truyền tham số `config_id` thay cho danh sách `scope` (đối với Meta Android SDK, truyền Configuration ID theo cơ chế cấu hình của SDK; chi tiết tên hàm cụ thể cần đối chiếu Javadoc thực tế khi cài đặt thư viện).
+   > - Ví dụ `scope=...` là cú pháp truyền quyền tiêu chuẩn trong Facebook Login cổ điển.
+   > - Với Facebook Login for Business, tài liệu chính thức [docs/references/meta/login-for-business.md] khuyến nghị tạo Configuration trên Dashboard và truyền tham số `config_id` thay cho danh sách `scope` (lưu ý: tài liệu Meta xác nhận `config_id` là tham số tùy chọn và `scope` vẫn có thể được truyền kèm, nhưng Meta khuyến cáo không nên dùng chung). Nếu sử dụng Meta Android SDK, truyền Configuration ID theo cơ chế cấu hình của SDK; chi tiết tên hàm cụ thể cần đối chiếu Javadoc thực tế khi cài đặt thư viện.
 
 2. **Xử lý Callback trên BFF & Chuyển hướng an toàn qua Android App Links:**
    - Meta chuyển hướng trình duyệt về endpoint BFF: `https://api.yourdomain.com/auth/facebook/callback?code={authorization-code}&state={returned-state}`.
@@ -209,7 +214,7 @@ Nếu sau Milestone 1 nhóm xây dựng một backend/BFF riêng và không nhú
    - **Lưu trữ an toàn phía Client (Bao gồm Page Access Token):**
      - **Chỉ lưu Token trong `EncryptedSharedPreferences` (Keystore):**
        - User Long-lived Token (`access_token`) và mã phiên `bff_session_token`.
-       - **Page Access Token của từng Facebook Page:** Toàn bộ tác vụ cốt lõi F5 (đăng bài), F6 (đọc/trả lời comment) và F7 (lấy số liệu insights) đều thực hiện dưới danh nghĩa Page và bắt buộc sử dụng **Page Access Token** lấy từ `GET /v26.0/me/accounts`. Các Page Access Token này cũng là token nhạy cảm, **chỉ được lưu trữ trong `EncryptedSharedPreferences`** và được tra cứu theo `page_id` (ví dụ key: `fb_page_token_{page_id}`).
+       - **Page Access Token của từng Facebook Page:** Đối với ứng dụng Social Agent (quản lý các Facebook Page do người dùng sở hữu), toàn bộ tác vụ cốt lõi F5 (đăng bài), F6 (đọc/trả lời comment) và F7 (lấy số liệu insights) đều thực hiện dưới danh nghĩa Page và sử dụng **Page Access Token** lấy từ `GET /v26.0/me/accounts`. (Lưu ý: Tài liệu Meta [docs/references/meta/pages-api-posts.md dòng 28–30] có trường hợp ngoại lệ cho phép dùng User Access Token kèm tính năng `Page Public Content Access` nếu app user không sở hữu/quản lý Trang; tuy nhiên trong nghiệp vụ của app ta, Page Access Token là token tiêu chuẩn bắt buộc). Các Page Access Token này là credential nhạy cảm, **chỉ được lưu trữ trong `EncryptedSharedPreferences`** và được tra cứu theo `page_id` (ví dụ key: `fb_page_token_{page_id}`).
      - **Room Database tuyệt đối KHÔNG lưu plaintext token:** Room chỉ lưu trữ metadata phi nhạy cảm của tài khoản và từng Page (`account_id` / `page_id`, `name`, `avatar_url`, `category`, `tasks`, `expires_at`, `connection_status`, `capabilities`). Khi Repository thực hiện đăng bài hoặc đọc số liệu cho một Page, app sẽ đọc `account_id` từ Room DB rồi truy xuất Page Access Token tương ứng từ `EncryptedSharedPreferences`.
      - **Xử lý khi "Ngắt kết nối" (Disconnect) ở F1:** Khi người dùng bấm ngắt kết nối một Page hoặc đăng xuất tài khoản Facebook, ứng dụng phải **xóa sạch Page Access Token tương ứng** (hoặc toàn bộ User Token và các Page Token liên quan) khỏi `EncryptedSharedPreferences`, đồng thời cập nhật/xóa metadata trong Room DB.
 
@@ -253,13 +258,15 @@ Nếu Meta hỗ trợ cấu hình custom scheme và bỏ qua secret qua `code_ve
 
 * **Đặc tính của Page Access Token:** 
   - **Bản chất thời hạn của Page Access Token:** 
-    - Tài liệu chính thức về endpoint `GET /v26.0/me/accounts` không nêu trường `expires_in` cho Page Access Token (chỉ trả về `access_token`, `id`, `name`, `category`, `tasks`).
-    - Theo tài liệu chính thức của Meta ([Get a Long-Lived Page Access Token](https://developers.facebook.com/docs/facebook-login/guides/access-tokens/get-long-lived)), **Page Access Token sinh từ User Long-lived Token không có ngày hết hạn cố định** (`data.expires_at: 0`, giao diện Debugger hiển thị `Expires: Never`). Ngược lại, nếu sinh từ User Short-lived Token thì Page Token sẽ có thời hạn ngắn tương ứng (~1–2 giờ).
-    - Tuy không có ngày hết hạn cố định khi sinh từ Long-lived Token, Page Access Token **vẫn bị vô hiệu hóa ngay lập tức** trong các điều kiện sau:
-      1. Người dùng đổi mật khẩu tài khoản Facebook cá nhân (lỗi mã 190, subcode 460).
-      2. Người dùng chủ động đăng xuất hoặc gỡ quyền của App trong Facebook Settings (subcode 458).
-      3. Người dùng bị xóa vai trò quản trị viên hoặc mất nhiệm vụ quản lý (Page Tasks: `MODERATE`, `CREATE_CONTENT`, `MANAGE`) trên chính Page đó (subcode 492).
-    - **Tác động thiết kế F1:** Page Access Token **không bị đối xử như hết hạn theo User Token (60 ngày)**; ứng dụng không gán TTL cố định 60 ngày cho Page Token trong Room DB. Thay vào đó, Room DB chỉ quản lý metadata kết nối, và ứng dụng theo dõi trạng thái token bằng cách xử lý mã lỗi thực tế khi gọi API (chuyển sang `ConnectionStatus.TOKEN_EXPIRED` khi gặp subcode 458, 460 hoặc lỗi phân quyền khi gặp 492).
+    - **Mâu thuẫn trong tài liệu chính thức của Meta về thời hạn Page Token (Cần kiểm thử thực tế):**
+      - Trang hướng dẫn [Get a Long-Lived Page Access Token](https://developers.facebook.com/docs/facebook-login/guides/access-tokens/get-long-lived) mô tả: Page Access Token sinh từ User Long-lived Token không có ngày hết hạn cố định (`data.expires_at: 0`, giao diện Debugger hiển thị `Expires: Never`) [docs/references/meta/long-lived-page-token.md].
+      - Ngược lại, trang tài liệu tổng quan [Pages API Overview](https://developers.facebook.com/documentation/pages-api/overview) lại ghi: Page Access Token là duy nhất cho mỗi Page, user, app và **có thời hạn** (*Page access tokens have an expiration date*) [docs/references/meta/pages-api-overview.md].
+      - **Kết luận kiến trúc (Cần kiểm thử thực tế):** Do tài liệu Meta tự mâu thuẫn giữa 2 trang này, nhóm không tự suy diễn hạn cố định (không giả định vĩnh viễn cũng không gán cứng 60 ngày), mà bắt buộc kiểm chứng giá trị `expires_at` thực tế bằng công cụ Access Token Debugger / `debug_token` trên Meta Developer Portal trong giai đoạn phát triển [docs/references/meta/long-lived-page-token.md, docs/references/meta/pages-api-overview.md].
+    - Dù token có ngày hết hạn hay không, Page Access Token **vẫn bị vô hiệu hóa ngay lập tức** trong các điều kiện sau:
+      1. Người dùng đổi mật khẩu tài khoản Facebook cá nhân (lỗi mã 190, subcode 460) [docs/references/meta/error-handling.md].
+      2. Ứng dụng không được cài đặt hoặc người dùng chưa đăng nhập / đã hủy cấp quyền (lỗi mã 190, subcode 458) [docs/references/meta/error-handling.md].
+      3. Người dùng bị xóa vai trò quản trị viên hoặc mất nhiệm vụ quản lý (Page Tasks tương ứng như `MODERATE`, `CREATE_CONTENT`, `ANALYZE`) trên chính Page đó (subcode 492) [docs/references/meta/error-handling.md].
+    - **Tác động thiết kế F1:** Ứng dụng không gán TTL cứng 60 ngày cho Page Token trong Room DB, mà quản lý trạng thái token theo mã lỗi thực tế khi gọi API (bắt mã lỗi `190` kèm subcode 458, 460 để chuyển trạng thái `ConnectionStatus.TOKEN_EXPIRED`, hoặc subcode 492 để xử lý như lỗi phân quyền `PermissionError` [docs/references/meta/error-handling.md]).
   - **Phương pháp kiểm thử thời hạn Page Token trong giai đoạn Dev (Chỉ dùng khi kiểm thử, không đưa vào App):**
     - **Cách thức kiểm chứng:** Trong quá trình phát triển và kiểm thử, nhóm sử dụng công cụ [Access Token Debugger](https://developers.facebook.com/tools/debug/accesstoken/) trên Meta Developer Portal (hoặc gọi thủ công endpoint `GET /debug_token?input_token={page_access_token}&access_token={app_access_token}` qua Postman hoặc Graph API Explorer).
     - **Kết quả cần tìm:** Đọc các trường metadata thực tế do Access Token Debugger hoặc `/debug_token` trả về, đặc biệt trường `data.expires_at` (giá trị `0` xác nhận token không có ngày hết hạn) và `data.data_access_expires_at` (Unix timestamp chỉ mốc hết hạn truy cập dữ liệu sau 90 ngày nếu người dùng không hoạt động). *(Lưu ý: `data_access_expires_at` là tên trường trong response của `/debug_token`, tương ứng với thuộc tính `dataAccessExpirationTime` của đối tượng `AccessToken` trên Android SDK).*
@@ -284,17 +291,24 @@ Nếu Meta hỗ trợ cấu hình custom scheme và bỏ qua secret qua `code_ve
         }
       }
       ```
-    - **Phân loại `error_subcode`:** Không hard-code bảng ánh xạ các subcode vào hành vi ứng dụng. Tài liệu lỗi Meta không bảo đảm mọi subcode có cùng ý nghĩa qua endpoint/version; client phải xem `error.code`, `error_subcode`, message, token loại nào (User/Page), endpoint và quyền/Page task. Chỉ chuyển sang `TOKEN_EXPIRED` khi response cho thấy token hết hạn/không hợp lệ; nếu lỗi là thiếu quyền hoặc mất Page task thì giữ phân loại lỗi phân quyền và hướng dẫn người dùng xử lý quyền.
+    - **Phân loại `error_subcode`:** Bảng ánh xạ `error_subcode` dưới đây dùng làm gợi ý xử lý chuẩn cho các tình huống phổ biến, không phải hợp đồng cố định bắt buộc cho mọi endpoint. Tài liệu lỗi Meta không bảo đảm mọi subcode có cùng ý nghĩa qua mọi endpoint/version; client phải kết hợp phân tích `error.code`, `error_subcode`, message, loại token (User hay Page), endpoint đang gọi và tình trạng quyền/Page task:
+      - Subcode `463` / `467`: Access token hết hạn hoặc không hợp lệ [docs/references/meta/error-handling.md] $\rightarrow$ Đánh dấu `ConnectionStatus.TOKEN_EXPIRED`, thông báo kết nối lại.
+      - Subcode `460`: Người dùng đổi mật khẩu tài khoản Facebook cá nhân [docs/references/meta/error-handling.md] $\rightarrow$ Vô hiệu hóa token, đánh dấu `ConnectionStatus.TOKEN_EXPIRED`.
+      - Subcode `458`: Ứng dụng không được cài đặt hoặc người dùng chưa đăng nhập vào ứng dụng (cần xác thực lại người dùng) [docs/references/meta/error-handling.md] $\rightarrow$ Đánh dấu `ConnectionStatus.TOKEN_EXPIRED`.
+      - Subcode `492`: Người dùng liên kết với mã truy cập Trang không có vai trò thích hợp trên Trang [docs/references/meta/error-handling.md] $\rightarrow$ Xử lý như lỗi phân quyền (`PermissionError`), không retry và hướng dẫn người dùng kiểm tra quyền quản trị trên Page.
 
   - **Xử lý lỗi phân quyền API & Mã lỗi đặc thù trên Comment API (Meta):**
     - **Ý nghĩa kỹ thuật từ tài liệu chính thức của Meta:**
-      - **Mã lỗi `10`** (*Permission Denied*): Ứng dụng hoặc Access Token không có quyền thực hiện thao tác này.
+      - **Mã lỗi `10`** (*Permission Denied*): Ứng dụng hoặc Access Token không có quyền thực hiện thao tác này [docs/references/meta/error-handling.md].
       - **Dải mã lỗi phân quyền `200–299`** (*Permissions-related errors*):
-        - Mã `200` (*Permissions disallow edit to field*): Không được phép sửa/thao tác trên trường dữ liệu.
-        - Mã `283` (*Requires pages_read_engagement or pages_read_user_content*): **Mã lỗi chính thức từ tài liệu tham chiếu Comment API của Meta**, xảy ra khi thao tác đọc/trả lời comment thiếu quyền tương tác cần thiết $\rightarrow$ Xử lý như lỗi phân quyền (`PermanentError`), không retry vô hạn và kích hoạt cơ chế `HANDED_OFF`.
-      - **Mã lỗi giới hạn tần suất & tạm thời trên Comment API:**
-        - Mã `1705` (*Temporary comment issue / rate limit*): Mã lỗi chính thức của Meta chỉ sự cố tạm thời hoặc vượt tần suất thao tác comment $\rightarrow$ Xử lý như `TransientError`, áp dụng exponential backoff retry.
-        - Mã `80001` (*Page rate limit on comments*): Giới hạn tốc độ thao tác của chính Page trên hệ thống bình luận $\rightarrow$ Xử lý như `TransientError`, tạm dừng hàng đợi và retry sau thời gian chờ.
+        - Mã `200` (*Permissions error*): Lỗi phân quyền truy cập hoặc thực hiện thao tác theo tài liệu tham chiếu Comment API của Meta [docs/references/meta/error-handling.md, docs/references/meta/page-photos.md].
+        - Mã `283` (*Requires pages_read_engagement or pages_read_user_content*): Mã lỗi phân quyền yêu cầu quyền tương tác mở rộng [docs/references/meta/page-photos.md, docs/references/meta/page-reference.md]; khi thao tác đọc/trả lời comment thiếu quyền tương tác (Cần kiểm thử thực tế trên endpoint `/comments`) $\rightarrow$ Xử lý như lỗi phân quyền không thể tự khắc phục ở runtime (`PermissionError`), không retry vô hạn và kích hoạt cơ chế `HANDED_OFF`.
+      - **Mã lỗi đặc thù & giới hạn tần suất trên Pages API:**
+        - Mã `1705`: Theo tài liệu chính thức [Pages API: Comments & Mentions](https://developers.facebook.com/docs/pages-api/comments-mentions/), Meta mô tả trường hợp thực hiện bình luận dưới danh nghĩa User cá nhân thay vì Page cũng trả về mã này (message ví dụ của Meta là *"There was an error posting to this wall"*, client không hard-code match theo chuỗi này) [docs/references/meta/pages-api-comments-mentions.md]. Vì đây là lỗi do danh tính actor/token không đúng loại, việc retry tự động với cùng token sẽ không thể khắc phục được. Trước khi phân loại lỗi, client **cần kiểm tra `error.message`, actor/Page token đang dùng (đang dùng User Token hay Page Token) và trạng thái của Page**:
+          - Nếu gửi nhầm User Token hoặc thiếu quyền đại diện của Page: Phân loại là lỗi cấu hình/xác thực token (`AuthenticationError`/`ConfigurationError`), tuyệt đối không retry, thông báo người dùng cấp lại Page Access Token hoặc chọn đúng Page quản trị.
+          - Nếu do trạng thái Page bị khóa hoặc hạn chế bình luận: Báo lỗi tương ứng để người dùng kiểm tra trạng thái Page trên Meta Business Suite.
+        - Mã `80001` (*Page account call rate limit*): Xuất hiện trong tài liệu Pages API (như Page Photos) chỉ sự cố vượt tần suất cuộc gọi cấp độ Page account nói chung (không riêng bình luận) $\rightarrow$ Xử lý như `TransientError`, tạm dừng hàng đợi và retry sau thời gian chờ (exponential backoff) [docs/references/meta/page-photos.md].
+        - Mã `506` (*Duplicate post*): Xuất hiện khi ứng dụng cố tình hoặc retry đăng bài viết có nội dung trùng lặp liên tiếp; Graph API từ chối đăng để chống spam ("Không thể đăng bài viết trùng lặp liên tiếp. Hãy thay đổi nội dung của bài viết và thử lại") $\rightarrow$ Xử lý như lỗi nội dung không thể retry tự động (`PermanentError`), thông báo người dùng đổi nội dung hoặc ngăn hàng đợi gửi trùng lặp [docs/references/meta/error-handling.md].
     - **Ánh xạ kiến trúc & Cơ chế xử lý:**
       - Đây có thể là lỗi phân quyền không thể tự khắc phục bằng retry hoặc refresh token, nhưng client phải đọc `error.code`, `error_subcode`, message, endpoint, Page task và trạng thái quyền trước khi phân loại. Không tự động coi mọi mã trong dải `200–299` là lỗi vĩnh viễn.
       - Khi xác nhận lỗi là thiếu quyền/Page task hoặc App Review không thể khắc phục ở runtime trong quá trình đăng bài (F5), Client **không retry vô hạn** và kích hoạt cơ chế dự phòng bàn giao (xem chi tiết tại §4):
@@ -307,12 +321,12 @@ Nếu Meta hỗ trợ cấu hình custom scheme và bỏ qua secret qua `code_ve
 
 | Chức năng / Khả năng | Scope cần xin | Mô tả & Lưu ý kỹ thuật |
 |---|---|---|
-| **F1 (Kết nối kênh)** | `public_profile`, `pages_show_list` | Lấy danh sách các Page người dùng quản lý (`GET /me/accounts`) và lấy Page Access Token. |
-| **`PUBLISH` (Đăng bài)** | `pages_manage_posts`, `pages_read_engagement` | Đăng bài viết (text, link), upload ảnh/video thay mặt Page lên endpoint `/{page-id}/feed` hoặc `/{page-id}/photos`. |
-| **`READ_COMMENTS` (Đọc comment)** | `pages_read_user_engagement`, `pages_read_engagement` | Đọc danh sách bình luận của người dùng và các phản hồi trên bài viết (`GET /{post-id}/comments`). **Yêu cầu Page task:** `MODERATE` hoặc `MANAGE`. `pages_read_user_content` chỉ bổ sung khi dùng endpoint user-generated content tương ứng, chẳng hạn `/tagged`. |
-| **`REPLY` (Trả lời comment)** | `pages_manage_engagement`, `pages_read_engagement` | Gửi bình luận trả lời (`POST /{comment-id}/comments`) dưới danh nghĩa Page. Theo tài liệu chính thức của Meta Pages API về Comments & Mentions, thao tác này yêu cầu đồng thời cả `pages_manage_engagement` và `pages_read_engagement`. **Yêu cầu Page task:** `MODERATE` hoặc `MANAGE` trên cả Page và comment ID mục tiêu. |
-| **`MENTION` (Nhắc tên)** | `pages_manage_posts` khi đăng bài và `pages_manage_engagement` khi thao tác comment/reply, nếu endpoint/version xác nhận hỗ trợ mention; `pages_read_user_content` chỉ khi đọc endpoint user-generated content tương ứng như `/tagged` *(kèm Page feature và Page task phù hợp)* | Không coi mention là capability mặc định. Chỉ thử với Page-scoped ID hoặc định danh được endpoint tài liệu hỗ trợ, sau khi xác nhận Page task, product và quyền thực tế; nếu không đáp ứng thì fallback về `HANDED_OFF`. Đây không phải cơ chế tìm kiếm/mention tự do mọi hồ sơ cá nhân. |
-| **`METRICS` (Số liệu)** | `pages_read_engagement`, `read_insights` *(đối chiếu thêm quyền và metric được yêu cầu bởi endpoint/version cụ thể)* | Đọc số lượt hiển thị/xem (`post_media_view` hoặc metric hiện hành tương ứng), tương tác (`reactions`, `shares`, `comments count`) và số lượng người theo dõi (`followers_count`). Đọc Page Insights yêu cầu **Page task:** `ANALYZE` hoặc `MANAGE`. Không dùng metric Insights `page_fans` đã deprecated làm dữ liệu chính. |
+| **F1 (Kết nối kênh)** | `public_profile`, `pages_show_list` | Lấy danh sách các Page người dùng quản lý (`GET /me/accounts`) và lấy Page Access Token [docs/references/meta/pages-api-overview.md]. `pages_show_list` không có dependencies [docs/references/meta/permissions-reference.md]. |
+| **`PUBLISH` (Đăng bài)** | `pages_manage_posts`, `pages_manage_engagement`, `pages_read_engagement`, `pages_read_user_engagement` *(Cần kiểm thử thực tế scope `pages_read_user_engagement`)* | Đăng bài viết (text, link), upload ảnh/video thay mặt Page lên endpoint `/{page-id}/feed` hoặc `/{page-id}/photos` [docs/references/meta/pages-api-posts.md, docs/references/meta/page-photos.md]. **Yêu cầu Page task:** Tài liệu hướng dẫn Posts [docs/references/meta/pages-api-posts.md] nêu yêu cầu các task `CREATE_CONTENT`, `MANAGE` và `MODERATE` cho bài viết feed (nguyên văn tài liệu dùng liên từ "and", cần kiểm thử thực tế xem Page có chấp nhận riêng task `CREATE_CONTENT` không); riêng endpoint upload ảnh `/{page-id}/photos` yêu cầu cụ thể task `CREATE_CONTENT` [docs/references/meta/page-photos.md]. **Dependencies bắt buộc khi App Review:** `pages_manage_posts` phụ thuộc `pages_read_engagement` và `pages_show_list` [docs/references/meta/permissions-reference.md]. |
+| **`READ_COMMENTS` (Đọc comment)** | `pages_read_user_engagement` *(Cần kiểm thử thực tế vs `pages_read_user_content`)*, `pages_read_engagement` | Đọc danh sách bình luận của người dùng và các phản hồi trên bài viết (`GET /{post-id}/comments?filter=stream` hoặc trường `order`) [docs/references/meta/graph-comments-edge.md, docs/references/meta/pages-api-comments-mentions.md]. **Yêu cầu Page task:** `MODERATE` trên Page. *(Lưu ý: Hướng dẫn Posts/Comments ghi `pages_read_user_engagement`, nhưng từ điển quyền `permissions-reference.md` chỉ có `pages_read_user_content`; Cần kiểm thử thực tế trên Developer Portal [docs/references/meta/permissions-reference.md]).* |
+| **`REPLY` (Trả lời comment)** | `pages_manage_engagement`, `pages_read_engagement`, `pages_read_user_engagement` *(Cần kiểm thử thực tế)* | Gửi bình luận trả lời (`POST /{comment-id}/comments`) dưới danh nghĩa Page [docs/references/meta/graph-comments-edge.md, docs/references/meta/pages-api-comments-mentions.md]. **Yêu cầu Page task:** `MODERATE` và `CREATE_CONTENT` trên Page (trang reference `/comments` chỉ nêu `pages_manage_engagement` và task `MODERATE`; Cần kiểm thử thực tế). **Dependencies bắt buộc khi App Review:** `pages_manage_engagement` phụ thuộc `pages_read_user_content` và `pages_show_list` [docs/references/meta/permissions-reference.md]. |
+| **`MENTION` (Nhắc tên)** | Chỉ xem xét khi endpoint/feature xác nhận; chịu xét duyệt feature **MENTIONING** | Hạn chế theo Pages API Comments & Mentions: Tài liệu chính thức [docs/references/meta/pages-api-comments-mentions.md] chỉ hướng dẫn mention trong comment/reply khi Page có feature "Page Mentioning", bật "Others Tagging this Page", và chỉ tag được người dùng đã từng tương tác bài viết/comment trên Page; tài liệu Posts [docs/references/meta/pages-api-posts.md] không hướng dẫn tag tự do khi đăng feed $\rightarrow$ Fallback về `HANDED_OFF`. |
+| **`METRICS` (Số liệu)** | `pages_read_engagement`, `read_insights` *(đối chiếu thêm quyền và metric được yêu cầu bởi endpoint/version cụ thể)* | Đọc số lượt hiển thị/xem (`post_media_view` hoặc metric hiện hành tương ứng), tương tác (`reactions`, `shares`, `comments count`) và số lượng người theo dõi (`followers_count`) [docs/references/meta/page-insights.md]. Đọc Page Insights yêu cầu **Page task:** `ANALYZE` trên Page [docs/references/meta/page-insights.md]. **Dependencies bắt buộc khi App Review:** `read_insights` phụ thuộc `pages_read_engagement` và `pages_show_list` [docs/references/meta/permissions-reference.md]. |
 
 ### 2.3. Các Endpoint chính
 > **Quy ước triển khai trong repository:** Các ví dụ `FacebookClient`/Repository ở mục này
@@ -326,6 +340,8 @@ Nếu Meta hỗ trợ cấu hình custom scheme và bỏ qua secret qua `code_ve
    ```http
    GET https://graph.facebook.com/v26.0/me/accounts?fields=id,name,access_token,category,tasks
    ```
+   *Lưu ý kỹ thuật với Page thuộc Business Portfolio (⚠️ Cần kiểm thử thực tế):*
+   Theo quan sát thực tế khi tích hợp (⚠️ nội dung ngoài bộ tài liệu tham chiếu `docs/references/meta/pages-api-overview.md`), nếu Page được quản lý bởi Meta Business Portfolio / Business Manager và người dùng chỉ được gán nhiệm vụ (*Page Tasks*) qua tài khoản doanh nghiệp thay vì sở hữu trực tiếp cá nhân, endpoint `/me/accounts` có thể không trả về đầy đủ hoặc trả về mảng rỗng `data: []` (điểm này chưa được mô tả trong tài liệu chính thức [docs/references/meta/pages-api-overview.md]). Khi đó, cần kiểm tra cấp quyền `business_management` [docs/references/meta/permissions-reference.md] hoặc kiểm tra cấu hình tài sản trong Meta Business Suite; nhóm cần kiểm thử thực tế hành vi của `/me/accounts` với tài khoản doanh nghiệp trên môi trường dev.
 2. **Đăng bài viết kèm nội dung văn bản (F5):**
    ```http
    POST https://graph.facebook.com/v26.0/{page-id}/feed
@@ -341,10 +357,11 @@ Nếu Meta hỗ trợ cấu hình custom scheme và bỏ qua secret qua `code_ve
    POST https://graph.facebook.com/v26.0/{page-id}/photos
    Content-Type: multipart/form-data
 
-   message="Nội dung bài viết kèm ảnh..."
+   caption="Nội dung bài viết kèm ảnh..."
    source=@/path/to/image.png
    access_token={page-access-token}
    ```
+   *(Lưu ý: Trên endpoint `/{page-id}/photos`, tham số `caption` là chuẩn; `message` và `name` đã bị đánh dấu Deprecated [docs/references/meta/page-photos.md]).*  
    *Trả về:* `{"id": "photo_id", "post_id": "{page-id}_{post-id}"}`.
 
 4. **Đăng bài viết đa ảnh (Multi-photo Post — F5):**
@@ -373,8 +390,9 @@ Nếu Meta hỗ trợ cấu hình custom scheme và bỏ qua secret qua `code_ve
      }
      ```
      *Nhận về:* `{"id": "{page-id}_{post-id}"}`.
-   - *Lưu ý kỹ thuật & Trạng thái xác minh:*
-     - **Số lượng ảnh và dung lượng file:** Không hard-code giới hạn cố định trong tài liệu nghiên cứu. Client phải đối chiếu tài liệu của endpoint/version đang dùng và xử lý rõ lỗi validation hoặc upload failure từ response.
+   - *Lưu ý kỹ thuật & Vòng đời ảnh:*
+     - **Vòng đời của ảnh chưa công khai (Unpublished Photos TTL):** Theo tài liệu Photo Specifications của Meta, các ảnh tải lên với `published=false` chỉ tồn tại tạm thời và **sẽ bị Meta tự động xóa sau khoảng 24 giờ** nếu không được gắn vào bài post qua `attached_media`. Do đó, hàng đợi WorkManager của ứng dụng phải thực hiện Bước 2 ngay sau khi hoàn tất tải ảnh lên, tránh để ảnh tồn đọng quá 24 giờ gây lỗi invalid media id [docs/references/meta/page-photos.md]. Nếu upload ảnh cho bài viết lên lịch (Scheduled Post), tài liệu Meta khuyến nghị gắn thêm tham số `temporary=true` (khi đó `published` bắt buộc là `false` và không được truyền `scheduled_publish_time` trong request upload ảnh [docs/references/meta/page-photos.md]).
+     - **Số lượng ảnh và dung lượng file:** Không tải lên quá giới hạn của endpoint/version đang dùng; client phải đối chiếu tài liệu và xử lý rõ lỗi validation hoặc upload failure từ response.
      - Trong Milestone 1, model `PostDraft` ưu tiên hỗ trợ `imageUri` (ảnh đơn), quy trình đa ảnh được chuẩn hóa sẵn sàng cho giai đoạn mở rộng tiếp theo.
 
    > [!WARNING]
@@ -391,8 +409,21 @@ Nếu Meta hỗ trợ cấu hình custom scheme và bỏ qua secret qua `code_ve
 
 5. **Lấy danh sách comment của bài viết (F6):**
    ```http
-   GET https://graph.facebook.com/v26.0/{post-id}/comments?fields=id,from,message,created_time,comment_count,parent&limit=50&access_token={page-access-token}
+   GET https://graph.facebook.com/v26.0/{post-id}/comments?filter=stream&fields=id,from,message,created_time,comment_count,parent&limit=50&access_token={page-access-token}
    ```
+   *Lưu ý kỹ thuật về tham số `filter` và cơ chế phân trang Cursor:*
+   - **Sử dụng `filter=stream` hoặc trường `order`:** Giá trị filter mặc định của Graph API trên edge `/comments` là `toplevel` (chỉ trả về bình luận cấp 1). Muốn lấy danh sách đầy đủ tất cả các cấp bình luận của bài viết, tài liệu Meta hướng dẫn đặt thông số `filter=stream` hoặc sử dụng trường `order` (`chronological` / `reverse_chronological`) [docs/references/meta/graph-comments-edge.md].
+   - **Phân trang bằng con trỏ (Cursor-based Pagination):** Phản hồi API trả về đối tượng `paging` chứa cặp con trỏ `cursors` (`before` và `after`) theo cấu trúc response mẫu trong tài liệu [docs/references/meta/pages-api-comments-mentions.md]:
+     ```json
+     "paging": {
+       "cursors": {
+         "before": "QVFIU...",
+         "after": "QVFIU..."
+       },
+       "next": "https://graph.facebook.com/v26.0/{post-id}/comments?..."
+     }
+     ```
+     Để tải trang kế tiếp trong thực tế, client truyền tham số `after={paging.cursors.after}` (lưu ý: tham số query `limit` và `after` là quy ước phân trang cursor phổ biến của Graph API, cần kiểm thử thực tế trên endpoint bài post).
 6. **Trả lời comment (F6):**
    ```http
    POST https://graph.facebook.com/v26.0/{comment-id}/comments
@@ -403,46 +434,47 @@ Nếu Meta hỗ trợ cấu hình custom scheme và bỏ qua secret qua `code_ve
      "access_token": "{page-access-token}"
    }
    ```
+   *(Lưu ý về URL endpoint — Cần kiểm thử thực tế: Theo tài liệu tham chiếu `graph-comments-edge.md`, endpoint trả lời comment là `POST /{comment-id}/comments`; tuy nhiên hướng dẫn `pages-api-comments-mentions.md` lại có ví dụ curl gửi trực tiếp tới `POST /{comment-id}`. Nhóm cần kiểm thử thực tế trên Graph API Explorer để xác nhận endpoint chuẩn [docs/references/meta/graph-comments-edge.md, docs/references/meta/pages-api-comments-mentions.md]).*
 7. **Lấy số liệu bài viết (F7):**
    ```http
-   GET https://graph.facebook.com/v26.0/{post-id}?fields=shares,comments.summary(total_count),reactions.summary(total_count)&access_token={page-access-token}
+   GET https://graph.facebook.com/v26.0/{post-id}?fields=shares,comments.summary(true),reactions.summary(total_count)&access_token={page-access-token}
    GET https://graph.facebook.com/v26.0/{post-id}/insights?metric=post_media_view&access_token={page-access-token}
    ```
    *Lưu ý thay đổi trường dữ liệu quan trọng:*
-   - Meta đã deprecated `post_impressions` và cung cấp `post_media_view` làm alternative; `post_impressions_unique` có alternative là `post_total_media_view_unique`. Ngoài ra, theo Changelog v25.0, khi v26.0 phát hành thì các metric **`page_post_reach`**, **`page_reach`**, **`video_impressions`** và **`story_impressions`** cũng bị gỡ bỏ hoàn toàn cho mọi version. Nếu request chứa metric không còn được version hiện hành hỗ trợ, API sẽ trả lỗi HTTP 400 (Invalid metric) và làm thất bại cuộc gọi.
-   - Để lấy số lượt hiển thị/xem, ưu tiên metric được tài liệu chính thức xác nhận cho version đang dùng, hiện là **`post_media_view`** cho lượt xem không duy nhất.
-   - Các tương tác like/reaction, comment, share được lấy trực tiếp và chính xác qua summary connection: `reactions.summary(total_count)`, `comments.summary(total_count)` và `shares`.
+   - Meta đã deprecated `post_impressions` và cung cấp `post_media_view` làm alternative; `post_impressions_unique` có alternative là `post_total_media_view_unique` [docs/references/meta/changelog-v25.md, docs/references/meta/page-insights-deprecated.md]. Ngoài ra, theo Changelog v25.0, khi v26.0 phát hành thì toàn bộ các metric reach/impressions sau bị gỡ bỏ hoàn toàn cho mọi version [docs/references/meta/changelog-v25.md]:
+     - Nhóm Page: `page_impressions_unique`, `page_impressions_paid_unique`, `page_impressions_viral_unique`, `page_impressions_nonviral_unique`, `page_posts_impressions`, `page_posts_impressions_unique`, `page_posts_impressions_paid`, `page_posts_impressions_paid_unique`, `page_posts_impressions_organic_unique`, `page_posts_served_impressions_organic_unique`, `page_posts_impressions_viral`, `page_posts_impressions_viral_unique`, `page_posts_impressions_nonviral`, `page_posts_impressions_nonviral_unique`, `page_video_views_unique`.
+     - Nhóm Post: `post_impressions_unique`, `post_impressions_paid_unique`, `post_impressions_fan_unique`, `post_impressions_organic_unique`, `post_impressions_viral_unique`, `post_impressions_nonviral_unique`, `post_video_views_organic_unique`, `post_video_views_paid_unique`, `post_video_views_unique`.
+     - Nhóm Video: `total_video_impressions` cùng các biến thể `_unique`, `_paid`, `_paid_unique`, `_organic`, `_organic_unique`, `_viral`, `_viral_unique`, `_fan*`, `total_video_views*`.
+     - Nhóm Story: `PAGE_STORY_IMPRESSIONS_BY_STORY_ID`, `PAGE_STORY_IMPRESSIONS_BY_STORY_ID_UNIQUE`.
+   - **Bẫy dữ liệu rỗng và mã lỗi:** Nếu Access Token thiếu quyền `read_insights`, API không trả về lỗi HTTP 403 mà trả về tập dữ liệu rỗng `data: []` [docs/references/meta/page-insights.md]. Nếu request chứa metric không còn được version hiện hành hỗ trợ, API sẽ trả về lỗi mã `100` (`"(#100) The value must be a valid insights metric"`); nếu không truyền tham số metric, API trả về lỗi mã `3001` (subcode `1504028`) [docs/references/meta/page-insights.md].
+   - Để lấy số lượt hiển thị/xem, ưu tiên metric được tài liệu chính thức xác nhận cho version đang dùng, hiện là **`post_media_view`** cho lượt xem không duy nhất [docs/references/meta/page-insights-deprecated.md].
+   - Các tương tác comment được lấy qua `comments.summary(true)` (trả về đối tượng `summary.total_count` theo tài liệu edge `/comments` [docs/references/meta/graph-comments-edge.md]). Đối với số lượt share (`shares`) và số lượt reactions (`reactions.summary(total_count)` hoặc `reactions.summary(true)`), đây là các trường quan sát thực tế trên Post node và không nằm trong tài liệu tham chiếu `graph-comments-edge.md` (⚠️ Cần kiểm thử thực tế trên Graph API Explorer để chốt đúng cấu trúc response).
 8. **Lấy số follower của Page (F7):**
    ```http
    GET https://graph.facebook.com/v26.0/{page-id}?fields=followers_count&access_token={page-access-token}
    ```
-   *Lưu ý về các trường số liệu trên Graph API v26.0 (Legacy Page Fields):*
-   - **`followers_count`:** Field của Page được tài liệu Graph API sử dụng để đọc tổng số người theo dõi. Phải kiểm tra field này còn được expose trên version, product và Page token thực tế trước khi dùng làm nguồn dữ liệu runtime.
-   - **`page_fans`:** Là metric Insights đã deprecated; không dùng làm fallback runtime. `fan_count` là Graph field khác với metric `page_fans`, vì vậy không được tự động coi là deprecated chỉ từ thay đổi metric; nếu cần dùng phải xác nhận field và quyền trên version hiện hành. `page_follows` là alternative của metric Insights `page_fans`, không mặc định là field thay thế trong truy vấn Page object.
+   *Lưu ý về các trường số liệu trên Graph API v26.0 (Page Followers):*
+   - **`followers_count`:** Field chuẩn của Page node được tài liệu Graph API sử dụng để đọc tổng số người theo dõi.
+   - **Đặc tính của Page dùng New Page Experience (NPE):** Trường `fan_count` biểu thị số người thích Page (đọc qua `Page Public Content Access` hoặc `Page Public Metadata Access`), trong khi `followers_count` là số người theo dõi [docs/references/meta/page-reference.md]. Đối với Page đã chuyển sang New Page Experience (NPE), tài liệu Meta nêu rõ `fan_count` sẽ trả về giá trị của `followers_count` [docs/references/meta/page-reference.md]. Tuy nhiên, để đảm bảo tính nhất quán trên mọi phiên bản và trải nghiệm Page, client nên truy vấn trực tiếp trường chuẩn `fields=followers_count` [docs/references/meta/page-reference.md].
+   - **Metric `page_fans`:** Là metric Insights đã bị deprecated hoàn toàn; không dùng làm nguồn dữ liệu [docs/references/meta/page-insights-deprecated.md].
 
 ### 2.4. Giới hạn & Quy định kiểm duyệt (App Review)
-- **Giới hạn nội bộ của app:** `63,206` ký tự theo cấu hình `ChannelType.FACEBOOK(maxChars = 63_206)`. Đây không phải giới hạn Pages API được Meta xác nhận trong tài liệu này; client phải xử lý lỗi validation nếu endpoint/version thực tế áp dụng giới hạn khác.
-- **Kích thước ảnh & Định dạng:**
-  - Định dạng và giới hạn ảnh phải đối chiếu theo endpoint/version đang dùng; không suy ra một danh sách định dạng chung cho mọi Pages API upload.
-  - **Giới hạn dung lượng (⚠️ Trạng thái: Chưa xác minh từ tài liệu chính thức của Meta — Số liệu thực nghiệm/quan sát cộng đồng dev):**
-    - Không hard-code giới hạn dung lượng `4 MB` hoặc `10 MB`: đây không phải các ngưỡng cố định được xác nhận trong tài liệu Pages API hiện hành.
-    - Client cần kiểm tra lỗi phản hồi khi upload, giới hạn được công bố cho endpoint/version đang dùng và khả năng tải lên thực tế trước khi chọn ngưỡng nội bộ.
-    *(Meta có thể kiểm tra định dạng, kích thước pixel và các giới hạn khác theo endpoint; không suy ra giới hạn MB chính thức nếu tài liệu endpoint không công bố).*
-- **Rate Limit (Giới hạn tần suất gọi):** Áp dụng cơ chế **Business Use Case (BUC) Rate Limiting** (và Platform Rate Limiting theo token):
-  - **Bản chất giới hạn động (Dynamic Threshold):** Theo tài liệu chính thức của Meta về [Graph API Rate Limiting](https://developers.facebook.com/docs/graph-api/overview/rate-limiting/), không có hạn ngạch cuộc gọi cố định cho tất cả các Page. Ngưỡng giới hạn được tính toán linh hoạt theo cửa sổ trượt (rolling window) dựa trên số lượng người dùng tương tác với Page (Page Engaged Users) và loại use-case cụ thể.
-  - **Cơ chế theo dõi tài nguyên:** Ứng dụng theo dõi trực tiếp mức tiêu thụ tài nguyên qua header HTTP trả về:
-    - `X-Business-Use-Case-Usage`: Chứa đối tượng JSON biểu thị tỉ lệ % đã sử dụng (`call_count`, `cpu_time`, `total_time` tính trên ngưỡng 100%) và thời gian chờ phục hồi (`estimated_time_to_regain_access`).
-    - `X-App-Usage`: Biểu diễn % tài nguyên cấp độ ứng dụng.
-  - **Xử lý khi chạm trần:** Có thể nhận HTTP 403/429 hoặc lỗi Graph API kèm mã và header usage tùy endpoint. Client phải đọc body lỗi cùng `X-Business-Use-Case-Usage`/`X-App-Usage`; chỉ map sang `PublishResult.RetryableError` khi response cho thấy lỗi tạm thời hoặc có thời gian retry, không ánh xạ cố định mọi mã lỗi vào retry.
+- **Giới hạn nội bộ của app:** `63,206` ký tự theo cấu hình `ChannelType.FACEBOOK(maxChars = 63_206)`. Lưu ý: Tài liệu tham chiếu chính thức [docs/references/meta/pages-api-posts.md] không công bố con số giới hạn ký tự tối đa cụ thể của bài viết; con số `63,206` hoàn toàn là cấu hình quy ước nội bộ của app, client phải chuẩn bị xử lý lỗi validation từ server nếu endpoint/version thực tế áp dụng giới hạn khác.
+- **Kích thước ảnh & Định dạng (Photo Specifications theo Meta Graph API):**
+  - **Định dạng file hỗ trợ chính thức:** Meta Pages Photos API chính thức hỗ trợ các định dạng file ảnh: **JPEG (`.jpg`, `.jpeg`), BMP (`.bmp`), PNG (`.png`), GIF (`.gif`), TIFF (`.tiff`)** [docs/references/meta/page-photos.md].
+  - **Giới hạn dung lượng tải lên:** Theo tài liệu Photo Specifications của Meta, dung lượng file ảnh không được vượt quá **4 MB**. Riêng đối với file định dạng PNG, file **không được vượt quá 1 MB**, nếu không hình ảnh có thể bị bể hình (*pixelated*) [docs/references/meta/page-photos.md]. Client Android cần kiểm tra kích thước file cục bộ trước khi upload multipart, nén hoặc cảnh báo người dùng nếu ảnh vượt quá các ngưỡng này.
+- **Rate Limit (Giới hạn tần suất gọi):** Áp dụng cơ chế **Business Use Case (BUC) Rate Limiting** cho Page access token và **Platform Rate Limiting** cho user/app token [docs/references/meta/rate-limiting.md]:
+  - **Bản chất giới hạn động (Dynamic Threshold):** Theo tài liệu chính thức của Meta về [Graph API Rate Limiting](https://developers.facebook.com/docs/graph-api/overview/rate-limiting/), không có hạn ngạch cuộc gọi cố định cho tất cả các Page. Các yêu cầu bằng Page access token tuân theo Giới hạn tốc độ BUC; số liệu thống kê được trả về trong header của phản hồi hoặc hiển thị trên App Dashboard [docs/references/meta/rate-limiting.md]. Các chi tiết về cửa sổ trượt theo Page Engaged Users và cấu trúc header `X-Business-Use-Case-Usage` / `X-App-Usage` (chứa `call_count`, `cpu_time`, `estimated_time_to_regain_access`) là thông tin ghi nhận từ quan sát thực tế ngoài bộ tài liệu tham chiếu (tài liệu tổng quan [docs/references/meta/rate-limiting.md] chỉ giải thích nguyên lý phân biệt giữa Platform Rate Limit và BUC Rate Limit mà không đặc tả chi tiết cấu trúc header; cần kiểm thử thực tế trên response thật).
+  - **Xử lý khi chạm trần:** Có thể nhận HTTP 403/429 hoặc lỗi Graph API kèm mã và header usage tùy endpoint. Client phải đọc body lỗi cùng header usage; chỉ map sang `PublishResult.RetryableError` khi response cho thấy lỗi tạm thời hoặc có thời gian retry, không ánh xạ cố định mọi mã lỗi vào retry [docs/references/meta/rate-limiting.md, docs/references/meta/error-handling.md].
 - **Chính sách hết hạn quyền truy cập dữ liệu (90-Day Data Access Expiration):**
-  - **Bản chất chính sách bảo mật nền tảng (Platform Policy):** Theo tài liệu chính thức về [Authentication Versus Data Access](https://developers.facebook.com/documentation/facebook-login/auth-vs-data), Meta áp dụng chính sách thời hạn truy cập dữ liệu người dùng là **90 ngày tính từ lần hoạt động cuối cùng của người dùng** trên ứng dụng.
+  - **Bản chất chính sách bảo mật nền tảng (Platform Policy):** Theo tài liệu chính thức về [Authentication Versus Data Access](https://developers.facebook.com/documentation/facebook-login/auth-vs-data), Meta áp dụng chính sách thời hạn truy cập dữ liệu người dùng là **90 ngày tính từ lần hoạt động cuối cùng của người dùng** trên ứng dụng [docs/references/meta/auth-vs-data-access.md].
   - **Phân biệt giữa Xác thực (Authentication), Data Access Expiration và Permission Expiration:**
-    - Khi hết hạn 90 ngày, phiên đăng nhập của người dùng **vẫn tồn tại** (người dùng vẫn ở trạng thái authenticated, access token không tự động mất hiệu lực xác thực danh tính), nhưng ứng dụng **bị chặn hoàn toàn quyền đọc/truy cập dữ liệu người dùng** cho đến khi được người dùng cấp lại quyền.
+    - Khi hết hạn 90 ngày, phiên đăng nhập của người dùng **vẫn tồn tại** (người dùng vẫn ở trạng thái authenticated, access token không tự động mất hiệu lực xác thực danh tính), nhưng ứng dụng **bị chặn hoàn toàn quyền đọc/truy cập dữ liệu người dùng** cho đến khi được người dùng cấp lại quyền [docs/references/meta/auth-vs-data-access.md].
     - Đây là **Data Access Expiration** của từng người dùng, không đồng nghĩa bản thân mọi permission
       đều có cùng một TTL. Khi data access hết hạn, app phải xin lại quyền/truy cập theo luồng Meta
       hiện hành; quyền cũng có thể bị thu hồi, thay đổi trạng thái xét duyệt hoặc bị từ chối theo
       endpoint/product. Không suy luận trạng thái hết hạn riêng của `pages_read_user_engagement` nếu
-      tài liệu permission/version hiện hành không liệt kê permission đó.
+      tài liệu permission/version hiện hành không liệt kê permission đó [docs/references/meta/auth-vs-data-access.md].
     - *Lưu ý về mã lỗi:* Tài liệu chính thức của Meta không nêu cụ thể mã lỗi HTTP hay subcode (⚠️ *Trạng thái mã lỗi: Chưa xác minh trong tài liệu chính thức; không khẳng định cố định lỗi OAuthException code 190*).
   - **Cơ chế phát hiện chính thức (Official Detection):**
     - **Phía Android SDK (Client-side):** Kiểm tra trực tiếp trên đối tượng `AccessToken` (`AccessToken.getCurrentAccessToken()`):
@@ -454,23 +486,28 @@ Nếu Meta hỗ trợ cấu hình custom scheme và bỏ qua secret qua `code_ve
       ```kotlin
       LoginManager.getInstance().reauthorizeDataAccess(activity)
       ```
+      [docs/references/meta/auth-vs-data-access.md].
     - Meta có thể yêu cầu người dùng xác nhận lại consent hoặc đăng nhập lại; ứng dụng không được giả định rằng mọi lần cấp lại quyền đều chỉ cần một lần bấm.
   - **Lưu ý về Permission Expiration:**
-    - Meta vẫn có thể thu hồi, thay đổi trạng thái xét duyệt hoặc từ chối permission theo endpoint/product; không được suy luận quyền đang hợp lệ chỉ từ việc đã từng được App Review phê duyệt.
+    - Meta vẫn có thể thu hồi, thay đổi trạng thái xét duyệt hoặc từ chối permission theo endpoint/product; không được suy luận quyền đang hợp lệ chỉ từ việc đã từng được App Review phê duyệt. Lưu ý rằng theo tài liệu Authentication Versus Data Access, các quyền của Page như `pages_manage_posts`, `pages_manage_engagement`, `pages_read_engagement` nằm trong danh mục không tự động hết hạn theo thời gian người dùng không hoạt động (*permissions do not expire*) [docs/references/meta/auth-vs-data-access.md]. Tuy nhiên, theo quy định bảo mật tại dòng 92 của tài liệu này, **nếu ứng dụng không sử dụng một permission trong vòng 90 ngày liên tục, permission đó vẫn có thể hết hạn (`that permission may expire`)**, bất kể người dùng có hoạt động hay quyền đó đã từng qua App Review.
     - *Tác động đến đồ án:* Cần kiểm tra permission và metric thực tế trên App Dashboard cũng như phản hồi API; không đồng nhất việc người dùng không hoạt động 90 ngày với việc permission cấp độ ứng dụng hết hạn.
 - **Quyền nào cần App Review (Meta App Review):**
-  - *Default Access (Tự động có, không cần review):* Chỉ có `public_profile` và `email`.
-  - *Advanced Access (BẮT BUỘC App Review nếu dùng công chúng):* Các quyền phục vụ tính năng chính cần được xét theo product và endpoint: `pages_show_list`, `pages_manage_posts`, `pages_read_engagement`, `read_insights`, `pages_read_user_engagement`, `pages_read_user_content` (chỉ khi dùng endpoint tương ứng) và `pages_manage_engagement`; cần xác minh quyền và trạng thái xét duyệt trên App Dashboard.
-  - *Điều kiện qua App Review:* Hồ sơ phải đáp ứng các yêu cầu mà Meta hiển thị cho từng permission/product; có thể bao gồm **Business Verification**, video screencast và các bước xác minh doanh nghiệp. Không suy ra rằng mọi permission Pages đều có cùng một bộ điều kiện.
-- **Chế độ Development dùng được tới đâu:**
-  - **Phạm vi và Điều kiện hoạt động:** Ở chế độ **Development Mode**, các quyền nâng cao (ví dụ `pages_manage_posts`) chỉ hoạt động **trong phạm vi tài khoản nội bộ và có điều kiện ràng buộc**, cụ thể:
-    1. **Ràng buộc tài khoản (App Roles):** Chỉ các tài khoản Facebook có vai trò chính thức trong mục *App Roles* trên Meta Dashboard (*Administrators*, *Developers*, hoặc *Testers*) mới có thể đăng nhập và cấp quyền. Người dùng vãng lai bên ngoài sẽ bị Meta từ chối.
+  - *Standard Access (Dành cho tài khoản có App Role / Business Role):* Các quyền như `public_profile` và `pages_show_list` có thể hoạt động ngay với tài khoản Tester/Developer trong App Roles mà chưa cần App Review hoàn tất [docs/references/meta/pages-api-overview.md].
+  - *Advanced Access (BẮT BUỘC App Review nếu dùng công chúng):* Khi ứng dụng cần phục vụ các tài khoản hoặc tài sản doanh nghiệp không thuộc quyền quản lý trực tiếp của nhóm phát triển, ứng dụng phải qua App Review để đạt mức Advanced Access [docs/references/meta/login-for-business.md, docs/references/meta/pages-api-overview.md]. Ngoài ra trong Facebook Login for Business, `public_profile` không được yêu cầu riêng lẻ mà bắt buộc đi kèm ít nhất một quyền doanh nghiệp khác [docs/references/meta/login-for-business.md]. Các quyền phục vụ tính năng chính cần được xét theo product và endpoint: `pages_show_list`, `pages_manage_posts`, `pages_read_engagement`, `read_insights`, `pages_read_user_content` (chỉ khi dùng endpoint tương ứng) và `pages_manage_engagement`; cần xác minh quyền và trạng thái xét duyệt trên App Dashboard [docs/references/meta/permissions-reference.md].
+  - *Điều kiện qua App Review:* Hồ sơ phải đáp ứng các yêu cầu mà Meta hiển thị cho từng permission/product; có thể bao gồm **Business Verification**, video screencast và các bước xác minh doanh nghiệp [docs/references/meta/permissions-reference.md]. Không suy ra rằng mọi permission Pages đều có cùng một bộ điều kiện.
+- **Cơ chế phân quyền của Business App (Standard Access vs Advanced Access):**
+  - **Bản chất kiểm soát quyền (Không có Development/Live Mode):** Theo tài liệu chính thức [Pages API Overview](https://developers.facebook.com/documentation/pages-api/overview), ứng dụng loại Doanh nghiệp (Business App) **không có App Mode (không có toggle Development Mode hay Live Mode)** như ứng dụng Consumer truyền thống. Thay vào đó, quyền truy cập API được kiểm soát thông qua hai cấp độ:
+    1. **Standard Access (Mặc định cho quyền chưa qua review):** Quyền và tính năng API chỉ hoạt động với các tài khoản:
+       - Có vai trò chính thức trong mục *App Roles* trên Meta Dashboard (*Administrators*, *Developers*, hoặc *Testers*).
+       - Hoặc có vai trò thành viên trong chính *Tài khoản Doanh nghiệp (Meta Business Account)* sở hữu ứng dụng đó.
+       - Người dùng bên ngoài (không có vai trò trong App hoặc Business) sẽ bị Meta từ chối truy cập khi app ở mức Standard Access.
     2. **Ràng buộc vai trò trên Page (Page Tasks):** Tài khoản thử nghiệm phải nắm vai trò quản trị hoặc nhiệm vụ phân quyền cụ thể (*Page Tasks*) trên chính Facebook Page được thử nghiệm:
-       - **Đăng bài (F5):** Yêu cầu Page task `CREATE_CONTENT` hoặc `MANAGE`.
-       - **Đọc và Trả lời comment (F6):** Yêu cầu Page task `MODERATE` hoặc `MANAGE` trên cả Page và comment ID mục tiêu.
-       - **Đọc số liệu Page Insights (F7):** Yêu cầu Page task `ANALYZE` hoặc `MANAGE` kết hợp quyền `read_insights` và `pages_read_engagement`.
-    3. **Ràng buộc kích hoạt tính năng:** Sản phẩm/tính năng tương ứng (ví dụ: *Pages API* hoặc *Facebook Login for Business*) phải được cấu hình trong App Dashboard.
-    4. **Giới hạn cần lưu ý:** Một số quyền nhạy cảm cao (như Live Video hoặc dữ liệu cá nhân chi tiết) vẫn có thể đòi hỏi xác minh doanh nghiệp ngay trong Development Mode. Với phạm vi đồ án (F1, F5, F6, F7 trên Page thử nghiệm của nhóm), chế độ Development Mode đáp ứng đủ yêu cầu phát triển mà chưa cần mở công chúng.
+       - **Đăng bài (F5):** Tài liệu hướng dẫn Posts [docs/references/meta/pages-api-posts.md] nêu yêu cầu các Page task `CREATE_CONTENT`, `MANAGE` và `MODERATE` trên Page (nguyên văn dùng liên từ "and"; cần kiểm thử thực tế trên môi trường dev nếu tài khoản chỉ có riêng task `CREATE_CONTENT`).
+       - **Đọc comment (F6):** Yêu cầu Page task `MODERATE` trên Page.
+       - **Trả lời comment (F6):** Yêu cầu Page task `MODERATE` và `CREATE_CONTENT` trên Page (nhiệm vụ gắn với Page quản trị, không có khái niệm task trên comment ID).
+       - **Đọc số liệu Page Insights (F7):** Yêu cầu Page task `ANALYZE` trên Page kết hợp quyền `read_insights` và `pages_read_engagement`.
+    3. **Advanced Access (Dành cho người dùng công chúng):** Bắt buộc phải hoàn tất quy trình Meta App Review và Business Verification để mọi người dùng đều có thể sử dụng.
+    4. **Đánh giá phạm vi đồ án:** Với phạm vi đồ án (F1, F5, F6, F7 trên Page thử nghiệm của nhóm), cấp độ **Standard Access** kết hợp App Roles của các thành viên đáp ứng hoàn toàn đầy đủ yêu cầu phát triển và chấm bài mà chưa cần mở công chúng.
 
 ---
 
@@ -495,9 +532,8 @@ backend; đối chiếu [OAuth 2.0 for Native Clients](https://learn.microsoft.c
   là quyết định triển khai của app, không phải yêu cầu riêng được LinkedIn bảo đảm.
 - **Điều kiện áp dụng bắt buộc:**
   - Mặc định các App tạo trên LinkedIn Developers **chưa được bật cờ Native PKCE**.
-  - **Bắt buộc:** LinkedIn phải bật PKCE OAuth 2 flow cho App ID. Nhóm cần liên hệ đầu mối LinkedIn
-    được chỉ định cho ứng dụng (point of contact/Developer Support theo kênh mà LinkedIn cấp) trước
-    khi triển khai; không giả định app mới được bật protocol mặc định.
+  - **Bắt buộc:** LinkedIn phải bật PKCE OAuth 2 flow cho App ID. Nhóm cần liên hệ đầu mối LinkedIn được chỉ định cho ứng dụng trước khi triển khai; không giả định app mới được bật protocol mặc định.
+  - ⚠️ **Rủi ro kỹ thuật về Scope OpenID Connect với Native PKCE (Phương án giải quyết & Kiểm thử thực tế [TEST-06]):** Theo tài liệu Sign In with LinkedIn v2 [docs/references/linkedin/sign-in-with-linkedin-v2.md], chuẩn OpenID Connect hiện đại sử dụng 3 scope: `openid`, `profile`, `email` và endpoint lấy profile là `GET /v2/userinfo`. Tuy nhiên, tài liệu Native PKCE [docs/references/linkedin/native-pkce.md] lại minh họa bằng scope legacy `r_liteprofile`. Một số phản hồi thực tế ghi nhận luồng Native PKCE có thể từ chối OpenID scope với thông báo lỗi *"Open ID permission is not supported for PKCE flows"*. **Phương án xử lý:** Mảng B thử nghiệm với `scope=openid profile`; nếu bị từ chối, tự động fallback về `scope=r_liteprofile` (kèm `GET /v2/me` theo [docs/references/linkedin/native-pkce.md]).
 - **Trao đổi Token bằng PKCE (Không có Client Secret):**
   ```http
   POST https://www.linkedin.com/oauth/v2/accessToken
@@ -509,6 +545,7 @@ backend; đối chiếu [OAuth 2.0 for Native Clients](https://learn.microsoft.c
   &client_id={client_id}
   &code_verifier={code_verifier}
   ```
+  *(Lưu ý về độ dài token: Độ dài của token và authorization code không cố định; ứng dụng client cần có khả năng xử lý token có độ dài tối thiểu 1.000 ký tự [docs/references/linkedin/native-pkce.md, docs/references/linkedin/programmatic-refresh-tokens.md]).*
 
 #### Luồng B — Tài liệu thiết kế tham khảo cho Backend/BFF (Ngoài phạm vi Milestone 1)
 
@@ -520,10 +557,10 @@ backend; đối chiếu [OAuth 2.0 for Native Clients](https://learn.microsoft.c
 Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm:
 - **Authorization Endpoint:** `https://www.linkedin.com/oauth/v2/authorization`
 - **Token Endpoint:** `https://www.linkedin.com/oauth/v2/accessToken`
-- **Redirect URI đăng ký với LinkedIn:** Bắt buộc là **URL HTTPS hợp lệ trỏ trực tiếp về máy chủ backend/BFF** (ví dụ: `https://api.yourdomain.com/auth/linkedin/callback` hoặc endpoint Cloudflare Worker).
+- **Redirect URI đăng ký với LinkedIn:** Phải là **URL hợp lệ đã đăng ký trên Developer Portal** (theo [docs/references/linkedin/authorization-code-flow.md], ví dụ: `https://dev.example.com/auth/linkedin/callback`; trong thiết kế kiến trúc tham khảo của nhóm, đây là endpoint HTTPS trỏ về máy chủ backend/BFF như `https://api.yourdomain.com/auth/linkedin/callback` hoặc endpoint Cloudflare Worker).
   > [!IMPORTANT]
-  > **Yêu cầu Callback HTTPS của Standard OAuth:**
-  > Theo tài liệu chính thức của LinkedIn OAuth 2.0, Developer Portal **chỉ chấp nhận callback giao thức HTTPS** làm Redirect URI cho luồng Standard Web OAuth (hoàn toàn không cho phép đăng ký trực tiếp Custom Scheme như `com.lttbdd.socialagent://...` làm callback trên LinkedIn Developer Portal).
+  > **Yêu cầu Callback của Standard OAuth:**
+  > Theo tài liệu chính thức của LinkedIn OAuth 2.0 [docs/references/linkedin/authorization-code-flow.md], Redirect URI được cấu hình phải là một URL hợp lệ (ví dụ: `https://dev.example.com/auth/linkedin/callback`); Developer Portal thường chỉ hỗ trợ URL web chuẩn (HTTPS trong production hoặc `http://localhost`, `http://127.0.0.1` trong dev) chứ không hỗ trợ cấu hình Custom Scheme trực tiếp cho Standard Web OAuth.
 - **Ràng buộc kỹ thuật:** Luồng standard này **bắt buộc phải có `client_secret`** khi gọi token endpoint.
 - **Quy trình hoạt động hoàn chỉnh của Kiến trúc BFF (Backend-For-Frontend) kèm Bảo mật Kép:**
   1. **Khởi tạo ủy quyền & Đăng ký phiên với BFF (App-to-BFF PKCE):**
@@ -541,6 +578,9 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
        ```
        - Server BFF lưu trữ cặp `(state, app_code_challenge)` vào bộ nhớ cache tạm thời (ví dụ Redis / memory store với TTL ngắn ~5–10 phút) để đối chiếu khi nhận callback.
      - **Mở Custom Tabs ủy quyền:** Sau khi phiên được khởi tạo trên BFF, Android app mở Custom Tabs điều hướng tới `https://www.linkedin.com/oauth/v2/authorization` với `redirect_uri=https://api.yourdomain.com/auth/linkedin/callback` (HTTPS URL tới BFF) và tham số `state`.
+       > [!NOTE]
+       > **Redirect URI trên LinkedIn Developer Portal (Production vs Môi trường Dev):**
+       > Trong môi trường production, LinkedIn bắt buộc Redirect URI phải dùng giao thức bảo mật `https://`. Tuy nhiên, trong quá trình phát triển nội bộ hoặc kiểm thử cục bộ (local dev), LinkedIn Developer Portal cho phép đăng ký URL dạng `http://localhost` hoặc `http://127.0.0.1` kèm cổng cụ thể (ví dụ: `http://127.0.0.1:8080/callback`) để nhà phát triển dễ dàng test OAuth flow trực tiếp mà không bắt buộc phải có domain HTTPS ngay.
   2. **Callback HTTPS từ LinkedIn về BFF:** Người dùng đăng nhập và xác nhận cấp quyền trên trình duyệt. Máy chủ xác thực LinkedIn chuyển hướng (redirect) trình duyệt trực tiếp về endpoint HTTPS của BFF kèm mã:
      `https://api.yourdomain.com/auth/linkedin/callback?code={authorization_code}&state={state}`
      - Server BFF nhận callback, kiểm tra đối chiếu tham số `state` nhận được với cache đã lưu ở bước `POST /auth/linkedin/start`. Nếu `state` không tồn tại hoặc đã hết hạn, BFF từ chối request ngay lập tức để chống CSRF.
@@ -626,7 +666,7 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
 > - Quyền cấp **Refresh Token (TTL 365 ngày)** để làm mới ngầm qua API là tính năng phụ thuộc entitlement/phê duyệt của LinkedIn, thường gắn với chương trình đối tác như Marketing Developer Platform (MDP). **Đồ án sinh viên không nên giả định được cấp**, nên phương án refresh chỉ là kiến trúc tham khảo và không được dùng làm đường vận hành duy nhất.
 > - **Nguyên tắc thiết kế F1:** Ứng dụng **tuyệt đối không phụ thuộc hoàn toàn vào Refresh Token**; nếu không được cấp, dùng luồng re-authentication khi access token hết hạn theo `expires_in` thực tế, không coi 60 ngày là hằng số runtime.
 
-1. **Vòng đời Access Token Tiêu chuẩn:** Theo tài liệu LinkedIn, access token **thường có thời hạn mặc định 60 ngày**; ứng dụng phải dùng `expires_in` thực tế thay vì hard-code thời hạn.
+1. **Vòng đời Access Token Tiêu chuẩn:** Theo tài liệu LinkedIn, access token **thường có thời hạn mặc định 60 ngày**; ứng dụng phải dùng `expires_in` thực tế thay vì hard-code thời hạn. Đặc biệt, theo tài liệu Native PKCE [docs/references/linkedin/native-pkce.md dòng 334], nếu người dùng thực hiện luồng cấp quyền với **tập scope khác so với scope đã cấp trước đó** (dù trên cùng client hay client khác), thì **toàn bộ các access token đã cấp trước đó đều bị vô hiệu hóa ngay lập tức**.
 2. **Phương án Xử lý khi Hết hạn Token (Re-authentication Flow — Cho ứng dụng thông thường):**
    - **Theo dõi thời hạn:** Khi đăng nhập thành công, app lưu `expires_at = System.currentTimeMillis() + (expires_in * 1000L)` vào Room Database (app không suy đoán bằng hằng số 60 ngày mà lưu thời hạn thực tế từ `expires_in`).
    - **Kích hoạt trạng thái hết hạn:** 
@@ -699,10 +739,20 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
            App client không suy hạn bằng hằng số 60 ngày. Mỗi lần nhận token (khi đăng nhập ban đầu hoặc khi refresh), app đều đọc giá trị `expires_in` thực tế do BFF chuyển tiếp từ LinkedIn để tính và lưu vào Room DB:
            $$\text{expires\_at} = \text{System.currentTimeMillis}() + (\text{response.expires\_in} \times 1000\text{L})$$
            *(Công thức này đồng bộ chính xác với cách tính hạn ở lần đăng nhập đầu tiên tại mục 2, đảm bảo app phản ánh trung thực hạn token thực tế và hiển thị badge cảnh báo kịp thời kể cả trong các chu kỳ refresh cuối cùng).*
-         - **Mốc hết hạn Refresh Token:** Với Programmatic Refresh Tokens được LinkedIn cấp, tài liệu hiện hành mô tả refresh token có TTL ban đầu 365 ngày và không được gia hạn khi dùng để refresh. Response `refresh_token_expires_in` là nguồn runtime để tính thời gian còn lại; không hard-code 365 ngày thay cho response.
+         - **Mốc hết hạn Refresh Token (Tính từ `refreshTokenIssuedAt`):**
+           - Với Programmatic Refresh Tokens được LinkedIn cấp, tài liệu mô tả refresh token có thời hạn tối đa 365 ngày kể từ thời điểm cấp quyền ban đầu và **không được gia hạn** khi refresh.
+           - **Lưu ý về trường `refresh_token_expires_in`:** Theo tài liệu [docs/references/linkedin/programmatic-refresh-tokens.md], trường này biểu thị số giây còn lại cho đến khi refresh token hết hạn (*number of seconds remaining*). Tuy nhiên, các ví dụ phản hồi trong tài liệu hiển thị các giá trị số nguyên như `525600` hoặc `439200` (có thể gây hiểu nhầm nếu đối chiếu với các mốc ngày/phút). Để đảm bảo tính xác định và tránh sai lệch từ phía server, app nên quản lý mốc thời hạn 365 ngày của refresh token bằng cách tính toán trực tiếp từ thời điểm cấp quyền ban đầu `refreshTokenIssuedAt`:
+             $$\text{refreshTokenDeadline} = \text{refreshTokenIssuedAt} + (365\text{L} \times 24 \times 3600 \times 1000\text{L})$$
          - **Ngưỡng kích hoạt làm mới & Cơ chế chống lặp Refresh vô tận (Infinite Refresh Loop Prevention):**
            - **Ngưỡng kích hoạt:** Đồng bộ thống nhất với ngưỡng cảnh báo F1 là **dưới 3 ngày (72 giờ)**. Khi thời hạn còn lại của token $\le 3\text{ ngày}$ (phát hiện qua `expiresAt` trong Room DB), app mới kích hoạt request gọi `POST /auth/linkedin/refresh` lên BFF.
-           - Nếu response sau refresh vẫn gần hết hạn, không retry vô hạn. Repository ghi nhận thời hạn thực tế và cảnh báo người dùng; khi refresh token hết hạn hoặc refresh thất bại, chuyển sang trạng thái cần kết nối lại dựa trên response thực tế và hiển thị hướng dẫn re-authentication.
+           - **Xử lý nếu `expires_in` sau refresh $\le 3\text{ ngày}$ (ví dụ ở chu kỳ ngày thứ 360–365):**
+             - Nếu sau khi refresh thành công mà `response.expires_in` trả về nhỏ hơn hoặc bằng ngưỡng cảnh báo 3 ngày (do refresh token đã chạm sát mốc 365 ngày):
+               - Access token mới nhận vẫn hoàn toàn hợp lệ trong khoảng thời gian còn lại đó ($\text{expires\_in}$ giây). Do đó, app vẫn lưu token vào `EncryptedSharedPreferences` và cập nhật $\text{expiresAt} = \text{System.currentTimeMillis}() + (\text{response.expires\_in} \times 1000\text{L})$ trong Room DB.
+               - **Tuyệt đối không gán ngay `ConnectionStatus.TOKEN_EXPIRED`** khi token vẫn còn thời hạn hiệu lực vì sẽ gây lỗi gián đoạn nghiệp vụ không đáng có cho người dùng.
+               - Để ngăn ngừa refresh lặp vô tận (Infinite Loop), Repository kích hoạt cờ cảnh báo `needsReauth = true` (hoặc trạng thái cảnh báo riêng `NEEDS_REAUTH`), đồng thời **vô hiệu hóa hoàn toàn tiến trình auto-refresh ngầm** cho tài khoản này.
+               - Giao diện F1/F4 hiển thị Badge cảnh báo: *"Phiên kết nối LinkedIn sắp hết hạn chu kỳ 365 ngày. Vui lòng kết nối lại sớm"* để người dùng chủ động Re-authentication 1 chạm qua trình duyệt.
+               - Kênh chỉ thực sự chuyển sang `ConnectionStatus.TOKEN_EXPIRED` khi $\text{expiresAt} \le \text{System.currentTimeMillis}()$ hoặc khi API thực tế trả về lỗi xác thực token.
+           - Sau mốc 365 ngày kể từ `refreshTokenIssuedAt`, mọi yêu cầu làm mới ngầm đều bị chặn; người dùng bắt buộc Re-authentication qua trình duyệt.
        - **Lưu trữ chuẩn:** App cập nhật Access Token mới trực tiếp vào **`EncryptedSharedPreferences`**. Room DB **chỉ cập nhật metadata** `expiresAt` (tính theo công thức động ở trên) và `ConnectionStatus.CONNECTED` (tuyệt đối không ghi token vào Room).
    - **Quy trình Thu hồi Phiên & Hủy `refresh_token` trên BFF khi Ngắt kết nối (`POST /auth/linkedin/logout`):**
      - **Rủi ro tồn đọng credential mồ côi (Orphaned Refresh Token Risk):** Khi app được duyệt quyền Partner Tier, máy chủ BFF lưu giữ `refresh_token` (thời hạn 365 ngày) trong cơ sở dữ liệu server để làm mới ngầm. Nếu khi người dùng bấm "Ngắt kết nối" (Disconnect) trên ứng dụng, app chỉ xóa token cục bộ trong `EncryptedSharedPreferences` mà không gửi lệnh hủy lên BFF, thì `refresh_token` vẫn tồn tại hợp lệ trên DB server, gây nguy cơ rò rỉ bảo mật và xung đột trạng thái nếu người dùng kết nối lại sau này.
@@ -723,7 +773,7 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
        4. Trả về HTTP 200 OK (hoặc 204 No Content).
      - **Xử lý phía App Client:** Sau khi gửi request logout (theo cơ chế best-effort nếu mất kết nối mạng), app tiến hành xóa sạch `access_token`, `refresh_token` (nếu có), và `bff_session_token` trong `EncryptedSharedPreferences`, đồng thời cập nhật/xóa metadata trong Room DB (chi tiết tại §5.3).
    - **Lưu ý với Client Native thuần túy (không có BFF):** Nếu chạy Luồng A (Native PKCE trực tiếp) mà không có backend server, tính năng programmatic refresh thường không thể thực thi do yêu cầu `client_secret` và entitlement tương ứng. Khi đó, app phải theo dõi `expires_in` thực tế và khởi động lại luồng OAuth khi token hết hạn; không hard-code chu kỳ 60 ngày.
-   - *Thời hạn tối đa:* Với Programmatic Refresh Tokens được cấp cho app, tài liệu LinkedIn mô tả refresh token có TTL 365 ngày; mỗi lần refresh cấp access token mới với TTL tối đa 60 ngày, nhưng ở cuối chu kỳ cả hai token có thể còn cùng thời gian sống. Refresh không gia hạn refresh token; app vẫn phải dùng `expires_in` và `refresh_token_expires_in` thực tế trong response và re-authenticate khi refresh token hết hạn.
+   - *Thời hạn tối đa:* Với Programmatic Refresh Tokens được cấp cho app, tài liệu LinkedIn mô tả refresh token có TTL 365 ngày; mỗi lần refresh cấp access token mới với TTL tối đa 60 ngày, nhưng ở cuối chu kỳ cả hai token có thể còn cùng thời gian sống. Refresh không gia hạn refresh token; sau 365 ngày kể từ `refreshTokenIssuedAt` (hoặc khi refresh thất bại), người dùng bắt buộc phải re-authenticate qua trình duyệt.
 
 ### 3.2. Danh sách quyền (Permissions / Scopes)
 Đối chiếu trực tiếp với các khả năng trong `ChannelCapability` (`core/model/Channel.kt`) theo chuẩn LinkedIn REST API & Community Management API:
@@ -735,12 +785,12 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
 
 | Chức năng / Khả năng | Scope cần xin | Mục đích & Chi tiết kỹ thuật |
 |---|---|---|
-| **F1 (Kết nối & Quản trị)** | `openid`, `profile`, `rw_organization_admin` | Xác thực đăng nhập qua OpenID Connect và kiểm tra vai trò quản trị viên (Admin) trên Page công ty. |
-| **`PUBLISH` (Đăng bài)** | `w_organization_social` *(Page)*<br>`w_member_social` *(Cá nhân)* | Đăng bài viết (text, link, media URN) lên Organization Page hoặc trang cá nhân của thành viên. |
-| **`READ_COMMENTS` (Đọc comment)** | `r_organization_social_feed` (Page)<br>*(Cá nhân: Không khả dụng)* | Đọc danh sách bình luận, các reply phân cấp và reaction trên bài viết của Organization Page (`GET /rest/socialActions/{targetUrn}/comments`). **Yêu cầu:** Sản phẩm Community Management API và role được tài liệu endpoint cho phép.<br>⚠️ *Đối với Member cá nhân:* Tài liệu Social Metadata API quy định `r_member_social` là **Closed Permission** (quyền đóng, hiện không nhận đơn đăng ký mới). Do đó tính năng đọc comment Member không khả dụng qua API, luôn kích hoạt luồng `HANDED_OFF`. |
-| **`REPLY` (Trả lời comment)** | `w_organization_social_feed` (Page)<br>`w_member_social_feed` (Cá nhân - cần xác nhận) | Gửi bình luận trả lời (`POST /rest/socialActions/{targetUrn}/comments`) dưới danh nghĩa `urn:li:organization:{org-id}`. **Yêu cầu:** Sản phẩm Community Management API và role được tài liệu endpoint cho phép.<br>⚠️ *Đối với Member cá nhân:* Trang Network Update Social Actions liệt kê scope mới `w_member_social_feed` (thay thế cho `w_member_social` từ 06/2023 cho các social action APIs). Cần kiểm tra trên Developer Portal xem app có xin được scope này không; nếu không, fallback về `HANDED_OFF`. |
-| **`MENTION` (Nhắc tên)** | `w_organization_social` *(chỉ là quyền đăng; capability phải xác nhận riêng)* | ⚠️ Không coi mention Member/Organization là capability chung của LinkedIn Posts API. Chỉ thử khi tài liệu của product/version hiện hành xác nhận cú pháp, URN và quyền; nếu không xác nhận được thì dùng luồng `HANDED_OFF`. LinkedIn không cung cấp API tìm kiếm profile URN tự do cho app thông thường. |
-| **`METRICS` (Số liệu)** | `rw_organization_admin` cho Organization Follower Statistics và Organization Share Statistics; cần role `ADMINISTRATOR` và xác nhận Product/Developer Portal<br>*(Cá nhân: Không khả dụng)* | Đọc số liệu tương tác (`likeCount`, `commentCount`, `shareCount`, `impressionCount`, `clickCount`) qua `organizationalEntityShareStatistics` và số người theo dõi (`firstDegreeSize`) qua `networkSizes`.<br>⚠️ *Đối với Member cá nhân:* Do `r_member_social` là quyền đóng, không có API công khai đọc thống kê bài viết Member; kích hoạt `HANDED_OFF`. |
+| **F1 (Kết nối & Quản trị)** | `openid`, `profile`, `r_organization_admin` (hoặc `rw_organization_admin`) | Xác thực đăng nhập qua OpenID Connect và kiểm tra vai trò quản trị viên trên Page công ty. *(Scope `r_organization_admin` là đủ cho thao tác đọc danh sách ACL/authorizations; chỉ cần `rw_organization_admin` nếu muốn phân quyền hoặc sửa đổi vai trò (lưu ý: các endpoint thống kê F7 như Follower/Share Stats yêu cầu cứng `rw_organization_admin`). Yêu cầu vai trò `ADMINISTRATOR` hoặc `CONTENT_ADMINISTRATOR` theo bảng phân quyền Organization [docs/references/linkedin/organization-access-control-by-role.md]; lưu ý Posts API [docs/references/linkedin/posts-api.md dòng 226] dùng tên viết tắt `CONTENT_ADMIN`; Comments API chỉ hỗ trợ role `ADMINISTRATOR`, `DIRECT_SPONSORED_CONTENT_POSTER`, `RECRUITING_POSTER` cho quyền ghi `w_organization_social_feed`, và chỉ hỗ trợ `ADMINISTRATOR`, `DIRECT_SPONSORED_CONTENT_POSTER` cho quyền đọc `r_organization_social_feed` [docs/references/linkedin/comments-api.md]).* |
+| **`PUBLISH` (Đăng bài)** | `w_organization_social` *(Page)*<br>`w_member_social` *(Cá nhân)* | Đăng bài viết (text, link, media URN) lên Organization Page hoặc trang cá nhân của thành viên [docs/references/linkedin/posts-api.md]. |
+| **`READ_COMMENTS` (Đọc comment)** | `r_organization_social_feed` (Page)<br>*(Cá nhân: Bị hạn chế / Cần kiểm tra)* | Đọc danh sách bình luận, các reply phân cấp và reaction trên bài viết của Organization Page (`GET /rest/socialActions/{targetUrn}/comments`) [docs/references/linkedin/comments-api.md]. **Yêu cầu:** Sản phẩm Community Management API và role được tài liệu endpoint cho phép.<br>⚠️ *Đối với Member cá nhân:* Tài liệu Comments API và Social Metadata API quy định quyền đọc tương tác cá nhân `r_member_social_feed` chỉ cấp cho đối tác được chọn lọc (*granted to select developers only*) [docs/references/linkedin/comments-api.md, docs/references/linkedin/social-metadata-api.md]. Nếu app chưa được LinkedIn duyệt cấp scope này, kích hoạt luồng `HANDED_OFF`. |
+| **`REPLY` (Trả lời comment)** | `w_organization_social_feed` (Page)<br>`w_member_social_feed` (Cá nhân - cần xác nhận) | Gửi bình luận trả lời (`POST /rest/socialActions/{targetUrn}/comments`) dưới danh nghĩa `urn:li:organization:{org-id}` [docs/references/linkedin/comments-api.md]. **Yêu cầu:** Sản phẩm Community Management API và role được tài liệu endpoint cho phép.<br>⚠️ *Đối với Member cá nhân:* Trang Network Update Social Actions và Comments API liệt kê scope `w_member_social_feed` cho các hành động tương tác cá nhân [docs/references/linkedin/network-update-social-actions.md, docs/references/linkedin/comments-api.md]. Cần kiểm tra trên Developer Portal xem app có xin được scope này không; nếu không, fallback về `HANDED_OFF`. |
+| **`MENTION` (Nhắc tên)** | `w_organization_social` *(chỉ là quyền đăng; capability phải xác nhận riêng)* | ⚠️ Không coi mention Member/Organization là capability chung của LinkedIn Posts API. Chỉ thử khi tài liệu của product/version hiện hành xác nhận cú pháp, URN và quyền [docs/references/linkedin/little-text-format.md]; nếu không xác nhận được thì dùng luồng `HANDED_OFF`. LinkedIn không cung cấp API tìm kiếm profile URN tự do cho app thông thường. |
+| **`METRICS` (Số liệu)** | `rw_organization_admin` (quy định chính thức [docs/references/linkedin/share-statistics.md, docs/references/linkedin/follower-statistics.md]; cần kiểm thử kèm `r_organization_social` (Cần kiểm thử thực tế) [TEST-05]) cho Organization Follower Statistics và Organization Share Statistics; cần role `ADMINISTRATOR` và xác nhận Product/Developer Portal<br>*(Cá nhân: Bị hạn chế / Cần kiểm tra)* | Đọc số liệu tương tác (`likeCount`, `commentCount`, `shareCount`, `impressionCount`, `clickCount`) qua `organizationalEntityShareStatistics` [docs/references/linkedin/share-statistics.md] và số người theo dõi (`firstDegreeSize`) qua `networkSizes` [docs/references/linkedin/organization-network-size.md].<br>⚠️ *Đối với Member cá nhân:* Tài liệu Increasing Access hỗ trợ quyền `r_member_postAnalytics` (đọc impressions, reactions, comments, shares) và `r_member_profileAnalytics` thuộc Community Management API [docs/references/linkedin/increasing-access.md]. Nếu app chưa được duyệt cấp các quyền này trên Portal, kích hoạt `HANDED_OFF`. |
 | **Làm mới ngầm (F1 - Tùy chọn)** | Scope và entitlement do Developer Portal/product cấp; không tự thêm `offline_access` nếu chưa được xác nhận | Programmatic Refresh Token phụ thuộc entitlement/phê duyệt của LinkedIn. Tài liệu hiện hành mô tả refresh token có TTL 365 ngày và không được gia hạn khi refresh; access token mới thường có TTL 60 ngày nhưng phải dùng `expires_in` thực tế. Request refresh phải thực thi qua BFF kèm `client_secret`. |
 
 ### 3.3. Các Endpoint chính (LinkedIn Versioned REST API)
@@ -748,18 +798,21 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
 > [!IMPORTANT]
 > **Chính sách Phiên bản & Vòng đời API của LinkedIn (Version Sunset Policy):**
 > - LinkedIn áp dụng cơ chế định phiên bản theo tháng với định dạng **`YYYYMM`** thông qua header `Linkedin-Version`.
-> - **Thời hạn hỗ trợ:** Mỗi phiên bản API được hỗ trợ ổn định trong **tối thiểu 1 năm** kể từ ngày phát hành; thời điểm sunset cụ thể phải kiểm tra trong bảng migration/version hiện hành.
+> - **Thời hạn hỗ trợ:** Mỗi phiên bản API thường được hỗ trợ ổn định trong **tối thiểu 1 năm** kể từ ngày phát hành (thông lệ phổ biến dựa trên mốc sunset của version 202511 trong [docs/references/linkedin/multiimage-post-api.md dòng 197]; bộ tài liệu tham chiếu hiện tại không có văn bản chung về Versioning Policy của LinkedIn, do đó ngày sunset cụ thể phải luôn được xác nhận trực tiếp trên bảng migration/version hiện hành của Developer Portal).
 > - **Cảnh báo lỗi:** Việc gửi một phiên bản đã sunset có thể khiến request bị từ chối; mã lỗi cụ thể phải được xử lý theo response thực tế và migration notice của LinkedIn, không hard-code một mã duy nhất.
 > - **Phiên bản áp dụng chuẩn hóa:** Tài liệu dùng **`202610`** làm giá trị ví dụ tại thời điểm cập nhật. Phải xác nhận lại version đang được LinkedIn cấp và ngày sunset trong bảng version/migration hiện hành trước khi triển khai; không suy ra vòng đời từ giá trị `YYYYMM` hoặc hard-code ngày sunset trong client.
 > - **Quy ước triển khai:** Trong mã nguồn Kotlin của Mảng B, version này cần được định nghĩa thành hằng số tập trung (ví dụ: `private const val LINKEDIN_API_VERSION = "202610"`) để dễ bảo trì và nâng cấp định kỳ.
 
 1. **Lấy thông tin người dùng / URN cá nhân (F1):**
    ```http
-   GET https://api.linkedin.com/v2/userinfo
+   GET https://api.linkedin.com/v2/me/
    Authorization: Bearer {access-token}
    ```
-   **Lấy các ACL Organization mà member có vai trò quản trị (F1):**
-   *(Scope yêu cầu: `rw_organization_admin`; cần role `ADMINISTRATOR` và trạng thái `APPROVED` cho các Organization API yêu cầu quản trị.)*
+   *(Theo tài liệu Native PKCE chính thức [docs/references/linkedin/native-pkce.md]; hoặc `GET /v2/userinfo` theo chuẩn OpenID Connect — ⚠️ **Cần kiểm thử thực tế** trên môi trường dev).*
+   *Nhận về:* Thông tin định danh thành viên (URN cá nhân của member theo định dạng `urn:li:person:{id}`) [docs/references/linkedin/native-pkce.md].
+   
+   **Lấy các ACL / Quyền quản trị Organization mà member có vai trò quản trị (F1):**
+   *(Scope yêu cầu: `r_organization_admin` là đủ cho thao tác đọc danh sách ACL qua GET; `rw_organization_admin` chỉ cần nếu thao tác ghi/sửa vai trò (riêng các endpoint thống kê bài viết/follower F7 quy định cứng `rw_organization_admin`). Cần role `ADMINISTRATOR` hoặc `CONTENT_ADMINISTRATOR` (Posts API dùng `CONTENT_ADMIN`) và trạng thái `APPROVED` cho các Organization API yêu cầu quản trị [docs/references/linkedin/organization-access-control-by-role.md, docs/references/linkedin/posts-api.md]).*
    ```http
    GET https://api.linkedin.com/rest/organizationAcls?q=roleAssignee&role=ADMINISTRATOR&state=APPROVED
    Headers:
@@ -767,26 +820,17 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
      Linkedin-Version: 202610
      X-Restli-Protocol-Version: 2.0.0
    ```
-   *Nhận về:* danh sách ACL chứa Organization URN, role, state và `roleAssignee`. Finder này trả
-   về các ACL phù hợp; client phải lọc tiếp theo member URN đã xác thực nếu cần danh sách của đúng
-   member. Response mặc định có thể chỉ đủ để xác định ACL; nếu cần metadata hiển thị, có thể dùng
-   projection được tài liệu hỗ trợ hoặc gọi Organizations lookup.
-   Request đã lọc theo finder `roleAssignee`, role `ADMINISTRATOR` và state `APPROVED`.
-   Theo schema chính thức hiện hành, `roleAssignee` là trường trong từng ACL response; không thêm
-   tham số query `roleAssignee=urn:li:person:{person-id}` vì endpoint không khai báo tham số đó.
-   Nếu cần kiểm tra một member cụ thể, client phải lọc các phần tử response theo `roleAssignee`
-   sau khi đã xác thực member URN, hoặc dùng finder được tài liệu hiện hành hỗ trợ.
-   Repository vẫn phải kiểm tra lại các
-   giá trị response và không suy ra quyền khác từ ACL. Sau đó trích xuất
-   `{org-id}` từ `urn:li:organization:{org-id}`, rồi lưu Organization như một `ChannelAccount`
-   riêng trong Room. `accountId` của account này là Organization ID/URN ổn định, không dùng
-   `urn:li:person:{id}` thay thế.
+   *Nhận về:* danh sách ACL chứa Organization URN, role, state và `roleAssignee`.
+   - **Cơ chế finder `q=roleAssignee`:** Khi truy vấn với `q=roleAssignee&role=ADMINISTRATOR&state=APPROVED`, máy chủ LinkedIn tự động lọc theo danh tính member gắn với access token hiện tại. Client **không cần phải lọc lại theo member URN**. (Lưu ý: Không thêm tham số query `roleAssignee=urn:li:person:{person-id}` vì endpoint không hỗ trợ tham số này trên query string).
+   - **Lộ trình khuyến nghị của LinkedIn (`organizationAuthorizations` vs `organizationAcls`):**
+     Tài liệu Organization Access Control của LinkedIn hiện khuyến nghị chuyển dần sang endpoint mới `GET https://api.linkedin.com/v2/organizationAuthorizations` (tra cứu ủy quyền theo member/organization) [docs/references/linkedin/organization-authorizations.md] thay cho `organizationAcls` (vốn là endpoint truyền thống đang dần bị xem xét thay thế trong các phiên bản Rest.li mới). Trong quá trình tích hợp, nếu Developer Portal cấp quyền truy cập `organizationAuthorizations`, Mảng B nên ưu tiên sử dụng endpoint khuyến nghị mới; nếu duy trì `organizationAcls`, cần giữ cấu hình version ổn định và xác nhận schema trả về.
+   - **Lưu Organization vào Room:** Sau khi kiểm tra các giá trị response, trích xuất `{org-id}` từ `urn:li:organization:{org-id}`, rồi lưu Organization như một `ChannelAccount` riêng trong Room. `accountId` của account này là Organization ID/URN ổn định, không dùng `urn:li:person:{id}` thay thế.
 
    Các Organization URN thu được ở bước này là đầu vào cho các endpoint F5, F6 và F7 bên dưới:
    `author`/`owner` khi đăng hoặc upload ảnh, `targetUrn` khi đọc/trả lời comment,
    `organizationalEntity` khi lấy metrics và `orgUrn` khi lấy follower count.
 
-   > **Lưu ý quyền:** `organizationAcls` chỉ cho biết các Organization và role mà access token có
+   > **Lưu ý quyền:** `organizationAcls` (hoặc `organizationAuthorizations`) chỉ cho biết các Organization và role mà access token có
    > thể truy vấn; từng thao tác vẫn phải kiểm tra thêm capability, sản phẩm Community Management
    > và quyền cụ thể của Organization. Không suy ra rằng có ACL là chắc chắn được đăng bài hoặc
    > đọc comment.
@@ -797,8 +841,9 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
    > quyền và version trong Developer Portal/tài liệu LinkedIn hiện hành**. Không hard-code
    > `/rest/organizations/{org-id}` hoặc batch `List(...)` nếu chưa có xác nhận đó.
 
-2. **Khởi tạo và upload ảnh (F5 - Hai bước):**
-   - Bước 1: Khởi tạo upload ảnh
+2. **Khởi tạo và upload ảnh (F5 — Quy trình tham khảo kiến trúc Images API, ⚠️ Cần kiểm thử thực tế):**
+   *(Lưu ý nguồn tài liệu: Bộ tài liệu tham chiếu `docs/references/linkedin/` không bao gồm file đặc tả riêng cho Images API; tài liệu Multi-image Post API [docs/references/linkedin/multiimage-post-api.md dòng 243] và Posts API [docs/references/linkedin/posts-api.md dòng 221] chỉ dẫn chiếu việc upload ảnh sang "Images API" để nhận Image URN `urn:li:image:{id}`. Cấu trúc endpoint dự kiến dưới đây dựa trên quy ước chuẩn Rest.li Images API và bắt buộc phải kiểm chứng thực tế trên môi trường dev):*
+   - **Bước 1: Khởi tạo upload ảnh (`action=initializeUpload` — Cần kiểm thử thực tế):**
      ```http
      POST https://api.linkedin.com/rest/images?action=initializeUpload
      Headers:
@@ -813,9 +858,31 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
        }
      }
      ```
-     *Nhận về:* `uploadUrl` và `image` (URN: `urn:li:image:{image-id}`).
-   - Bước 2: Tải file binary ảnh lên `uploadUrl` bằng HTTP PUT (`Content-Type: image/jpeg` hoặc `image/png`).
-3. **Đăng bài viết kèm ảnh đơn (F5 — Idempotency phía App & Mention cú pháp chuẩn):**
+     *Nhận về (response chuẩn có cấu trúc bọc trường `value`):*
+     ```json
+     {
+       "value": {
+         "uploadUrlExpiresAt": 1700000000000,
+         "uploadUrl": "https://api.linkedin.com/mediaUpload/...",
+         "image": "urn:li:image:{image-id}"
+       }
+     }
+     ```
+     Lưu giá trị `value.image` (Image URN) và `value.uploadUrl`.
+   - **Bước 2: Tải file binary ảnh lên `uploadUrl`:**
+     Gọi HTTP `PUT` gửi trực tiếp luồng binary của ảnh lên `uploadUrl` nhận được từ Bước 1 (`Content-Type: image/jpeg` hoặc `image/png`).
+   - **Bước 3: Chờ ảnh sẵn sàng (`status == AVAILABLE`):**
+     Hệ thống xử lý hình ảnh của LinkedIn hoạt động bất đồng bộ. Sau khi PUT binary thành công, client cần kiểm tra trạng thái ảnh trước khi đính kèm URN vào bài đăng:
+     ```http
+     GET https://api.linkedin.com/rest/images/{encodedImageUrn}
+     Headers:
+       Authorization: Bearer {access-token}
+       Linkedin-Version: 202610
+       X-Restli-Protocol-Version: 2.0.0
+     ```
+     *(Hoặc dùng dạng batch lookup: `GET /rest/images?ids=List({encodedImageUrn})` trả về cấu trúc `{results: { "{urn}": {"status": "AVAILABLE", ...} } }`).*
+     *Đợi đến khi nhận được:* `{"status": "AVAILABLE"}` (áp dụng cơ chế polling với khoảng cách 1–2 giây, tối đa 3–5 lần thử). Nếu gọi `POST /rest/posts` khi ảnh chưa chuyển sang `AVAILABLE`, LinkedIn sẽ từ chối tạo bài viết.
+3. **Đăng bài viết kèm ảnh đơn (F5 — Idempotency phía App & Cú pháp Mention / Little Text Format):**
    ```http
    POST https://api.linkedin.com/rest/posts
    Headers:
@@ -826,7 +893,7 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
 
    {
      "author": "urn:li:organization:{org-id}",
-     "commentary": "Chúc mừng Nguyễn Văn A và SocialAgent Team đã hoàn thành xuất sắc dự án!",
+     "commentary": "Chúc mừng @[SocialAgent Team](urn:li:organization:{org-id}) đã hoàn thành xuất sắc dự án! #SocialAgent #AI",
      "visibility": "PUBLIC",
      "distribution": {
        "feedDistribution": "MAIN_FEED",
@@ -842,10 +909,21 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
      "lifecycleState": "PUBLISHED"
    }
    ```
+   > [!IMPORTANT]
+   > **Quy tắc Little Text Format & Bắt buộc Escape 15 Ký tự Đặc biệt khi viết Plaintext (Crucial Pitfall):**
+   > - Theo tài liệu chính thức [Little Text Format](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/little-text-format), trường `commentary` của Posts API sử dụng định dạng Little Text Format.
+   > - **Bắt buộc escape 15 ký tự đặc biệt bằng dấu gạch chéo ngược `\` khi muốn hiển thị dưới dạng văn bản thô (plaintext) [docs/references/linkedin/little-text-format.md dòng 206, 323]:** `|`, `{`, `}`, `@`, `[`, `]`, `(`, `)`, `<`, `>`, `#`, `\`, `*`, `_`, `~`.
+   > - **Phạm vi áp dụng:** Theo tài liệu [docs/references/linkedin/little-text-format.md dòng 262], mọi ký tự dành riêng phải được escape bằng dấu gạch chéo ngược `\` để LinkedIn đối xử như văn bản thô (plaintext), ngay cả khi bài viết không sử dụng mention hay template. Nếu không escape, các ký tự đặc biệt này (như dấu ngoặc, gạch đứng, ký tự markdown) có thể bị trình phân tích cú pháp của LinkedIn hiểu nhầm là cấu trúc thẻ cú pháp, dẫn tới hiển thị sai lệch hoặc lỗi.
+   > - **Lưu ý triển khai phía Mảng B:** Client Android trước khi gửi request cần có hàm tiện ích tiền xử lý `escapeLittleText(text: String)` để tự động chèn `\` trước các ký tự dành riêng là nội dung thuần túy. **Không được escape các ký tự đặc biệt nằm trong cú pháp hợp lệ** (như mention `@[Name](urn:li:...)` hoặc hashtag template `{hashtag|#|tag}`), và không escape ký tự `#` khi muốn tạo hashtag tự nhiên.
+   >
+   > **Cú pháp Mention chính thức trong Little Text Format:**
+   > - **Cú pháp:** `@[Tên hiển thị](urn:li:organization:{id})` hoặc `@[Tên hiển thị](urn:li:person:{id})`. Tên hiển thị bên trong `@[...]` phải khớp chính xác với tên thực tế của đối tượng.
+   > - **Rào cản thực tế:** Trong phạm vi các API được cấp và bộ tài liệu tham chiếu hiện có của dự án (`docs/references/linkedin/`), LinkedIn không cung cấp API tìm kiếm tự do để lấy URN của người dùng/tổ chức. Ứng dụng chỉ mention được khi đã nắm giữ URN hợp lệ (ví dụ Organization Page mà người dùng quản trị). Nếu không có URN, hệ thống kích hoạt fallback về **`HANDED_OFF`**.
+   >
    > *Lưu ý về Idempotency:* LinkedIn Posts API không có header idempotency native chung được tài liệu chính thức xác nhận. Việc chống đăng trùng lặp hoàn toàn do ứng dụng tự quản lý qua Room DB (lưu `idempotencyKey`, nếu trùng thì trả lại kết quả bài cũ, không tạo bài mới).
 
 4. **Đăng bài viết đa ảnh (Multi-image Post — F5):**
-   - **Quy trình tải lên:** Khởi tạo `initializeUpload` và tải dữ liệu nhị phân lên `uploadUrl` cho từng ảnh (tương tự quy trình ảnh đơn) để thu thập danh sách Media URN: `[urn:li:image:{id1}, urn:li:image:{id2}, ...]`.
+   - **Quy trình tải lên:** Khởi tạo `initializeUpload` và tải dữ liệu nhị phân lên `uploadUrl` cho từng ảnh (tương tự quy trình ảnh đơn — ⚠️ **Cần kiểm thử thực tế**; tài liệu chính thức [docs/references/linkedin/multiimage-post-api.md] chỉ dẫn chiếu Images API mà không kèm file đặc tả trực tiếp) để thu thập danh sách Media URN: `[urn:li:image:{id1}, urn:li:image:{id2}, ...]`.
    - **Đăng bài bằng thuộc tính `multiImage`:**
      ```http
      POST https://api.linkedin.com/rest/posts
@@ -876,33 +954,36 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
      }
      ```
    - *Giới hạn kỹ thuật & Ràng buộc (theo tài liệu chính thức [Multi-image Post API](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/multiimage-post-api)):*
-     - **Số lượng ảnh:** Tối thiểu **2** và tối đa **20** ảnh cho một MultiImage post. Mỗi ảnh phải thuộc quyền sở hữu của author hoặc Organization; vẫn phải xác nhận product/quyền và version đang được app cấp trước khi bật tính năng. Tài liệu hiện hành cũng giới hạn API partners ở việc tạo **non-sponsored** MultiImage post.
-     - **Độ phân giải & Định dạng:** Tài liệu Images API quy định tổng độ phân giải **dưới 36.152.320 pixel** (chiều rộng $\times$ chiều cao); định dạng hỗ trợ gồm JPG, GIF, PNG. `altText` là tùy chọn và có giới hạn độ dài riêng theo schema MultiImage.
-     - **Dung lượng file:** Con số "8 MB/ảnh" không có trong tài liệu chính thức của Images API (trạng thái: *Chưa xác minh trong tài liệu*; khuyến nghị thực tế nên giữ file dưới 8 MB - 10 MB để đảm bảo hiệu năng tải lên từ thiết bị di động).
+     - **Số lượng ảnh & Loại bài viết:** Tối thiểu **2** và tối đa **20** ảnh cho một MultiImage post. Mỗi ảnh phải thuộc quyền sở hữu của author hoặc Organization; tài liệu chỉ hỗ trợ tạo bài viết tự nhiên (non-sponsored organic posts) [docs/references/linkedin/multiimage-post-api.md].
+     - **Độ phân giải, Định dạng & Giới hạn khung hình:** Tài liệu Multi-image Post API quy định tổng độ phân giải **dưới 36.152.320 pixel** (chiều rộng $\times$ chiều cao); định dạng hỗ trợ gồm JPG, GIF, PNG. Với ảnh GIF động, giới hạn tối đa là **250 frames** [docs/references/linkedin/multiimage-post-api.md]. `altText` là tùy chọn với độ dài tối đa **4.086 ký tự** (khuyến nghị dưới 120 ký tự) [docs/references/linkedin/multiimage-post-api.md].
+     - **Dung lượng file:** Mức trần dung lượng không được công bố trong tài liệu Multi-image Post API (trạng thái: ⚠️ **Cần kiểm thử thực tế**; mức trần dưới 8 MB - 10 MB là khuyến nghị thực nghiệm của nhóm phát triển để đảm bảo hiệu năng tải lên từ thiết bị di động, không phải thông số của tài liệu API) [docs/references/linkedin/multiimage-post-api.md].
      - *Phạm vi Milestone 1:* Model `PostDraft` hiện ưu tiên hỗ trợ `imageUri` (ảnh đơn), cấu trúc `multiImage` được chuẩn hóa sẵn sàng cho giai đoạn mở rộng tiếp theo.
 
 5. **Lấy danh sách comment (F6):**
    *(Theo tài liệu Comments API hiện hành, dùng `r_organization_social_feed`; khi chọn version khác,
    phải đối chiếu lại trang endpoint và Developer Portal, không tự đổi tên scope.)*
    ```http
-   GET https://api.linkedin.com/rest/socialActions/urn%3Ali%3Ashare%3A{share-id}/comments
+   GET https://api.linkedin.com/rest/socialActions/urn%3Ali%3Ashare%3A{share-id}/comments?start=0&count=20
    Headers:
      Authorization: Bearer {access-token}
      Linkedin-Version: 202610
      X-Restli-Protocol-Version: 2.0.0
    ```
-   *Lưu ý về `{targetUrn}`:* Với thread cấp một, đây là URN của bài viết gốc (`remotePostId`, ví dụ: `urn:li:share:{share-id}` hoặc `urn:li:ugcPost:{ugcPost-id}`). Khi đọc replies của một comment, Social Actions API cho phép dùng chính `commentUrn` làm target trên path.
-   > **Quy tắc URL Encoding của Rest.li 2.0.0:** URN trên URL path phải được percent-encode
-   > (`:` thành `%3A`, `(` thành `%28`, `)` thành `%29`, `,` thành `%2C` nếu có). Với OkHttp,
-   > dùng `HttpUrl.Builder.addPathSegment(rawUrn)` để truyền URN thô và để OkHttp percent-encode
-   > đúng một lần. Không truyền sẵn `%3A` khi thêm path segment, vì sẽ tạo double-encoding.
-   > Không encode cả chuỗi URL bằng tay sau khi OkHttp đã dựng request.
+   *Lưu ý về `{targetUrn}`, Phân trang & Bẫy lỗi HTTP 404:*
+   - **Xác định `{targetUrn}`:** Với thread cấp một, đây là URN của bài viết gốc (`remotePostId`, ví dụ: `urn:li:share:{share-id}` hoặc `urn:li:ugcPost:{ugcPost-id}`). Khi đọc replies của một comment, Social Actions API cho phép dùng chính `commentUrn` làm target trên path.
+   - **Cơ chế phân trang (`start` & `count` — ⚠️ Cần kiểm thử thực tế):** Tài liệu chính thức `comments-api.md` không có bảng Query Parameters riêng cho endpoint đọc comment này; hai tham số phân trang query `start` (vị trí offset bắt đầu từ `0`) và `count` (số lượng phần tử mỗi trang) là quy ước chuẩn Rest.li xuất hiện trong các tài liệu Social Actions liên quan cũ hơn [docs/references/linkedin/network-update-social-actions.md]. Cần kiểm thử thực tế trên response thật để xác định xem phiên bản `202610` có chấp nhận hai tham số này hay sử dụng cơ chế phân trang khác.
+   - **Bẫy lỗi kỹ thuật 404 khi bài viết chưa có comment:** Theo tài liệu Network Update Social Actions của LinkedIn [docs/references/linkedin/network-update-social-actions.md], nếu bài viết chưa từng có bình luận hay tương tác nào, yêu cầu lấy danh sách comments có thể trả về lỗi **`HTTP 404 Not Found`** (*"If no comments or likes are available for a share, a request to fetch comments or shares returns 404 - Not Found"*) thay vì một mảng rỗng `elements: []`. Lớp Client/Repository của app phải bắt và xử lý trường hợp HTTP 404 này như một danh sách rỗng hợp lệ thay vì báo lỗi thất bại.
+   > **Quy tắc URL Encoding của Rest.li 2.0.0 (với OkHttp):** 
+   > - Trong tài liệu chính thức của LinkedIn, endpoint path xuất hiện cả hai dạng ví dụ: dạng đã percent-encode (`urn%3Ali%3AugcPost%3A...`) và dạng URN thô (`/socialActions/urn:li:comment:(urn:li:activity:...)/comments`).
+   > - **Lưu ý kỹ thuật về OkHttp (phiên bản `5.4.0` trong `gradle/libs.versions.toml`):** Hàm `HttpUrl.Builder.addPathSegment(rawUrn)` tuân theo RFC 3986 path segment nên **không tự động encode các dấu `:`, `(`, `)`, `,`**. Nếu truyền URN đã encode sẵn vào `addPathSegment`, OkHttp sẽ encode dấu `%` thành `%25` gây lỗi double-encoding (`urn%253Ali...`).
+   > - **Khuyến nghị thực thi:** Để đảm bảo tính tương thích cao nhất với Rest.li 2.0.0, khuyến nghị phía app tự percent-encode riêng chuỗi URN đúng một lần (chuyển đổi `:`, `(`, `)`, `,` thành `%3A`, `%28`, `%29`, `%2C`), sau đó truyền vào bằng hàm **`HttpUrl.Builder.addEncodedPathSegment(encodedUrn)`** để OkHttp giữ nguyên mã đã encode. Trong quá trình dev, nhóm nên kiểm thử thực tế cả hai dạng (dạng thô và dạng đã encode) với backend LinkedIn để xác nhận khả năng chấp nhận của server.
+   > - **Phân định rõ với Body:** Tuyệt đối **KHÔNG percent-encode URN trong JSON body** (các trường `owner`, `author`, `actor`, `object`, `parentComment`... giữ nguyên định dạng chuỗi URN thô).
 
 6. **Trả lời comment (Nested Reply — F6):**
    *(Theo tài liệu Comments API hiện hành, dùng `w_organization_social_feed`; khi chọn version khác,
    phải đối chiếu lại trang endpoint và Developer Portal, không tự đổi tên scope.)*
    ```http
-   POST https://api.linkedin.com/rest/socialActions/{targetUrn}/comments
+   POST https://api.linkedin.com/rest/socialActions/{parentCommentUrn}/comments
    Headers:
      Authorization: Bearer {access-token}
      Linkedin-Version: 202610
@@ -911,7 +992,7 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
 
    {
      "actor": "urn:li:organization:{org-id}",
-     "object": "{targetUrn}",
+     "object": "{rootPostUrn}",
      "message": {
        "text": "Cảm ơn sự đóng góp của bạn!"
      },
@@ -919,22 +1000,26 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
    }
    ```
    *Lưu ý kỹ thuật & Hướng dẫn triển khai `SocialChannelClient.reply(commentId, text)` để tránh lỗi nhầm lẫn URN:*
-   - **Phân định rõ `{targetUrn}` trên URL & `"object"` trong body:**
-     - Trường `"object"` là URN của share/UGC post chứa comment. Với reply lồng nhau, `{targetUrn}` trên URL có thể là `commentUrn` của comment cha; với comment cấp một, `{targetUrn}` là URN bài viết. Không được đặt `commentUrn` vào trường `"object"`.
-     - Trường `"parentComment"` chỉ dùng cho nested reply và là URN của chính comment cha (`parentCommentUrn`).
+   - **Phân định rõ `{parentCommentUrn}` trên URL path & `"object": "{rootPostUrn}"` trong JSON body:**
+     - **Trên URL path (`{parentCommentUrn}`):** Với thao tác trả lời một bình luận (Nested Reply), endpoint của LinkedIn Social Actions API yêu cầu định danh trên path là URN của chính comment cha được trả lời (`parentCommentUrn`, ví dụ: `urn:li:comment:(urn:li:activity:{id},{sub-id})`).
+     - **Trường `"object"` trong body (`{rootPostUrn}`):** Bắt buộc phải là **thread URN của bài viết gốc (Root Post / Share / UGC Post / Activity)** chứa comment đó. **Tuyệt đối không chép nhầm `commentUrn` vào trường `"object"`**; nếu truyền nhầm URN của comment vào `"object"`, API có thể trả về lỗi validation hoặc từ chối request (cần xác minh mã/thông điệp lỗi cụ thể khi kiểm thử thực tế).
+     - **Trường `"parentComment"` trong body (`{parentCommentUrn}`):** Là URN của chính comment cha đang được phản hồi (ở dạng URN thô, không percent-encode).
+     - *(Ghi chú với Comment cấp một vào bài viết):* Nếu là tạo bình luận cấp một trực tiếp trên bài viết (không phải nested reply), URL path là `{rootPostUrn}`, body `"object"` là `{rootPostUrn}`, và bỏ trường `"parentComment"`.
    - **Khớp nối với Interface Contract của dự án (`SocialChannelClient.reply`):**
      - Chữ ký hàm trong `core/social/SocialChannelClient.kt` chỉ nhận: `suspend fun reply(commentId: String, text: String)`. Implementation `LinkedInClient` dự kiến đặt tại `data/social/LinkedInClient.kt` (hoặc `data/linkedin/LinkedInClient.kt`) và được cung cấp qua module trong `di/`.
-     - Để lấy được URN bài viết gốc và `parentCommentUrn` khi thực thi cuộc gọi API này trong `LinkedInClient`:
-       1. **Cách 1 (Khuyến nghị theo Data Model F6):** Model `Comment` trong `core/model/Comment.kt` đã lưu sẵn trường `remotePostId` (chính là `{targetUrn}` của bài viết gốc). Khi người dùng bấm trả lời một comment, Repository tra cứu bản ghi `Comment` trong Room DB theo `commentId` để lấy `remotePostId` tương ứng và truyền vào client.
-       2. **Cách 2 (Trích xuất từ Compound URN):** Định dạng comment URN của LinkedIn là URN phức hợp lồng nhau: `urn:li:comment:({threadUrn},{comment-sub-id})`. Lớp `LinkedInClient` có thể parse `threadUrn` để xác định thread gốc, nhưng nên ưu tiên `remotePostId` từ database vì thread URN có thể là Activity URN khác với URN lưu cho bài viết.
+     - Để xác định chính xác `{rootPostUrn}` và `{parentCommentUrn}` khi thực thi cuộc gọi API này trong `LinkedInClient`:
+       1. **Nguồn lấy `{rootPostUrn}`:** Khuyến nghị lấy từ trường `Comment.remotePostId` lưu trong Room DB (hoặc query entity bài viết tương ứng). Lưu ý rằng trong ví dụ chính thức của LinkedIn Comments API [docs/references/linkedin/comments-api.md dòng 813–814], trường `"object"` mang giá trị Share URN (`"object": "urn:li:share:6305471423242596352"`), trong khi `parentComment` lại chứa Activity URN (`"parentComment": "urn:li:comment:(urn:li:activity:6305471423192264704,...)"`). Do đó, không nên tự suy diễn hoặc parse `threadUrn` từ chuỗi Compound URN của `parentComment` để gán vào `"object"`, vì hai URN này có thể khác loại tiền tố và định danh.
+       2. **Nguồn lấy `{parentCommentUrn}`:** Sử dụng trực tiếp tham số `commentId` truyền vào hàm `SocialChannelClient.reply(commentId, text)`.
    - **Header `X-Restli-Protocol-Version: 2.0.0`:** Bắt buộc phải có để LinkedIn Rest.li framework xử lý đúng các ký tự đặc biệt (dấu ngoặc đơn, dấu phẩy) trong Compound URN của `parentComment`.
-   - **Encoding của endpoint reply:** `{targetUrn}` trên path dùng cùng quy tắc như endpoint đọc
-   comment: truyền URN thô vào `HttpUrl.Builder.addPathSegment(rawUrn)` để OkHttp encode một lần.
-   Các URN trong JSON body (`actor`, `object`, `parentComment`) giữ ở dạng URN hợp lệ của JSON;
-   không percent-encode thủ công nội dung body.
+   - **Encoding của endpoint reply:** `{parentCommentUrn}` trên path khuyến nghị percent-encode riêng URN đúng một lần rồi truyền vào `HttpUrl.Builder.addEncodedPathSegment(encodedParentCommentUrn)` (và kiểm thử thực tế với cả dạng thô). Các URN trong JSON body (`actor`, `object`: `rootPostUrn`, `parentComment`: `parentCommentUrn`) giữ nguyên ở dạng URN thô hợp lệ của JSON; tuyệt đối **không percent-encode nội dung trong JSON body**.
+   - **Giới hạn tần suất tạo comment ngắn hạn (1-Minute Rate Limit):** LinkedIn áp dụng giới hạn ngắn hạn theo cửa sổ 1 phút cho thao tác tạo comment của thành viên; khi vượt ngưỡng, API trả về lỗi HTTP `429` (`Comment create throttled: creation rate limit exceeded for member`) [docs/references/linkedin/comments-api.md]. Tầng xử lý của app cần điều tiết khoảng nghỉ giữa các lượt gửi comment tự động để không chạm ngưỡng này.
 7. **Lấy số liệu bài viết (F7):**
-   *(Scope yêu cầu: `rw_organization_admin`; người dùng phải có role `ADMINISTRATOR` và Product/endpoint phải được cấp trên Developer Portal.)*
-   
+   *(Scope yêu cầu: `rw_organization_admin` [docs/references/linkedin/share-statistics.md]; người dùng phải có role `ADMINISTRATOR` và Product/endpoint phải được cấp trên Developer Portal. Cần kiểm thử kèm `r_organization_social` (Cần kiểm thử thực tế) [TEST-05]).*
+
+   > [!NOTE]
+   > **Kinh nghiệm thực tế về Scope của Share Statistics API:**
+   > Bảng quyền chính thức của Share Statistics API chỉ quy định scope `rw_organization_admin` kèm role `ADMINISTRATOR` [docs/references/linkedin/share-statistics.md]. Tuy nhiên, trên thực tế cộng đồng developer ghi nhận trường hợp endpoint `organizationalEntityShareStatistics` trả về mã lỗi `HTTP 403 Forbidden` nếu access token không được cấp kèm scope `r_organization_social` (dù tài liệu [docs/references/linkedin/share-statistics.md] chỉ liệt kê `rw_organization_admin`). Do đó, khi cấu hình quyền cho app trên Developer Portal và xin quyền OAuth, Mảng B cần lưu ý kiểm thử thực tế sự kết hợp này trong Tuần 1 (⚠️ **Cần kiểm thử thực tế** [TEST-05]).
+
    Theo tài liệu chính thức về [Share Statistics API](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/organizations/share-statistics), endpoint này cung cấp hai tham số lọc riêng biệt tùy theo định dạng URN của bài viết:
    - **Trường hợp URN dạng Share (`urn:li:share:{id}`):** Dùng tham số `shares=List(...)`:
      ```http
@@ -963,16 +1048,16 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
    *Quy tắc triển khai & Bẫy thực tế khi parse dữ liệu (Crucial Implementation Pitfalls):*
    - **Các trường dữ liệu trả về:** `likeCount`, `commentCount`, `shareCount`, `impressionCount`, `uniqueImpressionsCount` (lượt hiển thị duy nhất), `clickCount`, `engagement`.
    - **Bẫy 1 — Bài viết chưa có tương tác không xuất hiện trong `elements`:** Nếu bài viết (`share` hoặc `ugcPost`) chưa từng có bất kỳ tương tác hoặc hiển thị nào, LinkedIn sẽ **không trả về phần tử tương ứng trong mảng `elements`** của JSON response. Phía client parser phải xử lý an toàn: nếu không tìm thấy URN trong `elements`, coi tất cả các chỉ số (`likeCount`, `commentCount`, `shareCount`, `impressionCount`, `uniqueImpressionsCount`, `clickCount`, `engagement`) có giá trị mặc định là `0`, tuyệt đối không throw ngoại lệ `NoSuchElementException`.
-   - **Bẫy 2 — `likeCount` có thể mang giá trị âm:** Theo tài liệu chính thức của LinkedIn Share Statistics, `likeCount` có thể mang giá trị âm (do độ trễ cập nhật batch khi người dùng unlike hoặc hủy reaction). Lớp parser phía app phải bọc qua `max(0, rawLikeCount)` trước khi lưu vào Room DB hoặc hiển thị lên giao diện F7 để tránh hiển thị số âm bất thường.
-   - **Bẫy 3 — Khuyến nghị gọi `socialActions` cho Like/Comment thời gian thực:** Tài liệu LinkedIn nêu rõ `organizationalEntityShareStatistics` là hệ thống tổng hợp số liệu theo lô (batch computation) nên có độ trễ cập nhật nhất định. Để lấy số lượng like/reaction và comment khớp chính xác theo thời gian thực với bài đăng trên feed, tài liệu khuyến nghị gọi trực tiếp endpoint `GET /rest/socialActions/{targetUrn}`.
+   - **Bẫy 2 — `likeCount` có thể mang giá trị âm:** Theo tài liệu chính thức của LinkedIn Share Statistics, số liệu `likeCount` chỉ tính các lượt like tự nhiên (organic likes). Khi một thành viên like một bài viết đang được tài trợ/quảng cáo (sponsored share) rồi sau đó bấm unlike (bỏ like), lượt like ban đầu không được tính vào organic likes nhưng thao tác unlike lại bị trừ vào tổng organic likes, dẫn đến chỉ số `likeCount` có thể mang giá trị âm. Lớp parser phía app phải bọc qua `max(0, rawLikeCount)` trước khi lưu vào Room DB hoặc hiển thị lên giao diện F7 để tránh hiển thị số âm bất thường.
+   - **Bẫy 3 — Khuyến nghị gọi `socialActions` cho Like/Comment thời gian thực:** Để lấy số lượng like/reaction và comment khớp chính xác theo thời gian thực với những gì đang hiển thị trên feed bài đăng, tài liệu chính thức của LinkedIn khuyến nghị gọi trực tiếp endpoint `GET /rest/socialActions/{targetUrn}` thay vì chỉ dựa vào `organizationalEntityShareStatistics`.
    - **Phân biệt định dạng URN:** Bài viết tạo qua endpoint `POST /rest/posts` trả về định danh trong header `x-restli-id`; phải lưu nguyên giá trị response và kiểm tra loại URN thực tế trước khi gọi endpoint metrics. Share Statistics hỗ trợ tham chiếu `share` hoặc `ugcPost` theo tham số tương ứng; không tự đổi tiền tố hoặc suy diễn một định dạng duy nhất.
    - Mã nguồn Mảng B cần phân tích tiền tố của URN bài viết lưu trong Room DB để ánh xạ sang tham số tương ứng (`shares` hoặc `ugcPosts[0]`, tăng chỉ số khi truy vấn nhiều UGC Post), và phải báo lỗi rõ ràng nếu nhận URN ngoài các dạng được endpoint metrics hỗ trợ.
    - ⚠️ *Cần kiểm chứng thực tế:* Do `organizationalEntityShareStatistics` là endpoint thống kê kế thừa, nhóm cần gọi thử nghiệm trực tiếp trên môi trường dev với ID bài đăng vừa tạo từ `POST /rest/posts` để xác nhận định dạng URN tương thích chính xác trên phiên bản `202610`.
    - **Giới hạn dữ liệu:** Endpoint có giới hạn cửa sổ truy vấn theo tài liệu/version hiện hành (tài liệu hiện được đối chiếu mô tả cửa sổ rolling **12 tháng**); không dùng endpoint này để giả định có thể truy vấn lịch sử lâu hơn.
 8. **Lấy số follower (F7):**
-   *(Scope yêu cầu: `rw_organization_admin`; cần kiểm tra thêm vai trò `ADMINISTRATOR` và quyền của app)*
+   *(Scope yêu cầu: `rw_organization_admin`; cần kiểm tra thêm vai trò `ADMINISTRATOR` và quyền của app [docs/references/linkedin/organization-network-size.md, docs/references/linkedin/follower-statistics.md])*
    ```http
-   GET https://api.linkedin.com/rest/networkSizes/urn%3Ali%3Aorganization%3A{org-id}?edgeType=COMPANY_FOLLOWED_BY_MEMBER
+   GET https://api.linkedin.com/v2/networkSizes/urn:li:organization:{org-id}?edgeType=CompanyFollowedByMember
    Headers:
      Authorization: Bearer {access-token}
      Linkedin-Version: 202610
@@ -980,34 +1065,38 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
    ```
    *Trả về:* `firstDegreeSize`.
    
-   *Lưu ý về tham số `edgeType`:*
-   - Với versioned REST API hiện hành, tài liệu Organization Lookup sử dụng giá trị enum **`COMPANY_FOLLOWED_BY_MEMBER`**.
-   - Không dùng giá trị camelCase cũ nếu version/product hiện hành không còn tài liệu hỗ trợ; khi nâng version phải kiểm tra lại enum và response thực tế.
+   *Lưu ý về endpoint và tham số `edgeType`:*
+   - Tài liệu chính thức Organization Network Size API quy định base path là **`/v2/networkSizes/`** và enum là **`CompanyFollowedByMember`** [docs/references/linkedin/organization-network-size.md].
+   - Mặc dù tài liệu chính thức chỉ quy định endpoint `/v2/networkSizes` và `CompanyFollowedByMember` [docs/references/linkedin/organization-network-size.md], để đảm bảo tính tương thích với chuẩn versioned Rest.li hiện hành (header `Linkedin-Version: 202610`), nhóm nên kiểm thử thực tế gọi endpoint này trong Tuần 1 (⚠️ **Cần kiểm thử thực tế** [TEST-04]).
 
 ### 3.4. Giới hạn (Rate Limits) & Quy định kiểm duyệt
-- **Độ dài bài viết tối đa:** `3,000` ký tự (khớp cấu hình trong `ChannelType.LINKEDIN(maxChars = 3_000)`).
-- **Kích thước ảnh & Định dạng:**
-  - **Giới hạn pixel (Chính thức theo Images API):** Tổng độ phân giải mỗi ảnh phải **dưới 36.152.320 pixel** (chiều rộng $\times$ chiều cao). Định dạng hỗ trợ: JPG/JPEG, GIF, PNG.
-  - **Dung lượng file:** Trạng thái: *Chưa xác minh mức trần cụ thể trong tài liệu Images API* (con số 8 MB là khuyến nghị thực tế để tránh timeout khi tải lên di động).
-  - Tỉ lệ khuyến nghị: `1.91:1` (ngang: 1200 x 627 px) hoặc `1:1` (vuông: 1200 x 1200 px).
+- **Độ dài bài viết tối đa:** Giới hạn của app là `3.000` ký tự theo cấu hình trong `ChannelType.LINKEDIN(maxChars = 3_000)`. Lưu ý: Tài liệu Posts API [docs/references/linkedin/posts-api.md] chỉ trả về mã lỗi `FIELD_LENGTH_TOO_LONG` khi vượt quá độ dài tối đa mà không công bố con số ký tự cụ thể trong bộ tài liệu tham chiếu; con số 3.000 ký tự là cấu hình nội bộ của app (⚠️ **Cần kiểm thử thực tế** trên API runtime).
+- **Kích thước ảnh & Định dạng (theo Multi-image Post API [docs/references/linkedin/multiimage-post-api.md]):**
+  - **Giới hạn pixel:** Tổng số pixel mỗi ảnh phải **dưới 36.152.320 pixel**. Định dạng hỗ trợ: JPG, GIF, PNG (ảnh GIF hỗ trợ tối đa 250 frames) [docs/references/linkedin/multiimage-post-api.md].
+  - **Dung lượng file & Tỉ lệ:** Mức trần dung lượng không được công bố trong tài liệu Multi-image Post API (trạng thái: ⚠️ **Cần kiểm thử thực tế**; con số 8 MB là khuyến nghị thực tế của nhóm để tránh timeout khi tải lên di động). Tỉ lệ `1.91:1` (ngang: 1200 x 627 px) hoặc `1:1` (vuông: 1200 x 1200 px) là đề xuất thiết kế giao diện phía app (tài liệu [docs/references/linkedin/multiimage-post-api.md] không quy định tỉ lệ khung hình cụ thể mà chỉ giới hạn tổng pixel dưới 36.152.320).
 - **Hạn ngạch & Giới hạn tần suất gọi (Rate Limits & Quotas theo Product / Tier):**
   - **Sản phẩm Share on LinkedIn (Đăng bài cá nhân):**
     - LinkedIn không công bố một quota chuẩn chung trong tài liệu cho mọi endpoint. Hạn mức application/member thực tế phải xem trên Developer Portal Analytics sau khi app gọi endpoint tương ứng.
     - Hạn mức được tính theo số request API trong cửa sổ 24 giờ và reset vào 00:00 UTC; không đồng nhất với số bài đăng vì bài có media còn phát sinh các request upload.
   - **Sản phẩm Community Management API (Page Công ty — F6/F7):**
-    - Không hard-code quota Development/Standard Tier theo một con số cố định. Tài liệu LinkedIn nêu rằng giới hạn application/member thay đổi theo endpoint, API Product và cấp độ ứng dụng; hạn mức thực tế phải xem trên Developer Portal Analytics sau khi app gọi endpoint tương ứng.
-    - Không hard-code quota trong client. Hạn mức là giới hạn application/member theo endpoint và app; tài liệu rate-limit hiện hành mô tả chu kỳ 24 giờ và reset lúc 00:00 UTC, nhưng giá trị quota cụ thể vẫn phải lấy từ Developer Portal.
+    - Theo tài liệu chính thức về cấp quyền truy cập [Increasing Access](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/increasing-access), hạn ngạch của **Community Management Development Tier** được quy định giới hạn cụ thể [docs/references/linkedin/increasing-access.md]:
+      - **Toàn bộ API:** Tối đa **500 API calls / app / 24 giờ**.
+      - **Giới hạn theo Member:** Tối đa **100 API calls / member / 24 giờ**.
+      - **Các API dùng `BATCH_GET`:** Hoàn toàn **không được phép gọi** (No API calls allowed).
+      - **Webhook cho Social Actions:** Tính năng Push notifications bị vô hiệu hóa.
+    - Chu kỳ hạn ngạch tính theo 24 giờ và reset vào 00:00 UTC. Khi cần nâng hạn mức lên Standard Tier, nhóm phải nộp đơn đăng ký xét duyệt.
   - **Cơ chế xử lý khi vượt ngưỡng:** LinkedIn có thể trả về HTTP `429 Too Many Requests`; client
     phải coi đây là lỗi tạm thời có điều kiện, áp dụng backoff có giới hạn và không mặc định rằng
     response luôn có header `Retry-After` hoặc tự suy ra thời điểm phục hồi. Chỉ map sang
     `PublishResult.RetryableError` khi response/endpoint cho thấy đúng là lỗi rate limit.
 - **Theo dõi Quota & Usage thực tế theo từng endpoint trên LinkedIn Developer Portal:**
-  - Theo tài liệu chính thức từ LinkedIn về [API Rate Limits](https://learn.microsoft.com/en-us/linkedin/shared/api-guide/concepts/rate-limits), LinkedIn **không công bố một hạn mức chuẩn chung phổ quát** cho tất cả các endpoint, mà rate limit được thiết lập riêng biệt theo từng API Product, từng endpoint và cấp độ ứng dụng.
+  - Theo tài liệu chính thức từ LinkedIn về [API Rate Limits](https://learn.microsoft.com/en-us/linkedin/shared/api-guide/concepts/rate-limits), LinkedIn thiết lập rate limit riêng biệt theo từng API Product, từng endpoint và cấp độ ứng dụng.
+  - **Cảnh báo qua Email khi chạm 75% Quota:** Quản trị viên của ứng dụng (Developer Admins) sẽ nhận được email cảnh báo khi ứng dụng vượt quá **75%** hạn mức rate limit quota được giao (chỉ kích hoạt với vi phạm ngưỡng cấp độ application, độ trễ thông báo khoảng 1–2 giờ) [docs/references/linkedin/rate-limits.md].
   - Do đó, **tài liệu ưu tiên phương pháp đối chiếu và kiểm tra trực tiếp hạn ngạch theo từng endpoint trên tab Analytics của Developer Portal**:
     1. Đăng nhập [LinkedIn Developer Portal](https://developer.linkedin.com/), chọn ứng dụng `SocialAgent App`.
     2. Chọn tab **Analytics** trên thanh menu điều hướng của ứng dụng.
     3. Chọn xem theo bộ lọc **Application Quota** hoặc **Member Quota** để theo dõi số lượng call đã thực hiện và hạn ngạch còn lại trong ngày theo từng endpoint.
-    4. **Lưu ý hiển thị của Portal:** Tab *Analytics* chỉ là nguồn quan sát usage/rate limit mà LinkedIn hiển thị cho từng app/product/endpoint. Không dùng trạng thái hiển thị của Portal để suy ra quota runtime hoặc tự tạo request chỉ nhằm “kích hoạt” một hạn mức; khi cần xác minh, dùng request hợp lệ trong môi trường Development và đối chiếu tài liệu hiện hành.
+    4. **Lưu ý hiển thị của Portal:** Tab *Analytics* là nguồn quan sát usage/rate limit cho từng app/product/endpoint. Với các endpoint chưa hiển thị trong bảng rate limit, nhà phát triển có thể thực hiện 1 cuộc gọi API thử nghiệm (single test API call) để Developer Portal ghi nhận và hiển thị hạn mức tương ứng [docs/references/linkedin/rate-limits.md].
 - **Quyền nào cần App Review / Phê duyệt Sản phẩm (Products):**
   - *Sản phẩm Share on LinkedIn & Sign In with OpenID Connect:* Có thể cung cấp luồng xin các scope `openid`, `profile` và `w_member_social`, nhưng không được coi sản phẩm là bằng chứng rằng mọi scope đã được cấp tự động cho mọi app. Runtime phải đọc scope/token thực tế và kiểm tra Developer Portal; nếu `w_member_social` không được cấp thì không gán capability `PUBLISH`.
   - *Sản phẩm Community Management API (Cần đăng ký & duyệt):* Chỉ ghi các scope thực sự được
@@ -1015,7 +1104,7 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
     `r_organization_social_feed` ở tài liệu Comments API hiện hành); không suy ra scope hợp lệ chỉ
     từ tên product hoặc từ một endpoint khác.
 - **Chế độ Development dùng được tới đâu:**
-  - **Phạm vi hoạt động:** Có thể kiểm thử đăng bài lên trang cá nhân của Developer/Tester và tương tác với Organization Page mà thành viên có vai trò phù hợp, nếu app đã được cấp đúng product/scope. Việc là Developer/Tester không tự cấp quyền quản trị Organization hoặc thay thế điều kiện của Community Management API. Rate limit cụ thể theo endpoint/member phải kiểm tra trên Developer Portal Analytics; không coi Development Tier có quota cố định chung cho mọi endpoint.
+  - **Phạm vi hoạt động:** Có thể kiểm thử đăng bài lên trang cá nhân của Developer/Tester và tương tác với Organization Page mà thành viên có vai trò phù hợp, nếu app đã được cấp đúng product/scope. Việc là Developer/Tester không tự cấp quyền quản trị Organization hoặc thay thế điều kiện của Community Management API. Riêng Community Management Development Tier có hạn ngạch cứng 500 calls/app/24h và 100 calls/member/24h [docs/references/linkedin/increasing-access.md]; các endpoint/sản phẩm khác phải theo dõi và kiểm tra hạn ngạch cụ thể trên Developer Portal Analytics [docs/references/linkedin/rate-limits.md].
   - **Dự phòng rào cản kiểm duyệt:** Nếu LinkedIn chưa kịp cấp quyền Community Management API cho Organization Page, app có thể kích hoạt luồng **`HANDED_OFF`** (Mục 4) để copy bài và mở Android Share Intent.
 
 ---
@@ -1023,12 +1112,12 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
 ## 4. Chức năng không làm được qua API & Đề xuất "Đã bàn giao" (`HANDED_OFF`)
 
 ### 4.1. Các hạn chế bất khả kháng từ chính sách API
-1. **Đăng bài lên Facebook cá nhân (Personal Profile Timeline):** Meta đã đóng hoàn toàn quyền `publish_actions` từ năm 2018. Không ứng dụng bên thứ ba nào được phép đăng bài trực tiếp lên trang cá nhân của người dùng qua API (chỉ cho phép đăng lên Page).
+1. **Đăng bài lên Facebook cá nhân (Personal Profile Timeline):** Quyền `publish_actions` không còn được hỗ trợ trong danh mục quyền hiện hành của Pages API; Pages API chỉ hỗ trợ đăng bài lên Facebook Page (yêu cầu quyền `pages_manage_posts`) và không hỗ trợ đăng trực tiếp lên trang cá nhân người dùng [docs/references/meta/pages-api-overview.md, docs/references/meta/permissions-reference.md].
 2. **Mention người dùng cá nhân trên Facebook & Rào cản tìm kiếm ID:**
    - *Meta (Facebook):* Mention chỉ là capability có điều kiện. App phải xác nhận endpoint/version, Page task, product và định danh Page-scoped ID được phép trước khi thử; đây không phải cơ chế tìm kiếm/mention tự do mọi hồ sơ cá nhân. Nếu điều kiện không được xác nhận hoặc request bị từ chối, app kích hoạt luồng `HANDED_OFF` để người dùng tag trực tiếp trên app Facebook.
    - *LinkedIn:* Việc mention Member/Organization bằng URN trong nội dung bài đăng **chưa được coi là capability được bảo đảm chung**; chỉ bật sau khi kiểm thử thành công với Posts API, product, version và quyền cụ thể của ứng dụng. Nếu chưa xác nhận hoặc không có URN hợp lệ, hệ thống kích hoạt luồng `HANDED_OFF` để người dùng mention trực tiếp trên ứng dụng mạng xã hội.
 3. **App chưa được cấp quyền Public / Chưa qua App Review:** Người dùng ngoài danh sách Developer/Tester có thể không dùng được các permission/product yêu cầu Advanced Access hoặc App Review. Business Verification, screencast và điều kiện bổ sung chỉ áp dụng khi Meta yêu cầu cho permission/product cụ thể; không suy ra rằng mọi permission Pages đều bắt buộc cùng một điều kiện.
-4. **Kênh không thể tự khắc phục ở runtime:** Nếu sau khi kiểm tra token, permission, Page task, product và endpoint mà thao tác vẫn không được cấp quyền, client không nên retry vô hạn và có thể dùng `HANDED_OFF`. Không gắn nhãn `PermanentError` chỉ từ một response permission error; phải giữ thông tin lỗi để phân biệt thiếu quyền tạm thời, token bị thu hồi và capability không được hỗ trợ.
+4. **Kênh không thể tự khắc phục ở runtime:** Nếu sau khi kiểm tra token, permission, Page task, product và endpoint mà thao tác vẫn không được cấp quyền, client không nên retry vô hạn và kích hoạt cơ chế `HANDED_OFF`. Client cần phân loại chính xác giữa lỗi phân quyền không thể tự khắc phục ở runtime (`PermissionError` $\rightarrow$ chuyển sang `HANDED_OFF`), lỗi token hết hạn/bị thu hồi (`AuthenticationError` $\rightarrow$ yêu cầu người dùng kết nối lại) và lỗi sự cố tạm thời (`TransientError` $\rightarrow$ exponential backoff retry); không tự động quy chụp mọi lỗi HTTP là lỗi vĩnh viễn (`PermanentError`) mà phải dựa trên `error.code`, `error_subcode` và message cụ thể để giữ nguyên vẹn thông tin chẩn đoán lỗi.
 
 ### 4.2. Cơ chế giải pháp "Đã bàn giao" (`HANDED_OFF`)
 Khớp với `PostStatus.HANDED_OFF` trong `core/model/Post.kt` (yêu cầu F5 trong `requirements.md`):
@@ -1091,7 +1180,7 @@ Thay vì xem trường hợp không gọi được API là lỗi thất bại (`
 ### 5.1. Meta for Developers (Facebook)
 - **Tên App:** `SocialAgent-Dev`
 - **Loại App (App Type):** `Business`
-- **Trạng thái:** `In Development` (Chế độ phát triển)
+- **Trạng thái truy cập quyền:** `Standard Access` (phục vụ tài khoản nội bộ có App Role hoặc Business Role; Business App không có toggle Development/Live mode)
 - **Kiểm tra loại hình đăng nhập trên Dashboard (Facebook Login vs Login for Business):**
   - Do app thuộc loại `Business`, Meta có thể yêu cầu sử dụng **Facebook Login for Business** thay cho Facebook Login cổ điển.
   - **Cần kiểm tra trên Dashboard:**
@@ -1143,7 +1232,7 @@ Thay vì lưu `client_secret`, ứng dụng chỉ quản lý các **Public Clien
    - **Tách biệt Token và Metadata (Principle of Least Privilege):**
      - **Chỉ lưu Token trong `EncryptedSharedPreferences`:** Toàn bộ token nhạy cảm gồm:
        - User Access Token (`access_token`), Refresh Token (`refresh_token` nếu có), và mã phiên `bff_session_token` (cho các luồng qua BFF).
-       - **Page Access Token của từng Facebook Page:** Toàn bộ các tác vụ F5 (đăng bài), F6 (đọc/trả lời comment) và F7 (lấy số liệu insights) của Facebook đều thực hiện dưới danh nghĩa Page và bắt buộc sử dụng Page Access Token. Từng token này được lưu an toàn trong `EncryptedSharedPreferences` và tra cứu theo `page_id` / `accountId` (ví dụ key: `fb_page_token_{page_id}`).
+       - **Page Access Token của từng Facebook Page:** Đối với ứng dụng Social Agent (quản lý Page do người dùng sở hữu), toàn bộ các tác vụ F5 (đăng bài), F6 (đọc/trả lời comment) và F7 (lấy số liệu insights) đều thực hiện dưới danh nghĩa Page và sử dụng Page Access Token (tài liệu Meta [docs/references/meta/pages-api-posts.md dòng 28–30] cho phép User Access Token kèm Page Public Content Access nếu người dùng không quản trị Page). Từng token này được lưu an toàn trong `EncryptedSharedPreferences` và tra cứu theo `page_id` / `accountId` (ví dụ key: `fb_page_token_{page_id}`).
        - Tất cả token đều được mã hóa bằng Android Keystore (`MasterKey.DEFAULT_AES256_GCM_SPEC`).
      - **Room Database tuyệt đối KHÔNG lưu plaintext token:** Room chỉ lưu trữ các metadata phi nhạy cảm của tài khoản và kênh/Page: `accountId`, `channelType`, `accountName`, `avatarUrl`, `expiresAt`, `connectionStatus`, `capabilities`. Khi gọi API, Repository sẽ lấy metadata từ Room và truy xuất token (hoặc Page token tương ứng theo `page_id`) từ `EncryptedSharedPreferences`.
    - Không ghi log token ra Logcat, không đính kèm token trong thông báo lỗi hoặc crash report.
@@ -1247,10 +1336,10 @@ Các mục dưới đây phải được xác nhận bằng tài liệu portal h
 - [ ] Xác nhận metric insights và field follower đang khả dụng trên version Graph API được App cấp.
 - [ ] LinkedIn xác nhận sản phẩm Community Management, quyền Organization và định dạng URN trả về từ
       endpoint đăng bài.
-- [ ] LinkedIn xác nhận Native PKCE cho App ID; nếu chưa có, mở issue backend/BFF riêng trước khi triển
+- [ ] LinkedIn xác nhận Native PKCE cho App ID; nếu chưa có, mở issue backend/BFF riêng (ngoài phạm vi repository Android này) trước khi triển
       khai Standard OAuth.
 - [ ] Kiểm thử retry, rate limit, token revoked/expired và fallback `HANDED_OFF` trên môi trường Development.
-- [ ] Kiểm tra disconnect xóa token cục bộ; nếu có BFF thì phải có quy trình thu hồi server-side trước khi
+- [ ] Kiểm tra disconnect xóa token cục bộ; nếu có luồng BFF ngoài phạm vi thì phải có quy trình thu hồi server-side trước khi
       coi kết nối đã ngắt hoàn toàn.
 
 ## 7. Tóm tắt nội dung dùng cho Slide Báo cáo (Research Presentation)
@@ -1261,7 +1350,7 @@ Dưới đây là dàn ý nội dung được thiết kế sẵn theo từng sli
 * **Ý chính trình chiếu:**
   * Đối chiếu trực tiếp với `enum class ChannelCapability`: `PUBLISH`, `READ_COMMENTS`, `REPLY`, `MENTION`, `METRICS`.
   * **Facebook Page:** Hỗ trợ đăng bài, comment/reply và metrics theo Page task, permission và version; mention là capability có điều kiện. Không hỗ trợ native Idempotency $\rightarrow$ Quản lý qua Room DB cục bộ.
-  * **LinkedIn Organization:** Hỗ trợ Company Page theo product/quyền được cấp; mention và idempotency header chỉ dùng sau khi xác minh theo endpoint/version.
+  * **LinkedIn Organization:** Hỗ trợ Company Page theo product/quyền được cấp; mention là capability có điều kiện và cần xác minh; không hỗ trợ native Idempotency Key $\rightarrow$ Quản lý hàng đợi và chống trùng lặp bằng Room DB cục bộ.
   * **LinkedIn Member (Cá nhân):** Có thể đăng bài cơ bản khi app được cấp `w_member_social`; quyền đọc/trả lời comment, metrics và mention không được coi là capability mặc định.
 * **Gợi ý Visual:** Bảng ma trận so sánh 3 cột (Facebook Page | LinkedIn Org | LinkedIn Member) với các icon tick xanh ✅ và cảnh báo ⚠️.
 
@@ -1296,12 +1385,12 @@ Dưới đây là dàn ý nội dung được thiết kế sẵn theo từng sli
 * **Ý chính trình chiếu:**
   * **Đăng bài có ảnh (F5):**
     * *Facebook:* 1 bước qua `POST /{page-id}/photos` (ảnh đơn) hoặc 2 bước qua `attached_media` (đa ảnh).
-    * *LinkedIn:* `initializeUpload` $\rightarrow$ PUT binary $\rightarrow$ Đăng bài với Image URN (ảnh đơn) hoặc `multiImage` (2–20 ảnh) nếu product/quyền của app hỗ trợ; mỗi ảnh phải dưới 36.152.320 pixel.
+    * *LinkedIn:* `initializeUpload` $\rightarrow$ PUT binary $\rightarrow$ Đợi ảnh `AVAILABLE` $\rightarrow$ Đăng bài với Image URN (ảnh đơn) hoặc `multiImage` (2–20 ảnh) (⚠️ **Cần kiểm thử thực tế**) nếu product/quyền của app hỗ trợ; mỗi ảnh phải dưới 36.152.320 pixel (ảnh GIF tối đa 250 frames, altText tối đa 4.086 ký tự [docs/references/linkedin/multiimage-post-api.md]).
   * **Tương tác & Số liệu (F6, F7):** Đọc comment phân cấp, reply theo ID/URN, lấy insights (sử dụng metric được version hiện hành hỗ trợ, ví dụ `post_media_view`) và follower count.
   * **Giới hạn kiểm soát:**
-    * *Độ dài bài:* Facebook (63.206 ký tự) vs LinkedIn (3.000 ký tự) $\rightarrow$ Đã cấu hình cứng trong `ChannelType`.
-    * *Kích thước ảnh:* Facebook (giới hạn dung lượng multipart chưa được xác minh trong tài liệu Pages API) vs LinkedIn (dưới 36.152.320 pixel/ảnh).
-    * *Rate limit:* Facebook (giới hạn động theo BUC / Page Engaged Users) vs LinkedIn (giới hạn application/member thay đổi theo Product và endpoint); quota thực tế phải kiểm tra trên Portal Analytics và response thực tế.
+    * *Độ dài bài:* Facebook (63.206 ký tự là cấu hình quy ước nội bộ trong `ChannelType` của app do `pages-api-posts.md` không công bố giới hạn ký tự cụ thể; client tự xử lý lỗi validation nếu vượt quá giới hạn) vs LinkedIn (3.000 ký tự cấu hình trong `ChannelType`, API trả về lỗi `FIELD_LENGTH_TOO_LONG` nếu vượt quá giới hạn tối đa theo [docs/references/linkedin/posts-api.md] nhưng không nêu con số cụ thể trong references).
+    * *Kích thước ảnh:* Facebook (tối đa dưới 4 MB/ảnh, riêng PNG khuyến nghị dưới 1 MB để tránh vỡ hạt [docs/references/meta/page-photos.md]; định dạng JPEG, BMP, PNG, GIF, TIFF) vs LinkedIn (dưới 36.152.320 pixel/ảnh [docs/references/linkedin/multiimage-post-api.md]).
+    * *Rate limit:* Facebook (giới hạn động theo BUC trên Page token [docs/references/meta/rate-limiting.md], ngưỡng động cụ thể cần quan sát theo response thực tế) vs LinkedIn (Community Management Development Tier tối đa 500 calls/app/24h và 100 calls/member/24h [docs/references/linkedin/increasing-access.md]; các endpoint/product khác thay đổi theo ứng dụng [docs/references/linkedin/rate-limits.md]); quota thực tế phải kiểm tra trên Portal Analytics và response thực tế.
 * **Gợi ý Visual:** Bảng so sánh 2 cột trực quan các chỉ số dung lượng, ký tự và Rate Limit.
 
 ---
@@ -1309,13 +1398,13 @@ Dưới đây là dàn ý nội dung được thiết kế sẵn theo từng sli
 ### 🛡️ Slide 4: Rào cản Chính sách & Giải pháp "Đã bàn giao" (`HANDED_OFF`)
 * **Ý chính trình chiếu:**
   * **Rào cản API bất khả kháng:**
-    1. Meta cấm bên thứ ba đăng bài lên Facebook cá nhân (đóng quyền `publish_actions` từ 2018).
+    1. Pages API của Meta chỉ hỗ trợ đăng bài lên Facebook Page, không hỗ trợ đăng bài lên trang cá nhân người dùng và không còn quyền `publish_actions` trong danh mục quyền hiện hành [docs/references/meta/pages-api-overview.md, docs/references/meta/permissions-reference.md].
     2. Meta chỉ cho Page mention người đã đăng bài/comment khi có Page-scoped ID và đủ điều kiện; LinkedIn chỉ bật mention Member/Organization sau khi kiểm thử endpoint/product cụ thể với URN hợp lệ.
     3. Rào cản kiểm duyệt App Review và điều kiện Advanced Access thay đổi theo permission/product; Business Verification hoặc tài liệu doanh nghiệp chỉ được yêu cầu khi Meta hiển thị cho trường hợp cụ thể.
-  * **Giải pháp 1 (Nội bộ):** Chạy ứng dụng ở **Development Mode** $\rightarrow$ Dành cho tài khoản được gán vai trò Tester/Developer trong App Roles và có Page Tasks quản trị trên Facebook Page thử nghiệm.
+  * **Giải pháp 1 (Nội bộ):** Sử dụng cấp độ **Standard Access** (dành cho Business App không có App Mode toggle [docs/references/meta/pages-api-overview.md]) $\rightarrow$ Thử nghiệm với các tài khoản nội bộ được gán vai trò Tester/Developer trong App Roles (hoặc thành viên trong Business Manager sở hữu App) và có Page Tasks quản trị trên Facebook Page thử nghiệm.
   * **Giải pháp 2 (Dự phòng F5 - `HANDED_OFF`):** 
     * Khi không thể gọi API và đã xác nhận lỗi phân quyền không thể tự khắc phục (sau khi phân tích `error.code`, `error_subcode`, endpoint, Page task và trạng thái quyền): Copy text vào Clipboard $\rightarrow$ Kích hoạt Android Share Intent native $\rightarrow$ Cập nhật trạng thái `PostStatus.HANDED_OFF`.
-    * Đảm bảo luồng trải nghiệm không bao giờ đứt gãy.
+    * Đảm bảo duy trì trải nghiệm liền mạch cho người dùng.
 * **Gợi ý Visual:** Sơ đồ rẽ nhánh: [Agent soạn bài] $\rightarrow$ [Đủ quyền API? $\rightarrow$ Gọi API] HOẶC [Thiếu quyền $\rightarrow$ Copy Clipboard + Mở Share Sheet $\rightarrow$ Badge HANDED_OFF].
 
 ---
@@ -1334,7 +1423,12 @@ Dưới đây là dàn ý nội dung được thiết kế sẵn theo từng sli
       AppAuth/BFF trong Milestone 1.
   * **Checklist kiểm thử tích hợp thực tế (Integration Verification Checklist):**
     Các điểm cần gọi thử nghiệm thực tế với Access Token thật trên môi trường dev trong Tuần 1 để chốt cấu hình:
-    1. **Quyền của `organizationAcls` (LinkedIn):** Kiểm chứng endpoint `GET /rest/organizationAcls` chấp nhận `rw_organization_admin` hay chỉ yêu cầu `r_organization_admin` khi lấy danh sách Organization Pages mà user làm Admin.
-    2. **Danh sách field của Page node trên Graph API v26.0 (Facebook):** Gọi thử `GET /{page-id}?fields=followers_count,fan_count` để xác nhận trường nào trả về dữ liệu chuẩn và trường nào là legacy/deprecated.
-    3. **Enum `COMPANY_FOLLOWED_BY_MEMBER` của `networkSizes` (LinkedIn):** Kiểm tra tham số `edgeType=COMPANY_FOLLOWED_BY_MEMBER` trên phiên bản LinkedIn API hiện hành để đảm bảo không bị lỗi 400 Bad Request.
+    1. **Quyền & Endpoint danh sách Organization (LinkedIn):** Xác nhận scope `r_organization_admin` là đủ cho thao tác đọc danh sách Organization Pages (không cần xin thừa `rw_organization_admin`); kiểm tra Developer Portal cấp quyền gọi endpoint khuyến nghị `GET /v2/organizationAuthorizations` [docs/references/linkedin/organization-authorizations.md] hay endpoint truyền thống `GET /rest/organizationAcls` [docs/references/linkedin/organization-access-control-by-role.md].
+    2. **Field `followers_count` của Page node trên Graph API (Facebook):** (⚠️ Cần kiểm thử thực tế) Gọi thử `GET /{page-id}?fields=followers_count,fan_count` để xác nhận dữ liệu trả về thực tế trên New Page Experience [docs/references/meta/page-reference.md].
+    3. **Enum `CompanyFollowedByMember` của `networkSizes` (LinkedIn):** (⚠️ Cần kiểm thử thực tế [TEST-04]) Kiểm tra endpoint `GET https://api.linkedin.com/v2/networkSizes/urn:li:organization:{org-id}?edgeType=CompanyFollowedByMember` để đảm bảo gateway chấp nhận cú pháp theo tài liệu [docs/references/linkedin/organization-network-size.md]; không tự ý dùng `/rest/` hay enum viết hoa khi chưa có tài liệu xác nhận [docs/references/linkedin/organization-network-size.md].
+    4. **Hiệu lực của scope `pages_read_user_engagement` (Facebook):** (⚠️ Cần kiểm thử thực tế [TEST-01]) Kiểm tra trên App Dashboard và Graph API xem hệ thống chấp nhận scope `pages_read_user_engagement` (theo hướng dẫn [docs/references/meta/pages-api-posts.md]) hay `pages_read_user_content` (theo từ điển quyền [docs/references/meta/permissions-reference.md]); đề xuất cấu hình ưu tiên xin `pages_read_user_content` kết hợp `pages_read_engagement` và `pages_show_list` [docs/references/meta/permissions-reference.md].
+    5. **Thời hạn Page Access Token (Facebook):** (⚠️ Cần kiểm thử thực tế [TEST-02]) Kiểm tra `expires_at` thực tế của Page token sinh từ User Long-Lived Token qua Access Token Debugger để xác minh xem token có giá trị `0` (không có ngày hết hạn theo [docs/references/meta/long-lived-page-token.md]) hay có hạn dùng cụ thể (theo [docs/references/meta/pages-api-overview.md]); đồng thời triển khai bắt mã lỗi HTTP 400/401 `code: 190` khi token bị thu hồi động [docs/references/meta/error-handling.md].
+    6. **Endpoint reply comment (Facebook):** (⚠️ Cần kiểm thử thực tế [TEST-03]) Gọi thử nghiệm để xác nhận Graph API chấp nhận endpoint Node/Edge chuẩn `POST /{comment-id}/comments` [docs/references/meta/graph-comments-edge.md] hay endpoint trực tiếp `POST /{comment-id}` [docs/references/meta/pages-api-comments-mentions.md]; đề xuất app ưu tiên gọi `POST /{comment-id}/comments` và chuẩn bị fallback nếu nhận lỗi 400/404 [docs/references/meta/graph-comments-edge.md].
+    7. **Scope Share Statistics (LinkedIn):** (⚠️ Cần kiểm thử thực tế [TEST-05]) Gọi thử `GET /rest/organizationalEntityShareStatistics` với token chỉ có `rw_organization_admin` [docs/references/linkedin/share-statistics.md] để xác minh xem có bị lỗi HTTP 403 khi thiếu `r_organization_social` không; đề xuất cấu hình app xin gộp cả `rw_organization_admin` và `r_organization_social` [docs/references/linkedin/share-statistics.md].
+    8. **Scope OpenID Connect trên Native PKCE (LinkedIn):** (⚠️ Cần kiểm thử thực tế [TEST-06]) Thử nghiệm gửi `scope=openid profile` trên endpoint `/oauth/native-pkce/authorization` [docs/references/linkedin/native-pkce.md, docs/references/linkedin/sign-in-with-linkedin-v2.md] để xác nhận máy chủ LinkedIn có chấp nhận OIDC cho native client không; chuẩn bị fallback về `scope=r_liteprofile` nếu API báo lỗi không hỗ trợ [docs/references/linkedin/native-pkce.md].
 * **Gợi ý Visual:** Timeline lộ trình thực hiện theo tuần của Milestone 1.

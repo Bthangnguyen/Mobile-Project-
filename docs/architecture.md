@@ -16,6 +16,9 @@ UI layer                          Data layer
 - **ViewModel** giữ `UiState`, gọi repository/interface, không biết đến Android View.
 - **Repository / Client** nói chuyện với mạng, DB, WorkManager.
 - **Offline-first:** UI đọc từ Room; mạng chỉ cập nhật Room. Nhờ đó app vẫn xem được dữ liệu khi mất mạng (F9).
+  Repository của từng tính năng inject DAO (`DraftDao`, `PostDao`, `CommentDao`, `MetricsDao`) từ `di/DatabaseModule.kt`,
+  đọc bằng `Flow` và đổi entity ↔ model qua `core/database/Mappers.kt`. Đổi schema thì tăng `version` trong
+  `AppDatabase`, thêm migration và commit file mới trong `app/schemas/`.
 
 ## Hợp đồng chung (`core/`)
 
@@ -56,7 +59,7 @@ com.lttbdd.socialagent
 │   ├── model/        Draft, Comment, PostMetrics, ChannelType, AgentEvent...
 │   ├── social/       SocialChannelClient
 │   ├── ai/           LlmClient, ContentAgent
-│   ├── database/     Room DB + DAO (A, thêm khi làm F5/F9)
+│   ├── database/     Room DB + DAO + entity + mapper (A)
 │   └── ui/           component dùng chung (D)
 ├── data/
 │   ├── fake/         bản giả của các interface

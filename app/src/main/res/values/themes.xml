@@ -2,6 +2,29 @@
     <style name="Theme.SocialAgent" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="colorPrimary">@color/brand_primary</item>
         <item name="colorOnPrimary">@color/brand_on_primary</item>
+        <item name="colorPrimaryContainer">@color/brand_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/brand_on_primary_container</item>
         <item name="colorSecondary">@color/brand_secondary</item>
+        <item name="colorOnSecondary">@color/brand_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/brand_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/brand_on_secondary_container</item>
+        <item name="android:colorBackground">@color/brand_background</item>
+        <item name="colorSurface">@color/brand_surface</item>
+        <item name="colorSurfaceVariant">@color/brand_surface_variant</item>
+        <item name="colorOnSurface">@color/brand_on_surface</item>
+        <item name="colorOnSurfaceVariant">@color/brand_on_surface_variant</item>
+        <item name="colorOutline">@color/brand_outline</item>
+        <item name="colorError">@color/brand_error</item>
+        <item name="colorOnError">@color/brand_on_error</item>
+        <item name="colorErrorContainer">@color/brand_error_container</item>
+        <item name="materialButtonStyle">@style/Widget.SocialAgent.Button</item>
+        <item name="textInputStyle">@style/Widget.SocialAgent.TextInputLayout</item>
+        <item name="materialCardViewStyle">@style/Widget.SocialAgent.Card</item>
+        <item name="bottomNavigationStyle">@style/Widget.SocialAgent.BottomNavigation</item>
+        <item name="toolbarStyle">@style/Widget.SocialAgent.Toolbar</item>
+        <item name="checkboxStyle">@style/Widget.SocialAgent.CheckBox</item>
+        <item name="radioButtonStyle">@style/Widget.SocialAgent.RadioButton</item>
+        <item name="materialSwitchStyle">@style/Widget.SocialAgent.Switch</item>
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.SocialAgent.Dialog</item>
     </style>
 </resources>

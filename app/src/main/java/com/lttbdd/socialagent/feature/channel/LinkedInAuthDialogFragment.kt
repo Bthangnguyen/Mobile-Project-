@@ -101,6 +101,12 @@ class LinkedInAuthDialogFragment : DialogFragment() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 progressBar?.visibility = View.GONE
+                val title = view?.title ?: ""
+                if (title.contains("Blocked", ignoreCase = true) || title.contains("Cloudflare", ignoreCase = true) || title.contains("unable to access", ignoreCase = true)) {
+                    android.util.Log.e("LinkedInOAuth", "Cloudflare Blocked Page detected: $title")
+                    onAuthErrorListener?.invoke("Cloudflare Blocked")
+                    dismissAllowingStateLoss()
+                }
             }
 
             override fun onReceivedError(
@@ -128,7 +134,9 @@ class LinkedInAuthDialogFragment : DialogFragment() {
             }
         }
 
-        webView?.loadUrl(authUrl)
+        val extraHeaders = HashMap<String, String>()
+        extraHeaders["X-Requested-With"] = ""
+        webView?.loadUrl(authUrl, extraHeaders)
     }
 
     private fun handleUrlRedirect(url: String, uri: Uri): Boolean {

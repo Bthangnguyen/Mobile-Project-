@@ -15,7 +15,6 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.facebook.CallbackManager
 import com.facebook.FacebookCallback
 import com.facebook.FacebookException
-import com.facebook.login.LoginBehavior
 import com.facebook.login.LoginManager
 import com.facebook.login.LoginResult
 import com.lttbdd.socialagent.R
@@ -93,26 +92,32 @@ class ChannelFragment : Fragment() {
     }
 
     /**
-     * Đăng nhập Facebook bình thường (ưu tiên app Facebook, fallback trình duyệt).
+     * Đăng nhập Facebook: Mở FacebookAuthDialogFragment để hiển thị WebView nội bộ.
      */
     private fun loginWithFacebook() {
-        LoginManager.getInstance()
-            .setLoginBehavior(LoginBehavior.NATIVE_WITH_FALLBACK)
-            .setAuthType(FACEBOOK_AUTH_TYPE_REREQUEST)
-            .logInWithReadPermissions(this, FACEBOOK_PERMISSIONS)
+        val dialog = FacebookAuthDialogFragment.newInstance()
+        dialog.onAuthTokenReceivedListener = { token ->
+            viewModel.handleOAuthCallback(
+                channelType = ChannelType.FACEBOOK,
+                authCode = token,
+                redirectUri = ChannelRepository.FACEBOOK_SDK_REDIRECT,
+            )
+        }
+        dialog.onAuthErrorListener = { error ->
+            if (isAdded) {
+                val message = if (error.startsWith("user_cancelled")) {
+                    getString(R.string.channel_facebook_cancel_title)
+                } else {
+                    error.ifBlank { getString(R.string.channel_facebook_login_error) }
+                }
+                Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
+            }
+        }
+        dialog.show(parentFragmentManager, FacebookAuthDialogFragment.TAG)
     }
 
-    /**
-     * Đăng nhập bằng tài khoản Facebook khác: xóa token SDK đang lưu, bỏ qua app Facebook
-     * (để không hiện lại "Tiếp tục với tên ...") và yêu cầu Facebook hiện lại trang đăng nhập
-     * qua auth_type=reauthenticate trên trình duyệt.
-     */
     private fun loginWithAnotherFacebookAccount() {
-        LoginManager.getInstance().logOut()
-        LoginManager.getInstance()
-            .setLoginBehavior(LoginBehavior.WEB_ONLY)
-            .setAuthType(FACEBOOK_AUTH_TYPE_REAUTHENTICATE)
-            .logInWithReadPermissions(this, FACEBOOK_PERMISSIONS)
+        loginWithFacebook()
     }
 
     private fun showFacebookCancelledDialog() {
@@ -226,11 +231,5 @@ class ChannelFragment : Fragment() {
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
-    }
-
-    companion object {
-        private val FACEBOOK_PERMISSIONS = listOf("public_profile")
-        private const val FACEBOOK_AUTH_TYPE_REREQUEST = "rerequest"
-        private const val FACEBOOK_AUTH_TYPE_REAUTHENTICATE = "reauthenticate"
     }
 }

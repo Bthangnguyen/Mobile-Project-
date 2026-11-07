@@ -40,4 +40,9 @@ interface ChannelRepository {
      * Ngắt kết nối một kênh và xóa token khỏi Keystore/SecureTokenStore.
      */
     suspend fun disconnectChannel(type: ChannelType, accountId: String): Result<Unit>
+
+    companion object {
+        /** redirectUri đánh dấu authCode là access token lấy từ Facebook Login SDK. */
+        const val FACEBOOK_SDK_REDIRECT = "facebook_sdk"
+    }
 }

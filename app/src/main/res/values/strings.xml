@@ -9,4 +9,55 @@
     <string name="nav_settings">Settings</string>
 
     <string name="placeholder_coming_soon">Coming soon</string>
+
+    <!-- F1 Channel Management -->
+    <string name="channel_title">My Channels</string>
+    <string name="channel_subtitle">Connected social media accounts and platform capability statuses</string>
+    <string name="channel_connect_facebook">Connect Facebook Page</string>
+    <string name="channel_connect_linkedin">Connect LinkedIn</string>
+    <string name="channel_status_connected">Connected</string>
+    <string name="channel_status_expired">Token Expired</string>
+    <string name="channel_status_disconnected">Disconnected</string>
+    <string name="channel_empty_title">No Channels Connected</string>
+    <string name="channel_empty_desc">Connect a channel (Facebook Page or LinkedIn) to view platform capability statuses</string>
+    <string name="channel_capabilities_header">Platform Capabilities Matrix:</string>
+    <string name="channel_connect_success">Channel connected successfully</string>
+    <string name="channel_connect_cancelled">Facebook login was cancelled or permission denied</string>
+    <string name="channel_type_unknown">Unverified Type</string>
+    <string name="channel_keystore_error">Keystore Decryption Error</string>
+
+    <!-- 5 Capabilities Rows -->
+    <string name="cap_publish">Publishing</string>
+    <string name="cap_read_comments">Read Comments</string>
+    <string name="cap_reply">Reply Comments</string>
+    <string name="cap_mention">Mention</string>
+    <string name="cap_metrics">Metrics &amp; Analytics</string>
+
+    <!-- Capability Statuses -->
+    <string name="cap_status_supported">Supported ✅</string>
+    <string name="cap_status_requires_perm">Requires Permission ⚠️</string>
+    <string name="cap_status_not_supported">Not Supported ❌</string>
+    <string name="cap_status_unverified">Unverified ❓</string>
+
+    <!-- Capability Captions -->
+    <string name="cap_fb_publish_ok">Ready to publish via POST /{page-id}/feed (pages_manage_posts granted)</string>
+    <string name="cap_fb_publish_no_perm">Missing required permission: pages_manage_posts</string>
+    <string name="cap_fb_read_comments_ok">Ready to read comments via GET /{post-id}/comments (pages_read_engagement granted)</string>
+    <string name="cap_fb_read_comments_no_perm">Missing required permission: pages_read_engagement or pages_read_user_content</string>
+    <string name="cap_fb_reply_ok">Ready to reply via POST /{comment-id}/comments (pages_manage_engagement granted)</string>
+    <string name="cap_fb_reply_no_perm">Missing required permission: pages_manage_engagement</string>
+    <string name="cap_fb_mention_page">Pages mention supported via @[page_id]; personal profile mention is unverified in official Pages API docs</string>
+    <string name="cap_fb_metrics_ok">Ready to read insights via GET /{post-id}/insights (read_insights granted)</string>
+    <string name="cap_fb_metrics_no_perm">Missing required permission: read_insights</string>
+
+    <string name="cap_li_publish_ok">Ready to publish via POST /rest/posts (w_organization_social / w_member_social granted)</string>
+    <string name="cap_li_publish_no_perm">Missing required permission: w_organization_social or w_member_social</string>
+    <string name="cap_li_read_comments_ok">Ready to read comments via GET /rest/socialActions/{urn}/comments (r_organization_social_feed granted)</string>
+    <string name="cap_li_read_comments_no_perm">Missing required permission: r_organization_social_feed or r_member_social_feed</string>
+    <string name="cap_li_reply_ok">Ready to reply via POST /rest/socialActions/{urn}/comments (w_organization_social_feed granted)</string>
+    <string name="cap_li_reply_no_perm">Missing required permission: w_organization_social_feed or w_member_social_feed</string>
+    <string name="cap_li_mention_ok">Org/Member mention supported via @[Name](urn:li:...) Little Text Format</string>
+    <string name="cap_li_mention_no_perm">Missing required permission: w_organization_social or w_member_social</string>
+    <string name="cap_li_metrics_ok">Ready to read statistics via GET /rest/organizationalEntityShareStatistics (rw_organization_admin granted)</string>
+    <string name="cap_li_metrics_no_perm">Missing required permission: rw_organization_admin</string>
 </resources>

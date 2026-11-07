@@ -30,6 +30,7 @@
     <string name="channel_facebook_cancel_title">Facebook login cancelled</string>
     <string name="channel_facebook_cancel_message">Do you want to log in with a different Facebook account?</string>
     <string name="channel_facebook_login_another">Use another account</string>
+    <string name="channel_facebook_connecting">Connecting to Social Agent...</string>
     <string name="channel_close">Close</string>
     <string name="channel_linkedin_cancelled">LinkedIn login was cancelled</string>
     <string name="channel_linkedin_login_failed">LinkedIn login failed: %1$s</string>

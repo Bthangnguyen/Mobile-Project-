@@ -6,9 +6,14 @@ import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.ConnectionStatus
 import com.lttbdd.socialagent.data.model.OAuthToken
 import com.lttbdd.socialagent.data.security.TokenStore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -33,18 +38,32 @@ class ChannelRepositoryImpl @Inject constructor(
         authCode: String,
         codeVerifier: String,
         redirectUri: String,
-    ): Result<ChannelAccount> {
-        return try {
-            // Giả lập/Thực thi trao đổi authCode đổi lấy OAuthToken (Ví dụ: Facebook trả về expires_in = 5184000s ~60 ngày)
-            val fakeExpiresInSeconds = 5184000L
-            val token = OAuthToken.createFromExpiresIn(
-                accessToken = "fb_access_token_$authCode",
-                expiresInSeconds = fakeExpiresInSeconds,
-                scope = "pages_manage_posts,pages_read_engagement",
-            )
+    ): Result<ChannelAccount> = withContext(Dispatchers.IO) {
+        try {
+            var accessToken = "fb_access_token_$authCode"
+            var accountId = "fb_page_101"
+            var accountName = "Social Agent Official Page"
+            var scope = "pages_manage_posts,pages_read_engagement"
 
-            val accountId = "fb_page_101"
-            val accountName = "Social Agent Official Page"
+            // Luồng Facebook Login SDK: authCode thực chất là access token thật của người dùng.
+            // Gọi Graph API /me để lấy đúng id và tên tài khoản thay vì dùng tên giả.
+            if (redirectUri == ChannelRepository.FACEBOOK_SDK_REDIRECT) {
+                val profile = fetchFacebookProfile(authCode)
+                    ?: return@withContext Result.failure(
+                        IllegalStateException("Không lấy được thông tin tài khoản Facebook"),
+                    )
+                accessToken = authCode
+                accountId = profile.first
+                accountName = profile.second
+                scope = "public_profile"
+            }
+
+            // Facebook trả về expires_in = 5184000s (~60 ngày) cho long-lived token
+            val token = OAuthToken.createFromExpiresIn(
+                accessToken = accessToken,
+                expiresInSeconds = 5184000L,
+                scope = scope,
+            )
 
             tokenStore.saveToken(ChannelType.FACEBOOK, accountId, token)
 
@@ -69,11 +88,30 @@ class ChannelRepositoryImpl @Inject constructor(
         }
     }
 
+    /**
+     * Gọi Graph API /me bằng access token để lấy (id, name). Trả null nếu lỗi.
+     * Token gửi qua header Authorization để không nằm trong URL/log.
+     */
+    private fun fetchFacebookProfile(accessToken: String): Pair<String, String>? {
+        return try {
+            val request = okhttp3.Request.Builder()
+                .url("https://graph.facebook.com/v20.0/me?fields=id,name")
+                .header("Authorization", "Bearer $accessToken")
+                .build()
+            httpClient.newCall(request).execute().use { response ->
+                val body = response.body?.string()
+                if (response.isSuccessful && !body.isNullOrEmpty()) parseFacebookProfile(body) else null
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     override suspend fun connectLinkedIn(
         authCode: String,
         codeVerifier: String,
         redirectUri: String,
-    ): Result<ChannelAccount> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+    ): Result<ChannelAccount> = withContext(Dispatchers.IO) {
         try {
             var accessToken = "li_access_token_$authCode"
             var expiresInSeconds = 5184000L
@@ -85,57 +123,52 @@ class ChannelRepositoryImpl @Inject constructor(
             val effectiveRedirectUri = if (redirectUri.isBlank()) "https://www.linkedin.com/developers/tools/oauth/redirect" else redirectUri
 
             if (!authCode.startsWith("demo_code") && !authCode.startsWith("code_li") && clientId.isNotBlank() && !clientId.contains("SOCIAL_AGENT")) {
-                try {
-                    val formBody = okhttp3.FormBody.Builder()
-                        .add("grant_type", "authorization_code")
-                        .add("code", authCode)
-                        .add("redirect_uri", effectiveRedirectUri)
-                        .add("client_id", clientId)
-                        .add("client_secret", clientSecret)
-                        .build()
+                // Code thật: đổi code lấy token. Lỗi thì báo lỗi, KHÔNG lưu tài khoản giả.
+                val formBody = okhttp3.FormBody.Builder()
+                    .add("grant_type", "authorization_code")
+                    .add("code", authCode)
+                    .add("redirect_uri", effectiveRedirectUri)
+                    .add("client_id", clientId)
+                    .add("client_secret", clientSecret)
+                    .build()
 
-                    val tokenRequest = okhttp3.Request.Builder()
-                        .url("https://www.linkedin.com/oauth/v2/accessToken")
-                        .post(formBody)
-                        .header("Content-Type", "application/x-www-form-urlencoded")
-                        .build()
+                val tokenRequest = okhttp3.Request.Builder()
+                    .url("https://www.linkedin.com/oauth/v2/accessToken")
+                    .post(formBody)
+                    .build()
 
-                    val response = httpClient.newCall(tokenRequest).execute()
-                    val responseBody = response.body?.string()
-
-                    if (response.isSuccessful && !responseBody.isNullOrEmpty()) {
-                        val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
-                        val jsonElement = json.parseToJsonElement(responseBody)
-                        val jsonObject = jsonElement as? kotlinx.serialization.json.JsonObject
-                        val tokenStr = jsonObject?.get("access_token")?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
-                        val expires = jsonObject?.get("expires_in")?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content?.toLongOrNull() }
-
-                        if (!tokenStr.isNullOrEmpty()) {
-                            accessToken = tokenStr
-                            if (expires != null && expires > 0) {
-                                expiresInSeconds = expires
-                            }
-                        }
-
-                        // Gọi UserInfo API
-                        val userRequest = okhttp3.Request.Builder()
-                            .url("https://api.linkedin.com/v2/userinfo")
-                            .header("Authorization", "Bearer $accessToken")
-                            .build()
-
-                        val userResponse = httpClient.newCall(userRequest).execute()
-                        val userBody = userResponse.body?.string()
-                        if (userResponse.isSuccessful && !userBody.isNullOrEmpty()) {
-                            val userObj = json.parseToJsonElement(userBody) as? kotlinx.serialization.json.JsonObject
-                            val name = userObj?.get("name")?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
-                            val sub = userObj?.get("sub")?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
-                            if (!name.isNullOrEmpty()) displayName = name
-                            if (!sub.isNullOrEmpty()) accountId = sub
-                        }
+                val tokenJson = httpClient.newCall(tokenRequest).execute().use { response ->
+                    val body = response.body?.string()
+                    if (!response.isSuccessful || body.isNullOrEmpty()) {
+                        return@withContext Result.failure(
+                            IllegalStateException("LinkedIn token exchange failed (HTTP ${response.code})"),
+                        )
                     }
-                } catch (_: Exception) {
-                    // Mạng lỗi hoặc offline -> dùng fallback token
+                    json.parseToJsonElement(body) as? JsonObject
                 }
+                val tokenStr = tokenJson?.stringField("access_token")
+                if (tokenStr.isNullOrEmpty()) {
+                    return@withContext Result.failure(IllegalStateException("LinkedIn không trả về access_token"))
+                }
+                accessToken = tokenStr
+                tokenJson?.stringField("expires_in")?.toLongOrNull()?.takeIf { it > 0 }?.let { expiresInSeconds = it }
+
+                // Gọi UserInfo API (OpenID Connect) để lấy tên thật của người dùng
+                val userRequest = okhttp3.Request.Builder()
+                    .url("https://api.linkedin.com/v2/userinfo")
+                    .header("Authorization", "Bearer $accessToken")
+                    .build()
+                val userObj = httpClient.newCall(userRequest).execute().use { response ->
+                    val body = response.body?.string()
+                    if (!response.isSuccessful || body.isNullOrEmpty()) {
+                        return@withContext Result.failure(
+                            IllegalStateException("Không lấy được thông tin tài khoản LinkedIn (HTTP ${response.code})"),
+                        )
+                    }
+                    json.parseToJsonElement(body) as? JsonObject
+                }
+                userObj?.stringField("name")?.takeIf { it.isNotEmpty() }?.let { displayName = it }
+                userObj?.stringField("sub")?.takeIf { it.isNotEmpty() }?.let { accountId = it }
             }
 
             val token = OAuthToken.createFromExpiresIn(
@@ -191,5 +224,25 @@ class ChannelRepositoryImpl @Inject constructor(
             currentList.add(account)
         }
         channelsFlow.value = currentList
+    }
+
+    private fun JsonObject.stringField(key: String): String? = (this[key] as? JsonPrimitive)?.content
+
+    companion object {
+        private val json = Json { ignoreUnknownKeys = true }
+
+        /**
+         * Parse JSON của Graph API /me thành (id, name). Trả null nếu thiếu trường.
+         */
+        internal fun parseFacebookProfile(body: String): Pair<String, String>? {
+            return try {
+                val obj = json.parseToJsonElement(body) as? JsonObject ?: return null
+                val id = (obj["id"] as? JsonPrimitive)?.content
+                val name = (obj["name"] as? JsonPrimitive)?.content
+                if (id.isNullOrBlank() || name.isNullOrBlank()) null else id to name
+            } catch (_: Exception) {
+                null
+            }
+        }
     }
 }

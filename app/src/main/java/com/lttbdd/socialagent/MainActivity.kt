@@ -58,7 +58,7 @@ class MainActivity : AppCompatActivity() {
             if (!code.isNullOrEmpty()) {
                 lifecycleScope.launch {
                     val isFacebook = uri.scheme?.startsWith("fb") == true || uri.path?.contains("facebook") == true
-                    if (isFacebook) {
+                    val result = if (isFacebook) {
                         channelRepository.connectFacebookPage(
                             authCode = code,
                             codeVerifier = "verifier_deep_link",
@@ -71,7 +71,12 @@ class MainActivity : AppCompatActivity() {
                             redirectUri = uri.toString(),
                         )
                     }
-                    Toast.makeText(this@MainActivity, getString(R.string.channel_connect_success), Toast.LENGTH_SHORT).show()
+                    // Chỉ báo thành công khi kết nối thật sự thành công
+                    val message = result.fold(
+                        onSuccess = { getString(R.string.channel_connect_success) },
+                        onFailure = { getString(R.string.channel_connect_failed, it.message.orEmpty()) },
+                    )
+                    Toast.makeText(this@MainActivity, message, Toast.LENGTH_SHORT).show()
                 }
             }
         }

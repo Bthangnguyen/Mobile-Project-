@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -85,5 +86,27 @@ class ChannelRepositoryTest {
         val disconnectResult = repository.disconnectChannel(ChannelType.FACEBOOK, "fb_page_101")
         assertTrue(disconnectResult.isSuccess)
         assertEquals(0, repository.getConnectedChannels().first().size)
+    }
+
+    @Test
+    fun `parseFacebookProfile returns id and name for valid json`() {
+        val json = """{"id":"1029384756","name":"Agent Fanpage"}"""
+        val result = ChannelRepositoryImpl.parseFacebookProfile(json)
+
+        assertEquals("1029384756" to "Agent Fanpage", result)
+    }
+
+    @Test
+    fun `parseFacebookProfile returns null for empty string or invalid json`() {
+        assertNull(ChannelRepositoryImpl.parseFacebookProfile(""))
+        assertNull(ChannelRepositoryImpl.parseFacebookProfile("not_json"))
+    }
+
+    @Test
+    fun `parseFacebookProfile returns null when id or name is missing or blank`() {
+        assertNull(ChannelRepositoryImpl.parseFacebookProfile("""{"id":"123"}"""))
+        assertNull(ChannelRepositoryImpl.parseFacebookProfile("""{"name":"Agent"}"""))
+        assertNull(ChannelRepositoryImpl.parseFacebookProfile("""{"id":"","name":"Agent"}"""))
+        assertNull(ChannelRepositoryImpl.parseFacebookProfile("""{"id":"123","name":" "}"""))
     }
 }

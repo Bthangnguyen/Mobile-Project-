@@ -57,11 +57,20 @@ class MainActivity : AppCompatActivity() {
             val code = uri.getQueryParameter("code")
             if (!code.isNullOrEmpty()) {
                 lifecycleScope.launch {
-                    channelRepository.connectFacebookPage(
-                        authCode = code,
-                        codeVerifier = "verifier_deep_link",
-                        redirectUri = uri.toString(),
-                    )
+                    val isFacebook = uri.scheme?.startsWith("fb") == true || uri.path?.contains("facebook") == true
+                    if (isFacebook) {
+                        channelRepository.connectFacebookPage(
+                            authCode = code,
+                            codeVerifier = "verifier_deep_link",
+                            redirectUri = uri.toString(),
+                        )
+                    } else {
+                        channelRepository.connectLinkedIn(
+                            authCode = code,
+                            codeVerifier = "verifier_deep_link",
+                            redirectUri = uri.toString(),
+                        )
+                    }
                     Toast.makeText(this@MainActivity, getString(R.string.channel_connect_success), Toast.LENGTH_SHORT).show()
                 }
             }

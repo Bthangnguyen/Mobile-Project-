@@ -107,21 +107,21 @@ class ChannelViewModel @Inject constructor(
     }
 
     /**
-     * Tạo tham số PKCE chuẩn bị mở luồng OAuth LinkedIn trên Custom Tabs (RFC 8252 & RFC 7636).
+     * Tạo tham số chuẩn bị mở luồng OAuth 2.0 LinkedIn (Authorization Code Flow).
      */
     fun prepareLinkedInOAuthUrl(redirectUri: String): String {
-        val verifier = PkceUtil.generateCodeVerifier()
-        val state = PkceUtil.generateState()
-        pendingCodeVerifier = verifier
+        val state = java.util.UUID.randomUUID().toString()
         pendingState = state
-        val challenge = PkceUtil.generateCodeChallengeS256(verifier)
 
-        val baseUrl = "https://www.linkedin.com/oauth/native-pkce/authorization"
-        val clientId = com.lttbdd.socialagent.BuildConfig.LINKEDIN_CLIENT_ID
-        val scope = "openid,profile,w_organization_social,r_organization_social_feed"
-        val encodedRedirectUri = java.net.URLEncoder.encode(redirectUri, java.nio.charset.StandardCharsets.UTF_8.name())
+        val effectiveRedirectUri = if (redirectUri.isBlank()) "https://www.linkedin.com/developers/tools/oauth/redirect" else redirectUri
+        val baseUrl = "https://www.linkedin.com/oauth/v2/authorization"
+        val clientId = com.lttbdd.socialagent.BuildConfig.LINKEDIN_CLIENT_ID.trim()
+        val scope = "openid profile email"
 
-        return "$baseUrl?response_type=code&client_id=$clientId&redirect_uri=$encodedRedirectUri&scope=$scope&state=$state&code_challenge=$challenge&code_challenge_method=S256"
+        val encodedScope = java.net.URLEncoder.encode(scope, java.nio.charset.StandardCharsets.UTF_8.name())
+        val encodedRedirectUri = java.net.URLEncoder.encode(effectiveRedirectUri, java.nio.charset.StandardCharsets.UTF_8.name())
+
+        return "$baseUrl?response_type=code&client_id=$clientId&redirect_uri=$encodedRedirectUri&scope=$encodedScope&state=$state"
     }
 
     /**

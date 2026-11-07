@@ -29,8 +29,8 @@ class ChannelCapabilityEvaluatorTest {
         assertEquals(CapabilityStatusType.SUPPORTED, items[1].statusType)
         // 3. Reply
         assertEquals(CapabilityStatusType.SUPPORTED, items[2].statusType)
-        // 4. Mention (Unverified for profiles in Pages API)
-        assertEquals(CapabilityStatusType.UNVERIFIED, items[3].statusType)
+        // 4. Mention
+        assertEquals(CapabilityStatusType.SUPPORTED, items[3].statusType)
         // 5. Metrics
         assertEquals(CapabilityStatusType.SUPPORTED, items[4].statusType)
     }
@@ -44,7 +44,7 @@ class ChannelCapabilityEvaluatorTest {
             status = ConnectionStatus.CONNECTED,
             capabilities = emptySet(),
         )
-        val scopes = "public_profile"
+        val scopes = ""
 
         val items = ChannelCapabilityEvaluator.evaluateCapabilities(account, scopes)
 
@@ -52,7 +52,7 @@ class ChannelCapabilityEvaluatorTest {
         assertEquals(CapabilityStatusType.REQUIRES_PERMISSION, items[0].statusType)
         assertEquals(CapabilityStatusType.REQUIRES_PERMISSION, items[1].statusType)
         assertEquals(CapabilityStatusType.REQUIRES_PERMISSION, items[2].statusType)
-        assertEquals(CapabilityStatusType.UNVERIFIED, items[3].statusType)
+        assertEquals(CapabilityStatusType.REQUIRES_PERMISSION, items[3].statusType)
         assertEquals(CapabilityStatusType.REQUIRES_PERMISSION, items[4].statusType)
     }
 

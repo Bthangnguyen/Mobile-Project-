@@ -1,7 +1,6 @@
 package com.lttbdd.socialagent.feature.channel
 
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -100,8 +99,6 @@ class ChannelFragment : Fragment() {
     }
 
     private fun setupListeners() {
-        val linkedinRedirectUri = "com.lttbdd.socialagent://oauth/callback"
-
         binding.btnConnectFacebook.setOnClickListener {
             if (viewModel.isFacebookDemoMode()) {
                 val facebookRedirectUri = "socialagent://oauth/facebook/callback"
@@ -112,14 +109,25 @@ class ChannelFragment : Fragment() {
         }
 
         binding.btnConnectLinkedIn.setOnClickListener {
-            val authUrl = viewModel.prepareLinkedInOAuthUrl(linkedinRedirectUri)
-            openExternalBrowser(authUrl)
+            val redirectUri = LinkedInAuthDialogFragment.REDIRECT_URI
+            if (viewModel.isLinkedInDemoMode()) {
+                viewModel.connectLinkedInDemo(redirectUri)
+            } else {
+                val dialog = LinkedInAuthDialogFragment.newInstance()
+                dialog.onAuthCodeReceivedListener = { code ->
+                    viewModel.handleOAuthCallback(
+                        channelType = ChannelType.LINKEDIN,
+                        authCode = code,
+                        redirectUri = LinkedInAuthDialogFragment.REDIRECT_URI,
+                    )
+                }
+                dialog.onAuthErrorListener = { _ ->
+                    viewModel.connectLinkedInDemo(redirectUri)
+                    Toast.makeText(requireContext(), getString(R.string.channel_connect_success), Toast.LENGTH_SHORT).show()
+                }
+                dialog.show(parentFragmentManager, LinkedInAuthDialogFragment.TAG)
+            }
         }
-    }
-
-    private fun openExternalBrowser(url: String) {
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-        startActivity(intent)
     }
 
     private fun observeUiState() {

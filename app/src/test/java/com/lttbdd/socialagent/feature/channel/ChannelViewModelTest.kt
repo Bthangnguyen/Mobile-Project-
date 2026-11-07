@@ -50,12 +50,13 @@ class ChannelViewModelTest {
     }
 
     @Test
-    fun `prepareLinkedInOAuthUrl returns URL with S256 code_challenge per RFC 7636`() {
+    fun `prepareLinkedInOAuthUrl returns standard authorization URL per LinkedIn OAuth 2`() {
         val redirectUri = "com.lttbdd.socialagent://oauth/callback"
         val url = viewModel.prepareLinkedInOAuthUrl(redirectUri)
 
-        assertTrue("URL contains linkedin native-pkce endpoint", url.contains("https://www.linkedin.com/oauth/native-pkce/authorization"))
-        assertTrue("URL contains code_challenge_method=S256", url.contains("code_challenge_method=S256"))
+        assertTrue("URL contains linkedin oauth endpoint", url.contains("https://www.linkedin.com/oauth/v2/authorization"))
+        assertTrue("URL contains response_type=code", url.contains("response_type=code"))
+        assertTrue("URL contains client_id", url.contains("client_id="))
     }
 
     @Test

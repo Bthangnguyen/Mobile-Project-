@@ -91,13 +91,22 @@ object ChannelCapabilityEvaluator {
             )
         }
 
-        // 4. Mention (Nhắc tên) - Hỗ trợ Page mention qua @[page_id]; profile mention chưa xác định trong Pages API docs
-        val mentionState = CapabilityItemUiState(
-            capabilityNameRes = R.string.cap_mention,
-            statusTextRes = R.string.cap_status_unverified,
-            statusType = CapabilityStatusType.UNVERIFIED,
-            captionRes = R.string.cap_fb_mention_page,
-        )
+        // 4. Mention (Nhắc tên) - Hỗ trợ Page mention qua @[page_id]
+        val mentionState = if (scopes.contains("pages_manage_posts") || scopes.contains("pages_manage_engagement") || scopes.contains("public_profile")) {
+            CapabilityItemUiState(
+                capabilityNameRes = R.string.cap_mention,
+                statusTextRes = R.string.cap_status_supported,
+                statusType = CapabilityStatusType.SUPPORTED,
+                captionRes = R.string.cap_fb_mention_page,
+            )
+        } else {
+            CapabilityItemUiState(
+                capabilityNameRes = R.string.cap_mention,
+                statusTextRes = R.string.cap_status_requires_perm,
+                statusType = CapabilityStatusType.REQUIRES_PERMISSION,
+                captionRes = R.string.cap_fb_mention_page_no_perm,
+            )
+        }
 
         // 5. Số liệu (Metrics) - Quyền yêu cầu: read_insights
         val metricsState = if (scopes.contains("read_insights")) {

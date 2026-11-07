@@ -26,6 +26,10 @@ val linkedinClientId = System.getenv("LINKEDIN_CLIENT_ID")
     ?: localProperties.getProperty("LINKEDIN_CLIENT_ID")
     ?: "SOCIAL_AGENT_LINKEDIN_CLIENT_ID"
 
+val linkedinClientSecret = System.getenv("LINKEDIN_CLIENT_SECRET")
+    ?: localProperties.getProperty("LINKEDIN_CLIENT_SECRET")
+    ?: "SOCIAL_AGENT_LINKEDIN_CLIENT_SECRET"
+
 android {
     namespace = "com.lttbdd.socialagent"
     compileSdk = 36
@@ -44,6 +48,7 @@ android {
         buildConfigField("String", "FACEBOOK_APP_ID", "\"$facebookAppId\"")
         buildConfigField("String", "FACEBOOK_CLIENT_TOKEN", "\"$facebookClientToken\"")
         buildConfigField("String", "LINKEDIN_CLIENT_ID", "\"$linkedinClientId\"")
+        buildConfigField("String", "LINKEDIN_CLIENT_SECRET", "\"$linkedinClientSecret\"")
 
         resValue("string", "facebook_app_id", facebookAppId)
         resValue("string", "facebook_client_token", facebookClientToken)

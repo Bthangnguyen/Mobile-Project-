@@ -45,7 +45,8 @@
     <string name="cap_fb_read_comments_no_perm">Cần cấp thêm quyền: pages_read_engagement hoặc pages_read_user_content</string>
     <string name="cap_fb_reply_ok">Sẵn sàng trả lời comment qua POST /{comment-id}/comments (đã có pages_manage_engagement)</string>
     <string name="cap_fb_reply_no_perm">Cần cấp thêm quyền: pages_manage_engagement</string>
-    <string name="cap_fb_mention_page">Hỗ trợ mention Page qua @[page_id]; mention cá nhân chưa xác định trong tài liệu Pages API</string>
+    <string name="cap_fb_mention_page">Sẵn sàng mention Trang qua @[page_id] trong bài viết và bình luận (đã có pages_manage_posts)</string>
+    <string name="cap_fb_mention_page_no_perm">Cần cấp thêm quyền: pages_manage_posts hoặc pages_manage_engagement</string>
     <string name="cap_fb_metrics_ok">Sẵn sàng đọc chỉ số qua GET /{post-id}/insights (đã có read_insights)</string>
     <string name="cap_fb_metrics_no_perm">Cần cấp thêm quyền: read_insights</string>
 

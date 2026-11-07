@@ -46,7 +46,8 @@
     <string name="cap_fb_read_comments_no_perm">Missing required permission: pages_read_engagement or pages_read_user_content</string>
     <string name="cap_fb_reply_ok">Ready to reply via POST /{comment-id}/comments (pages_manage_engagement granted)</string>
     <string name="cap_fb_reply_no_perm">Missing required permission: pages_manage_engagement</string>
-    <string name="cap_fb_mention_page">Pages mention supported via @[page_id]; personal profile mention is unverified in official Pages API docs</string>
+    <string name="cap_fb_mention_page">Ready to mention Pages via @[page_id] in posts and comments (pages_manage_posts granted)</string>
+    <string name="cap_fb_mention_page_no_perm">Missing required permission: pages_manage_posts or pages_manage_engagement</string>
     <string name="cap_fb_metrics_ok">Ready to read insights via GET /{post-id}/insights (read_insights granted)</string>
     <string name="cap_fb_metrics_no_perm">Missing required permission: read_insights</string>
 

@@ -55,11 +55,11 @@
 
     <fragment
         android:id="@+id/settingsFragment"
-        android:name="com.lttbdd.socialagent.core.ui.PlaceholderFragment"
-        android:label="@string/nav_settings">
+        android:name="com.lttbdd.socialagent.feature.channel.ChannelFragment"
+        android:label="@string/channel_title">
         <argument
             android:name="titleRes"
-            android:defaultValue="@string/nav_settings"
+            android:defaultValue="@string/channel_title"
             app:argType="reference" />
     </fragment>
 

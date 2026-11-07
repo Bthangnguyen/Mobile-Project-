@@ -8,4 +8,55 @@
     <string name="nav_settings">Cài đặt</string>
 
     <string name="placeholder_coming_soon">Sắp ra mắt</string>
+
+    <!-- F1 Channel Management -->
+    <string name="channel_title">Kênh của tôi</string>
+    <string name="channel_subtitle">Các tài khoản đã kết nối và trạng thái khả năng hỗ trợ theo nền tảng</string>
+    <string name="channel_connect_facebook">Kết nối Facebook Page</string>
+    <string name="channel_connect_linkedin">Kết nối LinkedIn</string>
+    <string name="channel_status_connected">Đã kết nối</string>
+    <string name="channel_status_expired">Token đã hết hạn</string>
+    <string name="channel_status_disconnected">Đã ngắt kết nối</string>
+    <string name="channel_empty_title">Chưa kết nối kênh nào</string>
+    <string name="channel_empty_desc">Kết nối một kênh (Facebook Page hoặc LinkedIn) để xem trạng thái chức năng theo từng nền tảng</string>
+    <string name="channel_capabilities_header">Ma trận khả năng hỗ trợ:</string>
+    <string name="channel_connect_success">Kết nối kênh thành công</string>
+    <string name="channel_connect_cancelled">Đã hủy đăng nhập Facebook hoặc từ chối cấp quyền</string>
+    <string name="channel_type_unknown">Chưa xác định</string>
+    <string name="channel_keystore_error">Lỗi giải mã Keystore</string>
+
+    <!-- 5 Capabilities Rows -->
+    <string name="cap_publish">Đăng bài</string>
+    <string name="cap_read_comments">Đọc bình luận</string>
+    <string name="cap_reply">Trả lời bình luận</string>
+    <string name="cap_mention">Nhắc tên (Mention)</string>
+    <string name="cap_metrics">Số liệu &amp; Thống kê</string>
+
+    <!-- Capability Statuses -->
+    <string name="cap_status_supported">Hỗ trợ ✅</string>
+    <string name="cap_status_requires_perm">Cần cấp thêm quyền ⚠️</string>
+    <string name="cap_status_not_supported">Chưa hỗ trợ ❌</string>
+    <string name="cap_status_unverified">Chưa xác định ❓</string>
+
+    <!-- Capability Captions -->
+    <string name="cap_fb_publish_ok">Sẵn sàng đăng bài qua POST /{page-id}/feed (đã có pages_manage_posts)</string>
+    <string name="cap_fb_publish_no_perm">Cần cấp thêm quyền: pages_manage_posts</string>
+    <string name="cap_fb_read_comments_ok">Sẵn sàng đọc comment qua GET /{post-id}/comments (đã có pages_read_engagement)</string>
+    <string name="cap_fb_read_comments_no_perm">Cần cấp thêm quyền: pages_read_engagement hoặc pages_read_user_content</string>
+    <string name="cap_fb_reply_ok">Sẵn sàng trả lời comment qua POST /{comment-id}/comments (đã có pages_manage_engagement)</string>
+    <string name="cap_fb_reply_no_perm">Cần cấp thêm quyền: pages_manage_engagement</string>
+    <string name="cap_fb_mention_page">Hỗ trợ mention Page qua @[page_id]; mention cá nhân chưa xác định trong tài liệu Pages API</string>
+    <string name="cap_fb_metrics_ok">Sẵn sàng đọc chỉ số qua GET /{post-id}/insights (đã có read_insights)</string>
+    <string name="cap_fb_metrics_no_perm">Cần cấp thêm quyền: read_insights</string>
+
+    <string name="cap_li_publish_ok">Sẵn sàng đăng bài qua POST /rest/posts (đã có w_organization_social / w_member_social)</string>
+    <string name="cap_li_publish_no_perm">Cần cấp thêm quyền: w_organization_social hoặc w_member_social</string>
+    <string name="cap_li_read_comments_ok">Sẵn sàng đọc comment qua GET /rest/socialActions/{urn}/comments (đã có r_organization_social_feed)</string>
+    <string name="cap_li_read_comments_no_perm">Cần cấp thêm quyền: r_organization_social_feed hoặc r_member_social_feed</string>
+    <string name="cap_li_reply_ok">Sẵn sàng trả lời comment qua POST /rest/socialActions/{urn}/comments (đã có w_organization_social_feed)</string>
+    <string name="cap_li_reply_no_perm">Cần cấp thêm quyền: w_organization_social_feed hoặc w_member_social_feed</string>
+    <string name="cap_li_mention_ok">Hỗ trợ mention Tổ chức/Cá nhân qua cú pháp Little Text Format @[Tên](urn:li:...)</string>
+    <string name="cap_li_mention_no_perm">Cần cấp thêm quyền: w_organization_social hoặc w_member_social</string>
+    <string name="cap_li_metrics_ok">Sẵn sàng đọc thống kê qua GET /rest/organizationalEntityShareStatistics (đã có rw_organization_admin)</string>
+    <string name="cap_li_metrics_no_perm">Cần cấp thêm quyền: rw_organization_admin</string>
 </resources>

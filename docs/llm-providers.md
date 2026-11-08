@@ -14,8 +14,9 @@ Fragment → ViewModel → Repository / ContentAgent → LlmClient
   `temperature` của model. `InMemoryLlmConfiguration` giữ lựa chọn trong phiên, mặc định chưa cấu hình.
 - `ApiKeySource.keyFor(provider)` là điểm #53 nối secure storage. Router đọc lại key ngay trước
   mỗi request, không giữ key trong cấu hình, disk, UiState hay cache của router.
-- #53 thay provider `LlmModule.apiKeys()` hiện trả `null` bằng implementation đọc key đã giải mã
-  từ secure storage. Chỉ giữ một binding `ApiKeySource`. Thao tác này không đổi `core/`.
+- #53 nối `LlmModule.apiKeys(store)` với `ApiKeyStore.read(provider)` từ secure storage.
+  Chỉ một binding `ApiKeySource`; mỗi request đọc lại bản mã và giải mã tạm thời, không đổi `core/`.
+  Chi tiết storage, quản lý key và bằng chứng kiểm thử tại [báo cáo #53](pr-53.md).
 - Không có key/model mặc định. Thiếu cấu hình trả `MISSING_CONFIGURATION`; thiếu key trả
   `MISSING_API_KEY`, không ngầm dùng Fake hoặc provider khác.
 - `WRITE_POST` phục vụ chat/soạn trả lời; `CLASSIFY_COMMENT` phục vụ phân loại. `GENERATE_IMAGE`
@@ -68,8 +69,9 @@ key giả được sinh khi chạy; không gọi API thật. Chạy từ root wo
 .\gradlew.bat assembleDebug testDebugUnitTest lintDebug
 ```
 
-Chưa có kiểm thử gọi dịch vụ thật bằng BYOK; quyền truy cập model, quota, chất lượng câu trả lời
-và tích hợp secure storage phải xác minh sau khi #53 cung cấp nguồn key.
+Chưa có kiểm thử gọi dịch vụ thật bằng BYOK; quyền truy cập model, quota và chất lượng câu trả lời
+vẫn cần xác minh riêng. #53 kiểm tra nguồn secure storage qua router/adapter bằng transport giả,
+không gọi API LLM thật trong CI.
 
 ## Tài liệu API chính thức
 

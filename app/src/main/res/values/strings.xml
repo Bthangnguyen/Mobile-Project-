@@ -9,4 +9,37 @@
     <string name="nav_settings">Settings</string>
 
     <string name="placeholder_coming_soon">Coming soon</string>
+
+    <!-- Quản lý BYOK, Issue #53. -->
+    <string name="api_keys_title">LLM API keys</string>
+    <string name="api_keys_openai">OpenAI</string>
+    <string name="api_keys_gemini">Gemini</string>
+    <string name="api_keys_description">Manage a separate key for each provider. Keys are encrypted on this device and sent only to the selected provider. Checking a key does not confirm model access or quota.</string>
+    <string name="api_keys_provider_status">%1$s: %2$s</string>
+    <string name="api_keys_not_configured">Not configured</string>
+    <string name="api_keys_configured_mask">Saved ••••••••</string>
+    <string name="api_keys_loading">Working…</string>
+    <string name="api_keys_input_label">New API key</string>
+    <string name="api_keys_input_help">Input is cleared when submitted. Save checks the current key again and saves only a verified key. Re-enter the key to retry.</string>
+    <string name="api_keys_verify">Check key</string>
+    <string name="api_keys_save">Check and save</string>
+    <string name="api_keys_update">Check and replace</string>
+    <string name="api_keys_delete">Delete key</string>
+    <string name="api_keys_delete_title">Delete stored key?</string>
+    <string name="api_keys_delete_confirmation">Delete the %1$s key from this device? Future requests will require a new key. This does not revoke the key with the provider.</string>
+    <string name="api_keys_cancel">Cancel</string>
+    <string name="api_keys_saved">Verified key saved securely.</string>
+    <string name="api_keys_deleted">Key deleted. Provider is no longer configured.</string>
+    <string name="api_keys_storage_error">Secure storage is unavailable. No saved key is displayed. Retry when the device is ready.</string>
+    <string name="api_keys_unreadable">Stored key cannot be decrypted. It has not been replaced. Delete it explicitly, then enter a new key.</string>
+    <string name="api_keys_input_error">Enter a non-empty key without spaces or line breaks.</string>
+    <string name="api_keys_operation_error">The operation could not be completed. Retry.</string>
+    <string name="api_keys_valid">VALID — authentication accepted. Model access and quota can still be restricted. Nothing was saved by this check.</string>
+    <string name="api_keys_invalid">INVALID — the provider rejected authentication. The saved key has not changed.</string>
+    <string name="api_keys_permission">UNVERIFIED — access is restricted (403). This does not prove the key is invalid. Nothing was saved.</string>
+    <string name="api_keys_rate_limit">UNVERIFIED — rate limit reached. Retry later. Nothing was saved.</string>
+    <string name="api_keys_service">UNVERIFIED — provider temporarily unavailable. Retry later. Nothing was saved.</string>
+    <string name="api_keys_network">UNVERIFIED — network unavailable. Check your connection. Nothing was saved.</string>
+    <string name="api_keys_timeout">UNVERIFIED — request timed out. Retry. Nothing was saved.</string>
+    <string name="api_keys_unverified">UNVERIFIED — authentication could not be confirmed. Nothing was saved.</string>
 </resources>

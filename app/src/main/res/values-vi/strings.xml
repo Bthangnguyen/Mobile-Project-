@@ -8,4 +8,37 @@
     <string name="nav_settings">Cài đặt</string>
 
     <string name="placeholder_coming_soon">Sắp ra mắt</string>
+
+    <!-- Quản lý BYOK, Issue #53. -->
+    <string name="api_keys_title">API key LLM</string>
+    <string name="api_keys_openai">OpenAI</string>
+    <string name="api_keys_gemini">Gemini</string>
+    <string name="api_keys_description">Quản lý key riêng cho từng nhà cung cấp. Key được mã hóa trên thiết bị và chỉ gửi đến nhà cung cấp đã chọn. Kiểm tra key không xác nhận quyền dùng model hoặc hạn mức.</string>
+    <string name="api_keys_provider_status">%1$s: %2$s</string>
+    <string name="api_keys_not_configured">Chưa cấu hình</string>
+    <string name="api_keys_configured_mask">Đã lưu ••••••••</string>
+    <string name="api_keys_loading">Đang xử lý…</string>
+    <string name="api_keys_input_label">API key mới</string>
+    <string name="api_keys_input_help">Ô nhập được xóa khi gửi. Lưu sẽ kiểm tra lại key hiện tại và chỉ lưu key đã xác minh. Nhập lại key để thử lại.</string>
+    <string name="api_keys_verify">Kiểm tra key</string>
+    <string name="api_keys_save">Kiểm tra và lưu</string>
+    <string name="api_keys_update">Kiểm tra và thay thế</string>
+    <string name="api_keys_delete">Xóa key</string>
+    <string name="api_keys_delete_title">Xóa key đã lưu?</string>
+    <string name="api_keys_delete_confirmation">Xóa key %1$s khỏi thiết bị? Các yêu cầu tiếp theo cần key mới. Thao tác này không thu hồi key tại nhà cung cấp.</string>
+    <string name="api_keys_cancel">Hủy</string>
+    <string name="api_keys_saved">Đã lưu an toàn key được xác minh.</string>
+    <string name="api_keys_deleted">Đã xóa key. Nhà cung cấp chưa được cấu hình.</string>
+    <string name="api_keys_storage_error">Không thể truy cập kho lưu trữ an toàn. Key đã lưu không được hiển thị. Thử lại khi thiết bị sẵn sàng.</string>
+    <string name="api_keys_unreadable">Không thể giải mã key đã lưu. Dữ liệu chưa bị thay thế. Hãy chủ động xóa rồi nhập key mới.</string>
+    <string name="api_keys_input_error">Nhập key không rỗng, không có khoảng trắng hoặc xuống dòng.</string>
+    <string name="api_keys_operation_error">Không thể hoàn tất thao tác. Hãy thử lại.</string>
+    <string name="api_keys_valid">HỢP LỆ — xác thực thành công. Quyền dùng model và hạn mức vẫn có thể bị giới hạn. Kiểm tra này chưa lưu key.</string>
+    <string name="api_keys_invalid">KHÔNG HỢP LỆ — nhà cung cấp từ chối xác thực. Key đã lưu không thay đổi.</string>
+    <string name="api_keys_permission">CHƯA XÁC MINH — quyền truy cập bị giới hạn (403). Chưa đủ bằng chứng key sai. Chưa lưu key.</string>
+    <string name="api_keys_rate_limit">CHƯA XÁC MINH — đã chạm giới hạn yêu cầu. Thử lại sau. Chưa lưu key.</string>
+    <string name="api_keys_service">CHƯA XÁC MINH — dịch vụ tạm thời không sẵn sàng. Thử lại sau. Chưa lưu key.</string>
+    <string name="api_keys_network">CHƯA XÁC MINH — không có kết nối mạng. Kiểm tra kết nối. Chưa lưu key.</string>
+    <string name="api_keys_timeout">CHƯA XÁC MINH — yêu cầu hết thời gian chờ. Hãy thử lại. Chưa lưu key.</string>
+    <string name="api_keys_unverified">CHƯA XÁC MINH — chưa thể xác nhận xác thực. Chưa lưu key.</string>
 </resources>

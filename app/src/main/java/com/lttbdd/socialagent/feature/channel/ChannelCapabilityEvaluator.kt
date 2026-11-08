@@ -27,11 +27,17 @@ data class CapabilityItemUiState(
  */
 object ChannelCapabilityEvaluator {
 
+    /**
+     * Tách chuỗi quyền, chấp nhận cả dấu phẩy (Facebook) lẫn khoảng trắng (LinkedIn/OAuth 2.0).
+     */
+    internal fun parseScopes(scopeString: String?): Set<String> =
+        scopeString.orEmpty().split(Regex("[,\\s]+")).filter { it.isNotEmpty() }.toSet()
+
     fun evaluateCapabilities(
         account: ChannelAccount,
         scopeString: String?,
     ): List<CapabilityItemUiState> {
-        val scopes = scopeString?.split(",")?.map { it.trim() }?.toSet() ?: emptySet()
+        val scopes = parseScopes(scopeString)
 
         return when (account.type) {
             ChannelType.FACEBOOK -> evaluateFacebook(scopes)

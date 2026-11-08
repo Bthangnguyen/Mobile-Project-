@@ -30,6 +30,7 @@
     <string name="channel_facebook_cancel_message">Bạn có muốn đăng nhập bằng tài khoản Facebook khác không?</string>
     <string name="channel_facebook_login_another">Dùng tài khoản khác</string>
     <string name="channel_facebook_connecting">Đang kết nối vào Social Agent...</string>
+    <string name="channel_facebook_blocked">Tài khoản bị Facebook tạm khóa do thao tác quá nhanh. Vui lòng chờ ít phút rồi thử lại.</string>
     <string name="channel_close">Đóng</string>
     <string name="channel_linkedin_cancelled">Đã hủy đăng nhập LinkedIn</string>
     <string name="channel_linkedin_login_failed">Đăng nhập LinkedIn thất bại: %1$s</string>

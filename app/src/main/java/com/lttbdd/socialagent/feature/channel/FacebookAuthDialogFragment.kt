@@ -9,19 +9,19 @@ import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.webkit.CookieManager
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import androidx.core.net.toUri
 import androidx.fragment.app.DialogFragment
 import com.lttbdd.socialagent.R
 
 /**
  * DialogFragment hiển thị WebView đăng nhập OAuth Facebook nội bộ app.
- * Dừng hoàn toàn việc xóa cookie mỗi lần mở form để bảo vệ cookie thiết bị (datr, sb),
- * loại bỏ vòng lặp JS auto-click gây nghi ngờ bot và hỗ trợ tự động xác nhận 1 lần nhẹ nhàng sau 1.5s.
+ * Không xóa cookie mỗi lần mở form để bảo vệ cookie thiết bị (datr, sb).
+ * Người dùng tự xem và bấm xác nhận các quyền trên trang của Facebook: không có JS tự bấm hộ,
+ * không có cầu nối JS (`addJavascriptInterface`) cho trang web bên ngoài.
+ * URL redirect được phân tích bởi [FacebookAuthRedirect] (kiểm tra `state`, đúng redirect URI).
  */
 class FacebookAuthDialogFragment : DialogFragment() {
 
@@ -32,19 +32,11 @@ class FacebookAuthDialogFragment : DialogFragment() {
     private var loadingOverlay: View? = null
     private var isHandled = false
 
+    /** Giá trị `state` đã gửi trong URL OAuth; redirect trả về phải khớp mới nhận token. */
+    private var expectedState: String = ""
+
     private val mainHandler = Handler(Looper.getMainLooper())
     private var fallbackRunnable: Runnable? = null
-
-    inner class FacebookAuthInterface {
-        @android.webkit.JavascriptInterface
-        fun onUrlChanged(url: String) {
-            activity?.runOnUiThread {
-                if (url.isNotBlank()) {
-                    handleUrlRedirect(url, url.toUri())
-                }
-            }
-        }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -65,18 +57,17 @@ class FacebookAuthDialogFragment : DialogFragment() {
         webView = view.findViewById(R.id.webView)
         loadingOverlay = view.findViewById(R.id.loadingOverlay)
 
-        val appId = com.lttbdd.socialagent.BuildConfig.FACEBOOK_APP_ID.trim()
-        val redirectUri = "https://www.facebook.com/connect/login_success.html"
         val scope = "public_profile,pages_show_list,pages_read_engagement,pages_manage_posts,pages_manage_engagement,read_insights"
-        val state = java.util.UUID.randomUUID().toString()
+        expectedState = java.util.UUID.randomUUID().toString()
 
+        // response_type=token: app chỉ dùng access token, không dùng `code` (code không phải token).
         val authUrl = Uri.parse("https://m.facebook.com/v20.0/dialog/oauth")
             .buildUpon()
-            .appendQueryParameter("client_id", appId)
-            .appendQueryParameter("redirect_uri", redirectUri)
-            .appendQueryParameter("response_type", "token,code")
+            .appendQueryParameter("client_id", facebookAppId())
+            .appendQueryParameter("redirect_uri", FacebookAuthRedirect.REDIRECT_URI)
+            .appendQueryParameter("response_type", "token")
             .appendQueryParameter("scope", scope)
-            .appendQueryParameter("state", state)
+            .appendQueryParameter("state", expectedState)
             .build()
             .toString()
 
@@ -107,8 +98,6 @@ class FacebookAuthDialogFragment : DialogFragment() {
             userAgentString = cleanUserAgent
         }
 
-        targetWebView.addJavascriptInterface(FacebookAuthInterface(), "Android")
-
         targetWebView.webChromeClient = object : WebChromeClient() {
             override fun onProgressChanged(view: WebView?, newProgress: Int) {
                 super.onProgressChanged(view, newProgress)
@@ -121,7 +110,7 @@ class FacebookAuthDialogFragment : DialogFragment() {
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                 super.onPageStarted(view, url, favicon)
                 if (!url.isNullOrEmpty()) {
-                    if (handleUrlRedirect(url, url.toUri())) {
+                    if (handleUrlRedirect(url)) {
                         view?.stopLoading()
                         return
                     }
@@ -133,23 +122,18 @@ class FacebookAuthDialogFragment : DialogFragment() {
                 super.onPageFinished(view, url)
                 if (!url.isNullOrEmpty()) {
                     checkIfFacebookBlocked(view)
-                    if (handleUrlRedirect(url, url.toUri())) {
+                    if (handleUrlRedirect(url)) {
                         view?.stopLoading()
                         return
                     }
                     updateVisualState(url)
-
-                    val lowerUrl = url.lowercase()
-                    if (lowerUrl.contains("/dialog/oauth")) {
-                        runSafeOAuthConfirmScript(view)
-                    }
                 }
             }
 
             override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
                 super.doUpdateVisitedHistory(view, url, isReload)
                 if (!url.isNullOrEmpty()) {
-                    if (handleUrlRedirect(url, url.toUri())) {
+                    if (handleUrlRedirect(url)) {
                         view?.stopLoading()
                         return
                     }
@@ -175,7 +159,7 @@ class FacebookAuthDialogFragment : DialogFragment() {
                     return
                 }
 
-                if (handleUrlRedirect(urlString, request?.url ?: Uri.EMPTY)) {
+                if (handleUrlRedirect(urlString)) {
                     return
                 }
 
@@ -190,19 +174,19 @@ class FacebookAuthDialogFragment : DialogFragment() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val urlString = request.url.toString()
                 if (isCustomSchemeRedirect(urlString)) {
-                    handleUrlRedirect(urlString, request.url)
+                    handleUrlRedirect(urlString)
                     return true
                 }
-                return handleUrlRedirect(urlString, request.url)
+                return handleUrlRedirect(urlString)
             }
 
             @Deprecated("Deprecated in API 24")
             override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
                 if (isCustomSchemeRedirect(url)) {
-                    handleUrlRedirect(url, url.toUri())
+                    handleUrlRedirect(url)
                     return true
                 }
-                return handleUrlRedirect(url, url.toUri())
+                return handleUrlRedirect(url)
             }
         }
 
@@ -217,7 +201,7 @@ class FacebookAuthDialogFragment : DialogFragment() {
         if (title.contains("bị chặn") || title.contains("blocked") || title.contains("temporarily")) {
             isHandled = true
             cancelSafetyFallbackTimeout()
-            onAuthErrorListener?.invoke("Tài khoản bị Facebook tạm khóa do thao tác quá nhanh. Vui lòng chờ ít phút rồi thử lại.")
+            onAuthErrorListener?.invoke(stringOrEmpty(R.string.channel_facebook_blocked))
             dismissAllowingStateLoss()
         }
     }
@@ -236,17 +220,11 @@ class FacebookAuthDialogFragment : DialogFragment() {
             return
         }
 
+        // Trang cấp quyền: luôn hiện để người dùng tự xem các quyền và bấm xác nhận.
         if (lowerUrl.contains("/dialog/oauth") || lowerUrl.contains("oauth/read") || lowerUrl.contains("oauth/confirm")) {
-            val cookies = CookieManager.getInstance().getCookie("https://m.facebook.com").orEmpty()
-            if (cookies.contains("c_user=")) {
-                activity?.runOnUiThread {
-                    loadingOverlay?.visibility = View.VISIBLE
-                    startSafetyFallbackTimeout()
-                }
-            } else {
-                activity?.runOnUiThread {
-                    loadingOverlay?.visibility = View.GONE
-                }
+            cancelSafetyFallbackTimeout()
+            activity?.runOnUiThread {
+                loadingOverlay?.visibility = View.GONE
             }
             return
         }
@@ -276,142 +254,32 @@ class FacebookAuthDialogFragment : DialogFragment() {
         fallbackRunnable = null
     }
 
-    private fun runSafeOAuthConfirmScript(view: WebView?) {
-        if (isHandled) return
-        val js = """
-            (function() {
-                try {
-                    if (window.Android && window.location && window.location.href) {
-                        window.Android.onUrlChanged(window.location.href);
-                    }
-                } catch(e) {}
+    private fun facebookAppId(): String = com.lttbdd.socialagent.BuildConfig.FACEBOOK_APP_ID.trim()
 
-                if (window.__fbConfirmClickedThisPage) return;
+    private fun stringOrEmpty(resId: Int): String = if (isAdded) getString(resId) else ""
 
-                setTimeout(function() {
-                    if (window.__fbConfirmClickedThisPage) return;
+    private fun isCustomSchemeRedirect(url: String): Boolean =
+        FacebookAuthRedirect.isRedirect(url, facebookAppId())
 
-                    try {
-                        if (window.Android && window.location && window.location.href) {
-                            window.Android.onUrlChanged(window.location.href);
-                        }
-
-                        var confirmBtn = document.querySelector('button[name="__CONFIRM__"]') ||
-                                         document.querySelector('input[name="__CONFIRM__"]');
-
-                        if (confirmBtn) {
-                            window.__fbConfirmClickedThisPage = true;
-                            confirmBtn.click();
-                        }
-                    } catch(e) {}
-                }, 1500);
-            })();
-        """.trimIndent()
-        view?.evaluateJavascript(js, null)
-    }
-
-    private fun isCustomSchemeRedirect(url: String): Boolean {
-        val appId = com.lttbdd.socialagent.BuildConfig.FACEBOOK_APP_ID.trim()
-        return url.startsWith("https://www.facebook.com/connect/login_success.html") ||
-                url.startsWith("fbconnect://success") ||
-                url.startsWith("com.lttbdd.socialagent://oauth") ||
-                url.startsWith("socialagent://oauth") ||
-                (appId.isNotBlank() && url.startsWith("fb$appId://authorize"))
-    }
-
-    private fun handleUrlRedirect(url: String, uri: Uri): Boolean {
+    /**
+     * Xử lý URL mà WebView đang mở. Chỉ phản ứng khi URL đúng là redirect của luồng đăng nhập;
+     * token chỉ được nhận khi `state` khớp. Trả về true nếu đã xử lý xong và đóng hộp thoại.
+     */
+    private fun handleUrlRedirect(url: String): Boolean {
         if (isHandled || url.isBlank()) return false
 
-        // 1. Kiểm tra access_token hoặc code ở login_success.html hoặc redirect_uri
-        val token = findAccessToken(url, uri)
-        if (!token.isNullOrEmpty()) {
-            isHandled = true
-            cancelSafetyFallbackTimeout()
-            onAuthTokenReceivedListener?.invoke(token)
-            dismissAllowingStateLoss()
-            return true
+        val result = FacebookAuthRedirect.parse(url, expectedState, facebookAppId()) ?: return false
+
+        isHandled = true
+        cancelSafetyFallbackTimeout()
+        when (result) {
+            is FacebookAuthRedirect.Result.Token -> onAuthTokenReceivedListener?.invoke(result.accessToken)
+            FacebookAuthRedirect.Result.Cancelled -> onAuthErrorListener?.invoke(USER_CANCELLED)
+            is FacebookAuthRedirect.Result.Failure ->
+                onAuthErrorListener?.invoke(stringOrEmpty(R.string.channel_facebook_login_error))
         }
-
-        // 2. Nếu có lỗi từ OAuth -> Đóng Dialog
-        val error = findError(url, uri)
-        if (!error.isNullOrEmpty()) {
-            isHandled = true
-            cancelSafetyFallbackTimeout()
-            onAuthErrorListener?.invoke(error)
-            dismissAllowingStateLoss()
-            return true
-        }
-
-        // 3. Nếu chạm vào Redirect URI chính thức mà chưa parse được token -> Đóng Dialog
-        if (isCustomSchemeRedirect(url) && (url.contains("login_success.html") || url.contains("authorize"))) {
-            isHandled = true
-            cancelSafetyFallbackTimeout()
-            onAuthErrorListener?.invoke("user_cancelled")
-            dismissAllowingStateLoss()
-            return true
-        }
-
-        return false
-    }
-
-    private fun findAccessToken(url: String, uri: Uri): String? {
-        uri.getQueryParameter("access_token")?.takeIf { it.isNotBlank() }?.let { return it }
-        uri.getQueryParameter("code")?.takeIf { it.isNotBlank() }?.let { return it }
-
-        val uriFragment = uri.fragment.orEmpty()
-        if (uriFragment.isNotBlank()) {
-            extractParamFromFragmentString(uriFragment, "access_token")?.takeIf { it.isNotBlank() }?.let { return it }
-            extractParamFromFragmentString(uriFragment, "code")?.takeIf { it.isNotBlank() }?.let { return it }
-        }
-
-        extractParamFromUrlFragment(url, "access_token")?.takeIf { it.isNotBlank() }?.let { return it }
-        extractParamFromUrlFragment(url, "code")?.takeIf { it.isNotBlank() }?.let { return it }
-
-        val tokenRegex = Regex("(?:access_token|code)=([^&\\s#]+)")
-        val match = tokenRegex.find(url)
-        if (match != null && match.groupValues.size > 1) {
-            val rawValue = match.groupValues[1]
-            return try {
-                java.net.URLDecoder.decode(rawValue, "UTF-8")
-            } catch (_: Exception) {
-                rawValue
-            }
-        }
-        return null
-    }
-
-    private fun findError(url: String, uri: Uri): String? {
-        uri.getQueryParameter("error")?.takeIf { it.isNotBlank() }?.let { return it }
-
-        val uriFragment = uri.fragment.orEmpty()
-        if (uriFragment.isNotBlank()) {
-            extractParamFromFragmentString(uriFragment, "error")?.takeIf { it.isNotBlank() }?.let { return it }
-        }
-
-        extractParamFromUrlFragment(url, "error")?.takeIf { it.isNotBlank() }?.let { return it }
-        return null
-    }
-
-    private fun extractParamFromUrlFragment(url: String, paramName: String): String? {
-        val fragmentIndex = url.indexOf('#')
-        if (fragmentIndex == -1) return null
-        val fragment = url.substring(fragmentIndex + 1)
-        return extractParamFromFragmentString(fragment, paramName)
-    }
-
-    private fun extractParamFromFragmentString(fragment: String, paramName: String): String? {
-        val params = fragment.split('&')
-        for (param in params) {
-            val keyValue = param.split('=')
-            if (keyValue.size == 2 && keyValue[0] == paramName) {
-                return try {
-                    java.net.URLDecoder.decode(keyValue[1], "UTF-8")
-                } catch (_: Exception) {
-                    keyValue[1]
-                }
-            }
-        }
-        return null
+        dismissAllowingStateLoss()
+        return true
     }
 
     override fun onDestroyView() {
@@ -423,6 +291,9 @@ class FacebookAuthDialogFragment : DialogFragment() {
 
     companion object {
         const val TAG = "FacebookAuthDialogFragment"
+
+        /** Giá trị báo lỗi mà ChannelFragment hiểu là người dùng hủy đăng nhập. */
+        const val USER_CANCELLED = "user_cancelled"
 
         fun newInstance(): FacebookAuthDialogFragment {
             return FacebookAuthDialogFragment()

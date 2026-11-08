@@ -55,12 +55,16 @@
 
     <fragment
         android:id="@+id/settingsFragment"
-        android:name="com.lttbdd.socialagent.core.ui.PlaceholderFragment"
+        android:name="com.lttbdd.socialagent.feature.apikeys.ApiKeysEntryFragment"
         android:label="@string/nav_settings">
-        <argument
-            android:name="titleRes"
-            android:defaultValue="@string/nav_settings"
-            app:argType="reference" />
+        <action
+            android:id="@+id/action_settings_to_api_keys"
+            app:destination="@id/apiKeysFragment" />
     </fragment>
+
+    <fragment
+        android:id="@+id/apiKeysFragment"
+        android:name="com.lttbdd.socialagent.feature.apikeys.ApiKeysFragment"
+        android:label="@string/api_keys_title" />
 
 </navigation>

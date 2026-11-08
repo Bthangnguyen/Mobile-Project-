@@ -8,6 +8,7 @@ import com.lttbdd.socialagent.data.ai.LlmConfigurationSource
 import com.lttbdd.socialagent.data.ai.OkHttpSseTransport
 import com.lttbdd.socialagent.data.ai.OpenAiClient
 import com.lttbdd.socialagent.data.ai.RoutingLlmClient
+import com.lttbdd.socialagent.data.apikeys.ApiKeyStore
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -27,9 +28,9 @@ object LlmModule {
     @Provides
     fun configurations(selections: InMemoryLlmConfiguration): LlmConfigurationSource = selections
 
-    /** #53 thay provider này bằng nguồn key từ secure storage; hiện tại báo thiếu key an toàn. */
+    /** Đọc secure storage ngay trước mỗi request; không giữ key cũ sau khi thay/xóa. */
     @Provides
-    fun apiKeys(): ApiKeySource = ApiKeySource { null }
+    fun apiKeys(store: ApiKeyStore): ApiKeySource = ApiKeySource { provider -> store.read(provider) }
 
     @Provides
     @Singleton

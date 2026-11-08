@@ -46,9 +46,15 @@ class AppDivider @JvmOverloads constructor(
     attrs: AttributeSet? = null,
 ) : View(context, attrs) {
 
+    private val dividerHeight = context.resources.getDimensionPixelSize(R.dimen.divider_thickness)
+
     init {
         setBackgroundColor(context.getColor(R.color.brand_surface_variant))
-        minimumHeight = context.resources.getDimensionPixelSize(R.dimen.divider_thickness)
         contentDescription = context.getString(R.string.ui_divider_description)
+    }
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val fixedHeightMeasureSpec = MeasureSpec.makeMeasureSpec(dividerHeight, MeasureSpec.EXACTLY)
+        super.onMeasure(widthMeasureSpec, fixedHeightMeasureSpec)
     }
 }

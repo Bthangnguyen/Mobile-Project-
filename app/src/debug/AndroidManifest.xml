@@ -2,7 +2,7 @@
     <application>
         <activity
             android:name="com.lttbdd.socialagent.core.ui.demo.UiShowcaseActivity"
-            android:exported="false"
+            android:exported="true"
             android:label="@string/ui_demo_title" />
     </application>
 </manifest>

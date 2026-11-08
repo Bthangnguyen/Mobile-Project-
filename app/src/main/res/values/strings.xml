@@ -57,6 +57,7 @@
     <string name="status_connecting">Connecting</string>
     <string name="status_expired">Expired</string>
     <string name="status_draft">Draft</string>
+    <string name="status_queued">Queued</string>
     <string name="status_pending_approval">Pending approval</string>
     <string name="status_publishing">Publishing</string>
     <string name="status_published">Published</string>
@@ -66,6 +67,7 @@
     <string name="agent_step_generating_outline">Generating outline</string>
     <string name="agent_step_writing_draft">Writing draft</string>
     <string name="agent_step_reviewing_content">Reviewing content</string>
+    <string name="agent_step_generating_image_prompt">Generating image prompt</string>
     <string name="agent_step_generating_image">Generating image</string>
     <string name="agent_step_completing_result">Completing result</string>
     <string name="agent_progress_waiting">Waiting</string>

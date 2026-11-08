@@ -10,15 +10,8 @@ import androidx.annotation.DrawableRes
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.textview.MaterialTextView
 import com.lttbdd.socialagent.R
+import com.lttbdd.socialagent.core.model.ConnectionStatus
 import com.lttbdd.socialagent.core.ui.components.StatusIndicator
-import com.lttbdd.socialagent.core.ui.components.StatusKind
-
-enum class ChannelConnectionState(val statusKind: StatusKind) {
-    CONNECTED(StatusKind.CONNECTED),
-    DISCONNECTED(StatusKind.DISCONNECTED),
-    CONNECTING(StatusKind.CONNECTING),
-    EXPIRED(StatusKind.EXPIRED),
-}
 
 class ChannelStatus @JvmOverloads constructor(
     context: Context,
@@ -56,14 +49,19 @@ class ChannelStatus @JvmOverloads constructor(
     fun setChannel(
         channelName: CharSequence,
         accountName: CharSequence,
-        connectionState: ChannelConnectionState,
+        connectionState: ConnectionStatus,
         @DrawableRes iconRes: Int? = null,
         actionLabel: CharSequence? = null,
+        isConnecting: Boolean = false,
         onAction: (() -> Unit)? = null,
     ) {
         platform.text = channelName
         account.text = accountName
-        status.setStatus(connectionState.statusKind)
+        if (isConnecting) {
+            status.setConnecting()
+        } else {
+            status.setStatus(connectionState)
+        }
         contentDescription = context.getString(
             R.string.channel_status_content_description,
             channelName,

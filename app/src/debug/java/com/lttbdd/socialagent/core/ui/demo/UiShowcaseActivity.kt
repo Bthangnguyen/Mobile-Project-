@@ -2,7 +2,6 @@ package com.lttbdd.socialagent.core.ui.demo
 
 import android.os.Bundle
 import android.widget.ArrayAdapter
-import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.snackbar.Snackbar
 import com.lttbdd.socialagent.R
@@ -10,13 +9,13 @@ import com.lttbdd.socialagent.core.ui.components.AppDialog
 import com.lttbdd.socialagent.core.ui.components.AppSnackbar
 import com.lttbdd.socialagent.core.ui.components.NavigationItem
 import com.lttbdd.socialagent.core.ui.components.StatusIndicator
-import com.lttbdd.socialagent.core.ui.components.StatusKind
 import com.lttbdd.socialagent.core.ui.components.ai.AgentProgress
-import com.lttbdd.socialagent.core.ui.components.ai.AgentStep
 import com.lttbdd.socialagent.core.ui.components.ai.AgentStepStatus
-import com.lttbdd.socialagent.core.ui.components.ai.ChannelConnectionState
 import com.lttbdd.socialagent.core.ui.components.ai.ChannelStatus
 import com.lttbdd.socialagent.databinding.ActivityUiShowcaseBinding
+import com.lttbdd.socialagent.core.model.AgentStep
+import com.lttbdd.socialagent.core.model.ConnectionStatus
+import com.lttbdd.socialagent.core.model.PostStatus
 
 class UiShowcaseActivity : AppCompatActivity() {
 
@@ -64,41 +63,45 @@ class UiShowcaseActivity : AppCompatActivity() {
             )
         }
 
-        StatusKind.entries.forEach { statusKind ->
+        PostStatus.entries.forEach { postStatus ->
             binding.statusContainer.addView(StatusIndicator(this).apply {
-                setStatus(statusKind)
+                setStatus(postStatus)
             })
         }
+        ConnectionStatus.entries.forEach { connectionStatus ->
+            binding.statusContainer.addView(StatusIndicator(this).apply {
+                setStatus(connectionStatus)
+            })
+        }
+        binding.statusContainer.addView(StatusIndicator(this).apply { setConnecting() })
+        binding.statusContainer.addView(StatusIndicator(this).apply { setPendingApproval() })
 
+        binding.agentProgress.setBriefStatus(AgentStepStatus.COMPLETED)
         binding.agentProgress.setStatuses(
             mapOf(
-                AgentStep.CREATING_BRIEF to AgentStepStatus.COMPLETED,
-                AgentStep.GENERATING_OUTLINE to AgentStepStatus.COMPLETED,
-                AgentStep.WRITING_DRAFT to AgentStepStatus.IN_PROGRESS,
-                AgentStep.REVIEWING_CONTENT to AgentStepStatus.WAITING,
-                AgentStep.GENERATING_IMAGE to AgentStepStatus.FAILED,
-                AgentStep.COMPLETING_RESULT to AgentStepStatus.WAITING,
+                AgentStep.OUTLINE to AgentStepStatus.COMPLETED,
+                AgentStep.DRAFT to AgentStepStatus.COMPLETED,
+                AgentStep.SELF_REVIEW to AgentStepStatus.IN_PROGRESS,
+                AgentStep.IMAGE_PROMPT to AgentStepStatus.WAITING,
+                AgentStep.IMAGE to AgentStepStatus.FAILED,
+                AgentStep.PACKAGE to AgentStepStatus.WAITING,
             ),
         )
         binding.channelStatus.setChannel(
             channelName = getString(R.string.ui_demo_channel_name),
             accountName = getString(R.string.ui_demo_account_name),
-            connectionState = ChannelConnectionState.CONNECTED,
+            connectionState = ConnectionStatus.CONNECTED,
             iconRes = R.drawable.ic_nav_posts,
             actionLabel = getString(R.string.ui_demo_action_connect),
         ) {
             binding.channelStatus.setChannel(
                 channelName = getString(R.string.ui_demo_channel_name),
                 accountName = getString(R.string.ui_demo_account_name),
-                connectionState = ChannelConnectionState.EXPIRED,
+                connectionState = ConnectionStatus.TOKEN_EXPIRED,
                 iconRes = R.drawable.ic_nav_posts,
             )
         }
-        listOf(
-            ChannelConnectionState.DISCONNECTED,
-            ChannelConnectionState.CONNECTING,
-            ChannelConnectionState.EXPIRED,
-        ).forEach { connectionState ->
+        ConnectionStatus.entries.forEach { connectionState ->
             binding.channelStatusContainer.addView(
                 ChannelStatus(this).apply {
                     setChannel(
@@ -110,6 +113,17 @@ class UiShowcaseActivity : AppCompatActivity() {
                 },
             )
         }
+        binding.channelStatusContainer.addView(
+            ChannelStatus(this).apply {
+                setChannel(
+                    channelName = getString(R.string.ui_demo_channel_name),
+                    accountName = getString(R.string.ui_demo_account_name),
+                    connectionState = ConnectionStatus.DISCONNECTED,
+                    iconRes = R.drawable.ic_nav_posts,
+                    isConnecting = true,
+                )
+            },
+        )
 
         binding.dropdown.setAdapter(
             ArrayAdapter(

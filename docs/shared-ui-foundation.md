@@ -80,37 +80,41 @@ can continue using the XML menu and Navigation Component bindings.
 
 ### Status and selection
 
-`StatusIndicator.setStatus(StatusKind)` supports `CONNECTED`, `DISCONNECTED`,
-`CONNECTING`, `EXPIRED`, `DRAFT`, `PENDING_APPROVAL`, `PUBLISHING`, `PUBLISHED`,
-`FAILED` and `HANDED_OFF`. Labels are localized, while semantic colors are shared.
+`StatusIndicator.setStatus(PostStatus)` displays post lifecycle values including
+`QUEUED`; `setStatus(ConnectionStatus)` displays the shared connection model.
+`setConnecting()` and `setPendingApproval()` support transient/UI workflow states
+that are not represented in those core models. Labels are localized and semantic
+colors are shared.
 `StyledCheckbox`, `StyledRadioButton`, `StyledSwitch` and `AppDropdown` wrap the
 corresponding Material controls.
 
 ### AI components
 
 `AgentProgress` lists the six writing steps in product order. Update one step or all
-steps without introducing agent/backend logic into the view:
+steps using `core.model.AgentStep` without introducing agent/backend logic into the view:
 
 ```kotlin
 binding.agentProgress.setStepStatus(
-    AgentStep.WRITING_DRAFT,
+    AgentStep.DRAFT,
     AgentStepStatus.IN_PROGRESS,
 )
 ```
 
 `AgentStepStatus` is `WAITING`, `IN_PROGRESS`, `COMPLETED` or `FAILED`.
-`setStatuses(Map<AgentStep, AgentStepStatus>)` resets omitted steps to `WAITING`.
+The shared brief row can be updated with `setBriefStatus(status)`.
+`setStatuses(Map<AgentStep, AgentStepStatus>)` resets omitted core steps to `WAITING`.
 
 `ChannelStatus.setChannel(...)` accepts the platform and account names, a
-`ChannelConnectionState`, an optional drawable resource, and an optional action
-label/callback. It only renders information supplied by its caller; it does not
-connect accounts, refresh tokens or perform OAuth.
+`core.model.ConnectionStatus`, an optional drawable resource, an optional action
+label/callback, and an optional `isConnecting` flag for an active connection attempt.
+It only renders information supplied by its caller; it does not connect accounts,
+refresh tokens or perform OAuth.
 
 ```kotlin
 binding.channelStatus.setChannel(
     channelName = getString(R.string.channel_linkedin),
     accountName = account.displayName,
-    connectionState = ChannelConnectionState.CONNECTED,
+    connectionState = ConnectionStatus.CONNECTED,
     actionLabel = getString(R.string.disconnect),
     onAction = ::confirmDisconnect,
 )

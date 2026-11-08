@@ -41,6 +41,12 @@ interface ChannelRepository {
      */
     suspend fun disconnectChannel(type: ChannelType, accountId: String): Result<Unit>
 
+    /**
+     * Quyền (scope) thật mà token của kênh đã được cấp, lưu lúc kết nối.
+     * Trả về null nếu chưa có token hoặc không đọc được.
+     */
+    suspend fun getGrantedScope(type: ChannelType, accountId: String): String? = null
+
     companion object {
         /** redirectUri đánh dấu authCode là access token lấy từ Facebook Login SDK. */
         const val FACEBOOK_SDK_REDIRECT = "facebook_sdk"

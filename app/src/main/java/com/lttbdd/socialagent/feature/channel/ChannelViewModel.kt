@@ -32,6 +32,9 @@ class ChannelViewModel @Inject constructor(
     private var pendingCodeVerifier: String? = null
     private var pendingState: String? = null
 
+    /** Quyền token đã được cấp thật, theo từng kênh. Rỗng/null nghĩa là chưa xác định được. */
+    private var grantedScopes: Map<String, String?> = emptyMap()
+
     init {
         loadChannels()
     }
@@ -39,17 +42,22 @@ class ChannelViewModel @Inject constructor(
     private fun loadChannels() {
         viewModelScope.launch {
             repository.getConnectedChannels().collect { channels ->
+                // Nạp quyền thật của từng kênh trước khi phát UiState để ma trận không hiện sai.
+                grantedScopes = channels.associate { account ->
+                    scopeKey(account) to repository.getGrantedScope(account.type, account.accountId)
+                }
                 _uiState.value = ChannelUiState.Success(channels = channels)
             }
         }
     }
 
-    fun getScopeForAccount(account: ChannelAccount): String? {
-        return when (account.type) {
-            ChannelType.FACEBOOK -> "public_profile,pages_show_list,pages_manage_posts,pages_read_engagement,pages_manage_engagement,read_insights"
-            ChannelType.LINKEDIN -> "openid,profile,w_organization_social,r_organization_social_feed,w_organization_social_feed,rw_organization_admin"
-        }
-    }
+    private fun scopeKey(account: ChannelAccount) = "${account.type.name}_${account.accountId}"
+
+    /**
+     * Trả về quyền thật của token đã lưu; null nếu chưa đọc được
+     * (khi đó ma trận hiển thị "Cần cấp thêm quyền", không giả định đã đủ quyền).
+     */
+    fun getScopeForAccount(account: ChannelAccount): String? = grantedScopes[scopeKey(account)]
 
     fun isFacebookDemoMode(): Boolean {
         val id = com.lttbdd.socialagent.BuildConfig.FACEBOOK_APP_ID

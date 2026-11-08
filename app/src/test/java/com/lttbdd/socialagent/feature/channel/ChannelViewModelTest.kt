@@ -75,10 +75,26 @@ class ChannelViewModelTest {
         assertEquals(ChannelType.FACEBOOK, successState.channels[0].type)
     }
 
+    @Test
+    fun `getScopeForAccount tra ve quyen that, khong viet cung`() = runTest {
+        viewModel.handleOAuthCallback(
+            channelType = ChannelType.FACEBOOK,
+            authCode = "code_fb_999",
+            redirectUri = "com.lttbdd.socialagent://oauth/callback",
+        )
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val facebook = (viewModel.uiState.value as ChannelUiState.Success).channels.first()
+        assertEquals("public_profile", viewModel.getScopeForAccount(facebook))
+    }
+
     private class FakeChannelRepository : ChannelRepository {
         private val channels = MutableStateFlow<List<ChannelAccount>>(emptyList())
 
         override fun getConnectedChannels(): Flow<List<ChannelAccount>> = channels.asStateFlow()
+
+        override suspend fun getGrantedScope(type: ChannelType, accountId: String): String? =
+            if (type == ChannelType.FACEBOOK) "public_profile" else null
 
         override suspend fun connectFacebookPage(
             authCode: String,

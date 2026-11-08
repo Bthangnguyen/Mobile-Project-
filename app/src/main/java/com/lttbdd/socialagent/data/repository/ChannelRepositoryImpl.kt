@@ -9,6 +9,7 @@ import com.lttbdd.socialagent.data.security.TokenStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -55,7 +56,8 @@ class ChannelRepositoryImpl @Inject constructor(
                 accessToken = authCode
                 accountId = profile.first
                 accountName = profile.second
-                scope = "public_profile"
+                // Lấy quyền người dùng thật sự đã cấp (họ có thể bỏ chọn từng quyền trên trang xác nhận).
+                scope = fetchFacebookGrantedScope(authCode) ?: "public_profile"
             }
 
             // Facebook trả về expires_in = 5184000s (~60 ngày) cho long-lived token
@@ -107,6 +109,33 @@ class ChannelRepositoryImpl @Inject constructor(
         }
     }
 
+    /**
+     * Gọi Graph API /me/permissions để lấy các quyền ở trạng thái granted.
+     * Trả về chuỗi phân tách bằng dấu phẩy, hoặc null nếu lỗi.
+     */
+    private fun fetchFacebookGrantedScope(accessToken: String): String? {
+        return try {
+            val request = okhttp3.Request.Builder()
+                .url("https://graph.facebook.com/v20.0/me/permissions")
+                .header("Authorization", "Bearer $accessToken")
+                .build()
+            httpClient.newCall(request).execute().use { response ->
+                val body = response.body?.string()
+                if (response.isSuccessful && !body.isNullOrEmpty()) parseFacebookGrantedScope(body) else null
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    override suspend fun getGrantedScope(type: ChannelType, accountId: String): String? {
+        return try {
+            tokenStore.getToken(type, accountId).first()?.scope
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     override suspend fun connectLinkedIn(
         authCode: String,
         codeVerifier: String,
@@ -117,6 +146,7 @@ class ChannelRepositoryImpl @Inject constructor(
             var expiresInSeconds = 5184000L
             var displayName = "Social Agent LinkedIn Company Page"
             var accountId = "li_org_202"
+            var grantedScope = "openid profile email w_member_social"
 
             val clientId = com.lttbdd.socialagent.BuildConfig.LINKEDIN_CLIENT_ID
             val clientSecret = com.lttbdd.socialagent.BuildConfig.LINKEDIN_CLIENT_SECRET
@@ -151,6 +181,8 @@ class ChannelRepositoryImpl @Inject constructor(
                     return@withContext Result.failure(IllegalStateException("LinkedIn không trả về access_token"))
                 }
                 accessToken = tokenStr
+                // Dùng scope LinkedIn thực sự trả về thay vì chuỗi viết cứng.
+                tokenJson?.stringField("scope")?.takeIf { it.isNotBlank() }?.let { grantedScope = it }
                 tokenJson?.stringField("expires_in")?.toLongOrNull()?.takeIf { it > 0 }?.let { expiresInSeconds = it }
 
                 // Gọi UserInfo API (OpenID Connect) để lấy tên thật của người dùng
@@ -174,7 +206,7 @@ class ChannelRepositoryImpl @Inject constructor(
             val token = OAuthToken.createFromExpiresIn(
                 accessToken = accessToken,
                 expiresInSeconds = expiresInSeconds,
-                scope = "openid profile email w_member_social",
+                scope = grantedScope,
             )
 
             tokenStore.saveToken(ChannelType.LINKEDIN, accountId, token)
@@ -230,6 +262,26 @@ class ChannelRepositoryImpl @Inject constructor(
 
     companion object {
         private val json = Json { ignoreUnknownKeys = true }
+
+        /**
+         * Parse JSON của Graph API /me/permissions thành chuỗi quyền đã cấp (status = granted),
+         * phân tách bằng dấu phẩy. Trả null nếu JSON sai định dạng hoặc không có quyền nào.
+         */
+        internal fun parseFacebookGrantedScope(body: String): String? {
+            return try {
+                val data = (json.parseToJsonElement(body) as? JsonObject)?.get("data") as? kotlinx.serialization.json.JsonArray
+                    ?: return null
+                val granted = data.mapNotNull { element ->
+                    val item = element as? JsonObject ?: return@mapNotNull null
+                    val permission = (item["permission"] as? JsonPrimitive)?.content
+                    val status = (item["status"] as? JsonPrimitive)?.content
+                    permission?.takeIf { it.isNotBlank() && status == "granted" }
+                }
+                if (granted.isEmpty()) null else granted.joinToString(",")
+            } catch (_: Exception) {
+                null
+            }
+        }
 
         /**
          * Parse JSON của Graph API /me thành (id, name). Trả null nếu thiếu trường.

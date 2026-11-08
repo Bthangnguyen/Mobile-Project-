@@ -109,4 +109,43 @@ class ChannelRepositoryTest {
         assertNull(ChannelRepositoryImpl.parseFacebookProfile("""{"id":"","name":"Agent"}"""))
         assertNull(ChannelRepositoryImpl.parseFacebookProfile("""{"id":"123","name":" "}"""))
     }
+
+    @Test
+    fun `parseFacebookGrantedScope chi lay quyen granted`() {
+        val json = """{"data":[
+            {"permission":"public_profile","status":"granted"},
+            {"permission":"pages_manage_posts","status":"declined"},
+            {"permission":"read_insights","status":"granted"}
+        ]}"""
+
+        assertEquals("public_profile,read_insights", ChannelRepositoryImpl.parseFacebookGrantedScope(json))
+    }
+
+    @Test
+    fun `parseFacebookGrantedScope tra null khi khong co quyen hoac json sai`() {
+        assertNull(ChannelRepositoryImpl.parseFacebookGrantedScope(""))
+        assertNull(ChannelRepositoryImpl.parseFacebookGrantedScope("not_json"))
+        assertNull(ChannelRepositoryImpl.parseFacebookGrantedScope("""{"data":[]}"""))
+        assertNull(
+            ChannelRepositoryImpl.parseFacebookGrantedScope(
+                """{"data":[{"permission":"read_insights","status":"declined"}]}""",
+            ),
+        )
+        assertNull(ChannelRepositoryImpl.parseFacebookGrantedScope("""{"error":{"code":190}}"""))
+    }
+
+    @Test
+    fun `getGrantedScope tra ve scope da luu cua token`() = runTest {
+        repository.connectFacebookPage(
+            authCode = "code_fb_123",
+            codeVerifier = "v",
+            redirectUri = "com.lttbdd.socialagent://oauth/callback",
+        )
+
+        assertEquals(
+            "pages_manage_posts,pages_read_engagement",
+            repository.getGrantedScope(ChannelType.FACEBOOK, "fb_page_101"),
+        )
+        assertNull(repository.getGrantedScope(ChannelType.FACEBOOK, "khong_ton_tai"))
+    }
 }

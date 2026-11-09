@@ -10,6 +10,7 @@ import com.lttbdd.socialagent.core.model.PostStatus
 /**
  * Một lần đăng bản nháp lên một kênh (F5).
  * [idempotencyKey] là duy nhất trong bảng: DB tự chặn việc tạo hai bài đăng cho cùng một lần bấm đăng.
+ * Xoá bản nháp không xoá bài đăng: [draftId] chuyển thành null, còn link bài và khoá chống trùng được giữ lại.
  */
 @Entity(
     tableName = "posts",
@@ -18,7 +19,7 @@ import com.lttbdd.socialagent.core.model.PostStatus
             entity = DraftEntity::class,
             parentColumns = ["id"],
             childColumns = ["draftId"],
-            onDelete = ForeignKey.CASCADE,
+            onDelete = ForeignKey.SET_NULL,
         ),
     ],
     indices = [
@@ -28,7 +29,8 @@ import com.lttbdd.socialagent.core.model.PostStatus
 )
 data class PostEntity(
     @PrimaryKey val id: String,
-    val draftId: String,
+    /** null khi bản nháp gốc đã bị xoá sau khi đăng xong. */
+    val draftId: String?,
     val channel: ChannelType,
     val status: PostStatus,
     val idempotencyKey: String,

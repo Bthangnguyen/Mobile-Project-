@@ -2,6 +2,7 @@ package com.lttbdd.socialagent.core.database
 
 import android.app.Application
 import android.content.Context
+import android.database.sqlite.SQLiteConstraintException
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.lttbdd.socialagent.core.database.entity.CommentEntity
@@ -9,13 +10,17 @@ import com.lttbdd.socialagent.core.database.entity.DraftEntity
 import com.lttbdd.socialagent.core.database.entity.MetricsSnapshotEntity
 import com.lttbdd.socialagent.core.database.entity.PostEntity
 import com.lttbdd.socialagent.core.model.ChannelType
+import com.lttbdd.socialagent.core.model.CommentCategory
 import com.lttbdd.socialagent.core.model.CommentStatus
 import com.lttbdd.socialagent.core.model.PostStatus
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -46,10 +51,15 @@ class AppDatabaseTest {
         db.close()
     }
 
-    private fun draft(id: String, updatedAt: Long, text: String = "Nội dung $id") = DraftEntity(
+    private fun draft(
+        id: String,
+        updatedAt: Long,
+        text: String = "Nội dung $id",
+        channel: ChannelType = ChannelType.FACEBOOK,
+    ) = DraftEntity(
         id = id,
         topicId = "t1",
-        channel = ChannelType.FACEBOOK,
+        channel = channel,
         text = text,
         imageUri = null,
         imageAltText = null,
@@ -86,7 +96,7 @@ class AppDatabaseTest {
     @Test
     fun `drafts are returned newest first and upsert replaces existing draft`() = runTest {
         val dao = db.draftDao()
-        dao.upsertAll(listOf(draft("d1", updatedAt = 1), draft("d2", updatedAt = 2)))
+        dao.upsertAll(listOf(draft("d1", updatedAt = 1), draft("d2", updatedAt = 2, channel = ChannelType.LINKEDIN)))
         dao.upsert(draft("d1", updatedAt = 3, text = "Đã sửa"))
 
         val drafts = dao.observeAll().first()
@@ -109,13 +119,45 @@ class AppDatabaseTest {
     }
 
     @Test
-    fun `deleting a draft also deletes its posts`() = runTest {
+    fun `draft with a queued or publishing post cannot be deleted`() = runTest {
         db.draftDao().upsert(draft("d1", updatedAt = 0))
-        db.postDao().insertIfAbsent(post(id = "p1", key = "key-1"))
+        db.postDao().insertIfAbsent(post(id = "p1", key = "key-1").copy(status = PostStatus.PUBLISHING))
 
-        db.draftDao().deleteById("d1")
+        val deleted = db.draftDao().deleteById("d1")
 
-        assertNull(db.postDao().getByIdempotencyKey("key-1"))
+        assertEquals(0, deleted)
+        assertNotNull(db.draftDao().getById("d1"))
+    }
+
+    @Test
+    fun `deleting a published draft keeps the post and its idempotency key`() = runTest {
+        db.draftDao().upsert(draft("d1", updatedAt = 0))
+        db.postDao().insertIfAbsent(
+            post(id = "p1", key = "key-1").copy(status = PostStatus.PUBLISHED, url = "https://example.com/p1"),
+        )
+
+        val deleted = db.draftDao().deleteById("d1")
+
+        assertEquals(1, deleted)
+        val post = db.postDao().getByIdempotencyKey("key-1")
+        assertNull(post?.draftId)
+        assertEquals("https://example.com/p1", post?.url)
+    }
+
+    @Test
+    fun `inserting a post for a missing draft throws`() = runTest {
+        assertThrows(SQLiteConstraintException::class.java) {
+            runBlocking { db.postDao().insertIfAbsent(post(id = "p1", key = "key-1")) }
+        }
+    }
+
+    @Test
+    fun `a topic can have only one draft per channel`() = runTest {
+        db.draftDao().upsert(draft("d1", updatedAt = 0))
+
+        assertThrows(SQLiteConstraintException::class.java) {
+            runBlocking { db.draftDao().upsert(draft("d2", updatedAt = 1)) }
+        }
     }
 
     @Test
@@ -165,6 +207,47 @@ class AppDatabaseTest {
         val byChannel = dao.observe().first().associate { it.channel to it.status }
         assertEquals(CommentStatus.REPLIED, byChannel[ChannelType.FACEBOOK])
         assertEquals(CommentStatus.NEW, byChannel[ChannelType.LINKEDIN])
+    }
+
+    @Test
+    fun `syncing comments from the network keeps status and AI category`() = runTest {
+        val dao = db.commentDao()
+        dao.syncFromRemote(listOf(comment("c1", ChannelType.FACEBOOK, "p", CommentStatus.NEW, at = 1)))
+        dao.updateStatus(ChannelType.FACEBOOK, "c1", CommentStatus.REPLIED)
+        dao.updateCategory(ChannelType.FACEBOOK, "c1", CommentCategory.PRAISE)
+
+        val edited = comment("c1", ChannelType.FACEBOOK, "p", CommentStatus.NEW, at = 1).copy(text = "Đã sửa")
+        val added = comment("c2", ChannelType.FACEBOOK, "p", CommentStatus.NEW, at = 2)
+        dao.syncFromRemote(listOf(edited, added))
+
+        val byId = dao.observe().first().associateBy { it.id }
+        assertEquals("Đã sửa", byId.getValue("c1").text)
+        assertEquals(CommentStatus.REPLIED, byId.getValue("c1").status)
+        assertEquals(CommentCategory.PRAISE, byId.getValue("c1").category)
+        assertEquals(CommentStatus.NEW, byId.getValue("c2").status)
+    }
+
+    @Test
+    fun `old metrics snapshots can be cleaned up`() = runTest {
+        val dao = db.metricsDao()
+        listOf(100L, 200L, 300L).forEach { at ->
+            dao.insert(
+                MetricsSnapshotEntity(
+                    channel = ChannelType.LINKEDIN,
+                    remotePostId = "p1",
+                    likes = 0,
+                    comments = 0,
+                    shares = 0,
+                    impressions = null,
+                    capturedAtMillis = at,
+                ),
+            )
+        }
+
+        val deleted = dao.deleteOlderThan(250)
+
+        assertEquals(2, deleted)
+        assertEquals(listOf(300L), dao.observeHistory(ChannelType.LINKEDIN, "p1").first().map { it.capturedAtMillis })
     }
 
     @Test

@@ -5,10 +5,10 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.lttbdd.socialagent.core.model.ChannelType
 
-/** Bản nháp cho một kênh, lưu lại để xem và sửa khi offline (F4, F9). */
+/** Bản nháp cho một kênh, lưu lại để xem và sửa khi offline (F4, F9). Mỗi topic có tối đa một bản nháp cho mỗi kênh. */
 @Entity(
     tableName = "drafts",
-    indices = [Index("topicId")],
+    indices = [Index(value = ["topicId", "channel"], unique = true)],
 )
 data class DraftEntity(
     @PrimaryKey val id: String,

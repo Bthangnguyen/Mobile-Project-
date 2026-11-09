@@ -27,6 +27,8 @@ interface PostDao {
     /**
      * Thêm bài đăng mới. Trả về -1 khi [PostEntity.idempotencyKey] đã tồn tại,
      * tức lần bấm đăng này đã được ghi trước đó và không được tạo bài trùng.
+     * `IGNORE` không áp dụng cho khoá ngoại: [PostEntity.draftId] trỏ tới bản nháp không tồn tại
+     * vẫn ném `SQLiteConstraintException`, nên phải lưu bản nháp trước.
      */
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertIfAbsent(post: PostEntity): Long

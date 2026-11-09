@@ -32,4 +32,8 @@ interface MetricsDao {
         """,
     )
     suspend fun getLatest(channel: ChannelType, remotePostId: String): MetricsSnapshotEntity?
+
+    /** Dọn snapshot cũ để bảng không phình mãi. Trả về số dòng đã xoá. */
+    @Query("DELETE FROM metrics_snapshots WHERE capturedAtMillis < :beforeMillis")
+    suspend fun deleteOlderThan(beforeMillis: Long): Int
 }

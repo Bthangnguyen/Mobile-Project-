@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "5373f7d99b70b212e4414fc46d35c6e4",
+    "identityHash": "0099fc6a8065aaf07bef0319540bbf02",
     "entities": [
       {
         "tableName": "drafts",
@@ -63,19 +63,20 @@
         },
         "indices": [
           {
-            "name": "index_drafts_topicId",
-            "unique": false,
+            "name": "index_drafts_topicId_channel",
+            "unique": true,
             "columnNames": [
-              "topicId"
+              "topicId",
+              "channel"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_drafts_topicId` ON `${TABLE_NAME}` (`topicId`)"
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_drafts_topicId_channel` ON `${TABLE_NAME}` (`topicId`, `channel`)"
           }
         ]
       },
       {
         "tableName": "posts",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `draftId` TEXT NOT NULL, `channel` TEXT NOT NULL, `status` TEXT NOT NULL, `idempotencyKey` TEXT NOT NULL, `remotePostId` TEXT, `url` TEXT, `errorMessage` TEXT, `attemptCount` INTEGER NOT NULL, `createdAtMillis` INTEGER NOT NULL, `updatedAtMillis` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`draftId`) REFERENCES `drafts`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `draftId` TEXT, `channel` TEXT NOT NULL, `status` TEXT NOT NULL, `idempotencyKey` TEXT NOT NULL, `remotePostId` TEXT, `url` TEXT, `errorMessage` TEXT, `attemptCount` INTEGER NOT NULL, `createdAtMillis` INTEGER NOT NULL, `updatedAtMillis` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`draftId`) REFERENCES `drafts`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
         "fields": [
           {
             "fieldPath": "id",
@@ -86,8 +87,7 @@
           {
             "fieldPath": "draftId",
             "columnName": "draftId",
-            "affinity": "TEXT",
-            "notNull": true
+            "affinity": "TEXT"
           },
           {
             "fieldPath": "channel",
@@ -170,7 +170,7 @@
         "foreignKeys": [
           {
             "table": "drafts",
-            "onDelete": "CASCADE",
+            "onDelete": "SET NULL",
             "onUpdate": "NO ACTION",
             "columns": [
               "draftId"
@@ -337,7 +337,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '5373f7d99b70b212e4414fc46d35c6e4')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '0099fc6a8065aaf07bef0319540bbf02')"
     ]
   }
 }

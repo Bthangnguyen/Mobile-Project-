@@ -14,6 +14,8 @@ import com.lttbdd.socialagent.core.database.entity.PostEntity
 /**
  * DB cục bộ của app: nguồn dữ liệu chính để UI đọc, kể cả khi offline (F9).
  * Mạng chỉ cập nhật vào đây. Đổi schema thì tăng [version] và thêm migration — xem `app/schemas/`.
+ * Enum (ChannelType, PostStatus…) được lưu theo tên: đổi tên một hằng số enum đã lưu cũng là đổi schema,
+ * cần migration để chuyển dữ liệu cũ.
  */
 @Database(
     entities = [

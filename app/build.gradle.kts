@@ -18,6 +18,14 @@ val facebookAppId = System.getenv("FACEBOOK_APP_ID")
     ?: localProperties.getProperty("FACEBOOK_APP_ID")
     ?: "SOCIAL_AGENT_FB_APP_ID"
 
+// Scheme của intent-filter phải chữ thường và chỉ gồm ký tự hợp lệ (lint AppLinkUrlError).
+// App ID thật là chuỗi số; khi chưa cấu hình (placeholder, ví dụ trên CI) dùng scheme cố định.
+val facebookLoginScheme = if (facebookAppId.isNotEmpty() && facebookAppId.all { it.isDigit() }) {
+    "fb$facebookAppId"
+} else {
+    "fbplaceholder"
+}
+
 val facebookClientToken = System.getenv("FACEBOOK_CLIENT_TOKEN")
     ?: localProperties.getProperty("FACEBOOK_CLIENT_TOKEN")
     ?: "SOCIAL_AGENT_CLIENT_TOKEN"
@@ -52,7 +60,7 @@ android {
 
         resValue("string", "facebook_app_id", facebookAppId)
         resValue("string", "facebook_client_token", facebookClientToken)
-        resValue("string", "fb_login_protocol_scheme", "fb$facebookAppId")
+        resValue("string", "fb_login_protocol_scheme", facebookLoginScheme)
     }
 
     buildTypes {

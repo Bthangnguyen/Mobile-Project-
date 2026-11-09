@@ -20,6 +20,7 @@ import com.facebook.login.LoginResult
 import com.lttbdd.socialagent.R
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.lttbdd.socialagent.core.model.ChannelType
+import com.lttbdd.socialagent.data.model.FacebookPage
 import com.lttbdd.socialagent.data.repository.ChannelRepository
 import com.lttbdd.socialagent.databinding.FragmentChannelBinding
 import dagger.hilt.android.AndroidEntryPoint
@@ -38,6 +39,8 @@ class ChannelFragment : Fragment() {
     private val binding get() = _binding!!
 
     private val viewModel: ChannelViewModel by viewModels()
+
+    private var facebookPageDialog: androidx.appcompat.app.AlertDialog? = null
     private lateinit var adapter: ChannelAdapter
     private lateinit var callbackManager: CallbackManager
 
@@ -192,6 +195,22 @@ class ChannelFragment : Fragment() {
     private fun observeUiState() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    viewModel.pagePicker.collect { picker ->
+                        picker?.let { showFacebookPagePicker(it.pages) }
+                    }
+                }
+                launch {
+                    viewModel.notices.collect { notice ->
+                        when (notice) {
+                            ChannelNotice.NO_FACEBOOK_PAGES -> Toast.makeText(
+                                requireContext(),
+                                R.string.channel_facebook_no_pages,
+                                Toast.LENGTH_LONG,
+                            ).show()
+                        }
+                    }
+                }
                 viewModel.uiState.collect { state ->
                     when (state) {
                         is ChannelUiState.Loading -> {
@@ -220,6 +239,19 @@ class ChannelFragment : Fragment() {
         }
     }
 
+    /** Hộp thoại chọn Page; không mở trùng khi màn hình quay lại STARTED. */
+    private fun showFacebookPagePicker(pages: List<FacebookPage>) {
+        if (facebookPageDialog?.isShowing == true) return
+        facebookPageDialog = MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.channel_facebook_pick_page_title)
+            .setItems(pages.map { it.name }.toTypedArray()) { _, which ->
+                viewModel.selectFacebookPage(pages[which])
+            }
+            .setNegativeButton(R.string.channel_close) { _, _ -> viewModel.cancelFacebookPagePicker() }
+            .setOnCancelListener { viewModel.cancelFacebookPagePicker() }
+            .show()
+    }
+
     private fun showDemoModeNotice(configKey: String) {
         Toast.makeText(
             requireContext(),
@@ -230,6 +262,9 @@ class ChannelFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        // dismiss() không gọi onCancel nên lựa chọn Page vẫn được giữ trong ViewModel.
+        facebookPageDialog?.dismiss()
+        facebookPageDialog = null
         _binding = null
     }
 }

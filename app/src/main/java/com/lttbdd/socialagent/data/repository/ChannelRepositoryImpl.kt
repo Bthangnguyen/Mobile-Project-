@@ -4,6 +4,7 @@ import com.lttbdd.socialagent.core.model.ChannelAccount
 import com.lttbdd.socialagent.core.model.ChannelCapability
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.ConnectionStatus
+import com.lttbdd.socialagent.data.model.FacebookPage
 import com.lttbdd.socialagent.data.model.OAuthToken
 import com.lttbdd.socialagent.data.security.TokenStore
 import kotlinx.coroutines.Dispatchers
@@ -125,6 +126,60 @@ class ChannelRepositoryImpl @Inject constructor(
             }
         } catch (_: Exception) {
             null
+        }
+    }
+
+    override suspend fun fetchFacebookPages(userAccessToken: String): Result<List<FacebookPage>> =
+        withContext(Dispatchers.IO) {
+            try {
+                val request = okhttp3.Request.Builder()
+                    .url("https://graph.facebook.com/v20.0/me/accounts?fields=id,name,access_token&limit=100")
+                    .header("Authorization", "Bearer $userAccessToken")
+                    .build()
+                httpClient.newCall(request).execute().use { response ->
+                    val body = response.body?.string()
+                    if (response.isSuccessful && !body.isNullOrEmpty()) {
+                        Result.success(FacebookPagesParser.parse(body))
+                    } else {
+                        Result.failure(IllegalStateException("Không tải được danh sách Page (HTTP ${response.code})"))
+                    }
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+    override suspend fun connectFacebookSelectedPage(
+        userAccessToken: String,
+        page: FacebookPage,
+    ): Result<ChannelAccount> = withContext(Dispatchers.IO) {
+        try {
+            // Quyền được cấp ở mức người dùng và áp dụng cho Page token; ma trận khả năng đọc từ đây.
+            val scope = fetchFacebookGrantedScope(userAccessToken) ?: "public_profile"
+            val token = OAuthToken.createFromExpiresIn(
+                accessToken = page.accessToken,
+                expiresInSeconds = 5184000L,
+                scope = scope,
+            )
+            tokenStore.saveToken(ChannelType.FACEBOOK, page.id, token)
+
+            val channelAccount = ChannelAccount(
+                type = ChannelType.FACEBOOK,
+                accountId = page.id,
+                displayName = page.name,
+                status = ConnectionStatus.CONNECTED,
+                capabilities = setOf(
+                    ChannelCapability.PUBLISH,
+                    ChannelCapability.READ_COMMENTS,
+                    ChannelCapability.REPLY,
+                    ChannelCapability.MENTION,
+                    ChannelCapability.METRICS,
+                ),
+            )
+            updateOrAddChannel(channelAccount)
+            Result.success(channelAccount)
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 

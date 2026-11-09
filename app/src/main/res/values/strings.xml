@@ -32,6 +32,8 @@
     <string name="channel_facebook_login_another">Use another account</string>
     <string name="channel_facebook_connecting">Connecting to Social Agent...</string>
     <string name="channel_facebook_blocked">Facebook has temporarily blocked this account for acting too fast. Please wait a few minutes and try again.</string>
+    <string name="channel_facebook_pick_page_title">Choose a Facebook Page</string>
+    <string name="channel_facebook_no_pages">No Facebook Page was found for this account, so it was connected with the personal profile. A Page is required to publish.</string>
     <string name="channel_close">Close</string>
     <string name="channel_linkedin_cancelled">LinkedIn login was cancelled</string>
     <string name="channel_linkedin_login_failed">LinkedIn login failed: %1$s</string>

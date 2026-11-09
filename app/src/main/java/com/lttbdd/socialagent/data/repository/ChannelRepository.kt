@@ -2,6 +2,7 @@ package com.lttbdd.socialagent.data.repository
 
 import com.lttbdd.socialagent.core.model.ChannelAccount
 import com.lttbdd.socialagent.core.model.ChannelType
+import com.lttbdd.socialagent.data.model.FacebookPage
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -46,6 +47,21 @@ interface ChannelRepository {
      * Trả về null nếu chưa có token hoặc không đọc được.
      */
     suspend fun getGrantedScope(type: ChannelType, accountId: String): String? = null
+
+    /**
+     * Lấy danh sách Facebook Page mà người dùng quản lý (Graph API `/me/accounts`).
+     * Thất bại (lỗi mạng, thiếu quyền `pages_show_list`) trả về Result.failure.
+     */
+    suspend fun fetchFacebookPages(userAccessToken: String): Result<List<FacebookPage>> =
+        Result.success(emptyList())
+
+    /**
+     * Kết nối một Page đã chọn: lưu Page access token và hiển thị tên Page làm tài khoản đang dùng.
+     */
+    suspend fun connectFacebookSelectedPage(
+        userAccessToken: String,
+        page: FacebookPage,
+    ): Result<ChannelAccount> = Result.failure(UnsupportedOperationException("Chưa hỗ trợ chọn Page"))
 
     companion object {
         /** redirectUri đánh dấu authCode là access token lấy từ Facebook Login SDK. */

@@ -143,7 +143,7 @@ class ChannelViewModel @Inject constructor(
         val effectiveRedirectUri = if (redirectUri.isBlank()) "https://www.linkedin.com/developers/tools/oauth/redirect" else redirectUri
         val baseUrl = "https://www.linkedin.com/oauth/v2/authorization"
         val clientId = com.lttbdd.socialagent.BuildConfig.LINKEDIN_CLIENT_ID.trim()
-        val scope = "openid profile email"
+        val scope = LinkedInAuthDialogFragment.SCOPE
 
         val encodedScope = java.net.URLEncoder.encode(scope, java.nio.charset.StandardCharsets.UTF_8.name())
         val encodedRedirectUri = java.net.URLEncoder.encode(effectiveRedirectUri, java.nio.charset.StandardCharsets.UTF_8.name())

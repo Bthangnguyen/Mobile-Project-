@@ -65,6 +65,14 @@ class ChannelViewModelTest {
     }
 
     @Test
+    fun `LinkedIn xin quyen dang bai w_member_social`() {
+        val url = viewModel.prepareLinkedInOAuthUrl("com.lttbdd.socialagent://oauth/callback")
+
+        assertTrue("URL xin w_member_social", url.contains("w_member_social"))
+        assertTrue("Dialog va ViewModel dung chung scope", LinkedInAuthDialogFragment.SCOPE.contains("w_member_social"))
+    }
+
+    @Test
     fun `handleOAuthCallback connects channel successfully and updates UiState`() = runTest {
         viewModel.handleOAuthCallback(
             channelType = ChannelType.FACEBOOK,

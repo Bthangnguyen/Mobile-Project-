@@ -10,7 +10,6 @@ import javax.inject.Inject
 
 data class SettingsUiState(
     val language: AppLanguage,
-    val languageOptions: List<AppLanguage> = AppLanguage.entries,
 )
 
 @HiltViewModel
@@ -20,6 +19,14 @@ class SettingsViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(SettingsUiState(language = languageManager.current()))
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+
+    /**
+     * Đọc lại ngôn ngữ đang áp dụng. Gọi khi màn hình hiện lại, vì ViewModel sống qua lần tạo lại Activity
+     * và trên Android 13+ người dùng có thể đổi ngôn ngữ của app trong Cài đặt hệ thống.
+     */
+    fun refresh() {
+        _uiState.update { it.copy(language = languageManager.current()) }
+    }
 
     fun onLanguageSelected(language: AppLanguage) {
         // Bỏ qua khi chọn lại ngôn ngữ đang dùng, tránh tạo lại Activity không cần thiết.

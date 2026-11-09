@@ -22,7 +22,18 @@ class SettingsViewModelTest {
         val viewModel = SettingsViewModel(FakeLanguageManager(AppLanguage.VIETNAMESE))
 
         assertEquals(AppLanguage.VIETNAMESE, viewModel.uiState.value.language)
-        assertEquals(AppLanguage.entries, viewModel.uiState.value.languageOptions)
+    }
+
+    @Test
+    fun `refresh picks up a language changed outside the app`() {
+        val manager = FakeLanguageManager(AppLanguage.VIETNAMESE)
+        val viewModel = SettingsViewModel(manager)
+
+        manager.language = AppLanguage.ENGLISH // ví dụ: đổi trong Cài đặt hệ thống trên Android 13+
+        viewModel.refresh()
+
+        assertEquals(AppLanguage.ENGLISH, viewModel.uiState.value.language)
+        assertTrue(manager.applied.isEmpty())
     }
 
     @Test

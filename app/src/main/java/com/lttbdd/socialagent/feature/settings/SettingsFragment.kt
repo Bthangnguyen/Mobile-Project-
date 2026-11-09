@@ -41,6 +41,11 @@ class SettingsFragment : Fragment() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        viewModel.refresh()
+    }
+
     private fun render(state: SettingsUiState) {
         val group = binding.languageGroup
         // Gỡ listener khi cập nhật từ state để không gửi ngược lựa chọn về ViewModel.

@@ -26,32 +26,27 @@
 
         <com.lttbdd.socialagent.core.ui.components.PrimaryButton
             android:id="@+id/button_primary"
-            style="@style/Widget.SocialAgent.Button.Primary"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/ui_demo_primary_button" />
 
         <com.lttbdd.socialagent.core.ui.components.SecondaryButton
-            style="@style/Widget.SocialAgent.Button.Secondary"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/ui_demo_secondary_button" />
 
         <com.lttbdd.socialagent.core.ui.components.OutlinedButton
-            style="@style/Widget.SocialAgent.Button.Outlined"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/ui_demo_outlined_button" />
 
         <com.lttbdd.socialagent.core.ui.components.TextButton
-            style="@style/Widget.SocialAgent.Button.Text"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/ui_demo_text_button" />
 
         <com.lttbdd.socialagent.core.ui.components.IconButton
             android:id="@+id/icon_button"
-            style="@style/Widget.SocialAgent.Button.Icon"
             android:layout_width="@dimen/button_height"
             android:layout_height="@dimen/button_height"
             android:contentDescription="@string/ui_demo_icon_button"
@@ -177,14 +172,12 @@
 
         <com.lttbdd.socialagent.core.ui.components.PrimaryButton
             android:id="@+id/feedback_button"
-            style="@style/Widget.SocialAgent.Button.Primary"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/ui_demo_feedback_action" />
 
         <com.lttbdd.socialagent.core.ui.components.PrimaryButton
             android:id="@+id/dialog_button"
-            style="@style/Widget.SocialAgent.Button.Primary"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/ui_demo_dialog_action" />

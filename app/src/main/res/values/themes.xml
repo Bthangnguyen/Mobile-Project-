@@ -18,6 +18,11 @@
         <item name="colorOnError">@color/brand_on_error</item>
         <item name="colorErrorContainer">@color/brand_error_container</item>
         <item name="materialButtonStyle">@style/Widget.SocialAgent.Button</item>
+        <item name="socialAgentPrimaryButtonStyle">@style/Widget.SocialAgent.Button.Primary</item>
+        <item name="socialAgentSecondaryButtonStyle">@style/Widget.SocialAgent.Button.Secondary</item>
+        <item name="socialAgentOutlinedButtonStyle">@style/Widget.SocialAgent.Button.Outlined</item>
+        <item name="socialAgentTextButtonStyle">@style/Widget.SocialAgent.Button.Text</item>
+        <item name="socialAgentIconButtonStyle">@style/Widget.SocialAgent.Button.Icon</item>
         <item name="textInputStyle">@style/Widget.SocialAgent.TextInputLayout</item>
         <item name="materialCardViewStyle">@style/Widget.SocialAgent.Card</item>
         <item name="bottomNavigationStyle">@style/Widget.SocialAgent.BottomNavigation</item>

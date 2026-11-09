@@ -10,13 +10,13 @@ import com.google.android.material.textfield.MaterialAutoCompleteTextView
 class StyledCheckbox @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
-    defStyleAttr: Int = android.R.attr.checkboxStyle,
+    defStyleAttr: Int = androidx.appcompat.R.attr.checkboxStyle,
 ) : MaterialCheckBox(context, attrs, defStyleAttr)
 
 class StyledRadioButton @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
-    defStyleAttr: Int = android.R.attr.radioButtonStyle,
+    defStyleAttr: Int = androidx.appcompat.R.attr.radioButtonStyle,
 ) : MaterialRadioButton(context, attrs, defStyleAttr)
 
 class StyledSwitch @JvmOverloads constructor(
@@ -28,7 +28,7 @@ class StyledSwitch @JvmOverloads constructor(
 class AppDropdown @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
-    defStyleAttr: Int = android.R.attr.autoCompleteTextViewStyle,
+    defStyleAttr: Int = androidx.appcompat.R.attr.autoCompleteTextViewStyle,
 ) : MaterialAutoCompleteTextView(context, attrs, defStyleAttr) {
 
     init {

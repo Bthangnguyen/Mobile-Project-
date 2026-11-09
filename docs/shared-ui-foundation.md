@@ -22,18 +22,18 @@ The typography styles are `TextAppearance.SocialAgent.Display`, `.Headline`, `.T
 ### Buttons
 
 `PrimaryButton`, `SecondaryButton`, `OutlinedButton`, `TextButton` and `IconButton`
-extend Material `MaterialButton`. Select the matching style:
+extend Material `MaterialButton`. Each class selects its matching shared style by
+default; callers do not need to set a `style` attribute:
 
 ```xml
-<com.lttbdd.socialagent.core.ui.components.PrimaryButton
-    style="@style/Widget.SocialAgent.Button.Primary"
+<com.lttbdd.socialagent.core.ui.components.SecondaryButton
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:text="@string/save" />
+    android:layout_height="wrap_content" />
 ```
 
-The remaining styles are `Widget.SocialAgent.Button.Secondary`, `.Outlined`,
-`.Text` and `.Icon`. Button text and content descriptions remain string resources.
+The matching styles are `Widget.SocialAgent.Button.Primary`, `.Secondary`,
+`.Outlined`, `.Text` and `.Icon`. Button text and content descriptions remain
+string resources. An explicit XML style can still override the class default.
 
 ### Inputs
 

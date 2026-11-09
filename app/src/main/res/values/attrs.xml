@@ -1,0 +1,7 @@
+<resources>
+    <attr name="socialAgentPrimaryButtonStyle" format="reference" />
+    <attr name="socialAgentSecondaryButtonStyle" format="reference" />
+    <attr name="socialAgentOutlinedButtonStyle" format="reference" />
+    <attr name="socialAgentTextButtonStyle" format="reference" />
+    <attr name="socialAgentIconButtonStyle" format="reference" />
+</resources>

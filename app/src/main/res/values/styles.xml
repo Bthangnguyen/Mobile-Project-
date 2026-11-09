@@ -1,0 +1,64 @@
+<resources>
+    <style name="TextAppearance.SocialAgent.Display" parent="TextAppearance.Material3.DisplaySmall">
+        <item name="android:textColor">@color/brand_on_surface</item>
+    </style>
+    <style name="TextAppearance.SocialAgent.Headline" parent="TextAppearance.Material3.HeadlineSmall">
+        <item name="android:textColor">@color/brand_on_surface</item>
+    </style>
+    <style name="TextAppearance.SocialAgent.Title" parent="TextAppearance.Material3.TitleMedium">
+        <item name="android:textColor">@color/brand_on_surface</item>
+    </style>
+    <style name="TextAppearance.SocialAgent.Body" parent="TextAppearance.Material3.BodyLarge">
+        <item name="android:textColor">@color/brand_on_surface</item>
+    </style>
+    <style name="TextAppearance.SocialAgent.Label" parent="TextAppearance.Material3.LabelLarge">
+        <item name="android:textColor">@color/brand_on_surface</item>
+    </style>
+    <style name="TextAppearance.SocialAgent.Caption" parent="TextAppearance.Material3.BodySmall">
+        <item name="android:textColor">@color/brand_on_surface_variant</item>
+    </style>
+
+    <style name="Widget.SocialAgent.Button" parent="Widget.Material3.Button">
+        <item name="android:minHeight">@dimen/button_height</item>
+        <item name="cornerRadius">@dimen/corner_radius_medium</item>
+    </style>
+    <style name="Widget.SocialAgent.Button.Primary" parent="Widget.SocialAgent.Button" />
+    <style name="Widget.SocialAgent.Button.Secondary" parent="Widget.SocialAgent.Button">
+        <item name="backgroundTint">@color/brand_secondary_container</item>
+        <item name="android:textColor">@color/brand_on_secondary_container</item>
+    </style>
+    <style name="Widget.SocialAgent.Button.Outlined" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="android:minHeight">@dimen/button_height</item>
+        <item name="cornerRadius">@dimen/corner_radius_medium</item>
+    </style>
+    <style name="Widget.SocialAgent.Button.Text" parent="Widget.Material3.Button.TextButton">
+        <item name="android:minHeight">@dimen/button_height</item>
+    </style>
+    <style name="Widget.SocialAgent.Button.Icon" parent="Widget.SocialAgent.Button">
+        <item name="iconSize">@dimen/icon_size</item>
+        <item name="iconPadding">0dp</item>
+    </style>
+
+    <style name="Widget.SocialAgent.TextInputLayout" parent="Widget.Material3.TextInputLayout.OutlinedBox">
+        <item name="boxCornerRadiusTopStart">@dimen/corner_radius_medium</item>
+        <item name="boxCornerRadiusTopEnd">@dimen/corner_radius_medium</item>
+        <item name="boxCornerRadiusBottomStart">@dimen/corner_radius_medium</item>
+        <item name="boxCornerRadiusBottomEnd">@dimen/corner_radius_medium</item>
+    </style>
+    <style name="Widget.SocialAgent.Card" parent="Widget.Material3.CardView.Filled">
+        <item name="cardCornerRadius">@dimen/corner_radius_large</item>
+        <item name="contentPadding">@dimen/card_padding</item>
+    </style>
+    <style name="Widget.SocialAgent.BottomNavigation" parent="Widget.Material3.BottomNavigationView">
+        <item name="backgroundTint">@color/brand_surface</item>
+    </style>
+    <style name="Widget.SocialAgent.Toolbar" parent="Widget.Material3.Toolbar">
+        <item name="titleTextAppearance">@style/TextAppearance.SocialAgent.Title</item>
+    </style>
+    <style name="Widget.SocialAgent.CheckBox" parent="Widget.Material3.CompoundButton.CheckBox" />
+    <style name="Widget.SocialAgent.RadioButton" parent="Widget.Material3.CompoundButton.RadioButton" />
+    <style name="Widget.SocialAgent.Switch" parent="Widget.Material3.CompoundButton.Switch" />
+    <style name="ThemeOverlay.SocialAgent.Dialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="colorPrimary">@color/brand_primary</item>
+    </style>
+</resources>

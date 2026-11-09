@@ -18,7 +18,8 @@ import com.lttbdd.socialagent.R
 
 /**
  * DialogFragment hiển thị WebView đăng nhập OAuth Facebook nội bộ app.
- * Không xóa cookie mỗi lần mở form để bảo vệ cookie thiết bị (datr, sb).
+ * Mỗi lần mở form xóa cookie phiên Facebook (c_user, xs...) để luôn hiện form đăng nhập thay vì
+ * "Tiếp tục dưới tên ..."; giữ cookie thiết bị (datr, sb), xem [FacebookSessionCookies].
  * Người dùng tự xem và bấm xác nhận các quyền trên trang của Facebook: không có JS tự bấm hộ,
  * không có cầu nối JS (`addJavascriptInterface`) cho trang web bên ngoài.
  * URL redirect được phân tích bởi [FacebookAuthRedirect] (kiểm tra `state`, đúng redirect URI).
@@ -71,8 +72,20 @@ class FacebookAuthDialogFragment : DialogFragment() {
             .build()
             .toString()
 
-        // Bỏ hoàn toàn việc xóa cookie mỗi lần bấm nút Connect để bảo vệ cookie thiết bị (datr, sb)
+        clearFacebookSession()
         setupWebViewAndLoad(authUrl)
+    }
+
+    /** Xóa cookie phiên Facebook (trừ datr, sb) để Facebook hiện form đăng nhập. */
+    private fun clearFacebookSession() {
+        val cookieManager = android.webkit.CookieManager.getInstance()
+        val hosts = listOf("https://m.facebook.com", "https://www.facebook.com", "https://facebook.com")
+        for (host in hosts) {
+            for (name in FacebookSessionCookies.namesToExpire(cookieManager.getCookie(host))) {
+                cookieManager.setCookie(host, FacebookSessionCookies.expireCookie(name, ".facebook.com"))
+            }
+        }
+        cookieManager.flush()
     }
 
     @SuppressLint("SetJavaScriptEnabled")

@@ -49,7 +49,7 @@ class LinkedInAuthDialogFragment : DialogFragment() {
 
         val clientId = com.lttbdd.socialagent.BuildConfig.LINKEDIN_CLIENT_ID.trim()
         val redirectUri = REDIRECT_URI
-        val scope = "openid profile email"
+        val scope = SCOPE
         val state = java.util.UUID.randomUUID().toString()
 
         val authUrl = Uri.parse("https://www.linkedin.com/oauth/v2/authorization")
@@ -167,6 +167,12 @@ class LinkedInAuthDialogFragment : DialogFragment() {
 
     companion object {
         const val REDIRECT_URI = "https://www.linkedin.com/developers/tools/oauth/redirect"
+
+        /**
+         * Quyền xin khi đăng nhập LinkedIn: hồ sơ (OpenID) và đăng bài thay mặt thành viên (`w_member_social`).
+         * Cần bật sản phẩm "Share on LinkedIn" trong LinkedIn Developer app, nếu không LinkedIn báo lỗi scope.
+         */
+        const val SCOPE = "openid profile email w_member_social"
         const val TAG = "LinkedInAuthDialogFragment"
 
         fun clearLinkedInCookies() {

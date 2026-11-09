@@ -14,8 +14,13 @@ import java.nio.charset.StandardCharsets
  */
 object FacebookAuthRedirect {
 
-    /** Redirect URI chính thức của luồng đăng nhập thủ công (manual login flow) của Facebook. */
-    const val REDIRECT_URI = "https://www.facebook.com/connect/login_success.html"
+    /**
+     * Redirect URI của luồng đăng nhập thủ công. Facebook không cho đăng ký URL `facebook.com`
+     * vào "Valid OAuth Redirect URIs", nên dùng URL thuộc miền của dự án. URL này phải khớp chính xác
+     * với mục Valid OAuth Redirect URIs và miền của nó phải có trong App Domains (Settings → Basic).
+     * WebView chặn URL này trước khi tải, nên máy chủ không cần xử lý yêu cầu.
+     */
+    const val REDIRECT_URI = "https://social-agent-backend.onrender.com/oauth/facebook/callback"
 
     private const val ERROR_ACCESS_DENIED = "access_denied"
 

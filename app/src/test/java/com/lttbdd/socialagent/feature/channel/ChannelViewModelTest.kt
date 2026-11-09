@@ -4,18 +4,23 @@ import com.lttbdd.socialagent.core.model.ChannelAccount
 import com.lttbdd.socialagent.core.model.ChannelCapability
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.ConnectionStatus
+import com.lttbdd.socialagent.data.model.FacebookPage
 import com.lttbdd.socialagent.data.repository.ChannelRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -88,8 +93,92 @@ class ChannelViewModelTest {
         assertEquals("public_profile", viewModel.getScopeForAccount(facebook))
     }
 
+    private fun connectWithFacebookToken() {
+        viewModel.handleOAuthCallback(
+            channelType = ChannelType.FACEBOOK,
+            authCode = "user_token_gia",
+            redirectUri = ChannelRepository.FACEBOOK_SDK_REDIRECT,
+        )
+        testDispatcher.scheduler.advanceUntilIdle()
+    }
+
+    @Test
+    fun `nhieu Page thi hien hop thoai chon va chua ket noi cho den khi chon`() = runTest {
+        fakeRepository.pages = listOf(FacebookPage("p1", "Page Mot", "t1"), FacebookPage("p2", "Page Hai", "t2"))
+
+        connectWithFacebookToken()
+
+        assertEquals(2, viewModel.pagePicker.value?.pages?.size)
+        assertTrue((viewModel.uiState.value as ChannelUiState.Success).channels.isEmpty())
+
+        viewModel.selectFacebookPage(fakeRepository.pages[1])
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertNull(viewModel.pagePicker.value)
+        val channels = (viewModel.uiState.value as ChannelUiState.Success).channels
+        assertEquals(listOf("Page Hai"), channels.map { it.displayName })
+        assertEquals("p2", channels.first().accountId)
+    }
+
+    @Test
+    fun `mot Page thi tu dong ket noi Page do`() = runTest {
+        fakeRepository.pages = listOf(FacebookPage("p1", "Page Duy Nhat", "t1"))
+
+        connectWithFacebookToken()
+
+        assertNull(viewModel.pagePicker.value)
+        val channels = (viewModel.uiState.value as ChannelUiState.Success).channels
+        assertEquals(listOf("Page Duy Nhat"), channels.map { it.displayName })
+    }
+
+    @Test
+    fun `khong co Page thi ket noi bang ho so va phat thong bao`() = runTest {
+        val notices = mutableListOf<ChannelNotice>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.notices.collect { notices.add(it) } }
+
+        connectWithFacebookToken()
+
+        assertEquals(listOf(ChannelNotice.NO_FACEBOOK_PAGES), notices)
+        val channels = (viewModel.uiState.value as ChannelUiState.Success).channels
+        assertEquals(listOf("Facebook Page Test"), channels.map { it.displayName })
+    }
+
+    @Test
+    fun `huy hop thoai chon Page thi khong ket noi va xoa token tam`() = runTest {
+        fakeRepository.pages = listOf(FacebookPage("p1", "A", "t1"), FacebookPage("p2", "B", "t2"))
+        connectWithFacebookToken()
+        assertNotNull(viewModel.pagePicker.value)
+
+        viewModel.cancelFacebookPagePicker()
+        viewModel.selectFacebookPage(fakeRepository.pages[0])
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertNull(viewModel.pagePicker.value)
+        assertTrue((viewModel.uiState.value as ChannelUiState.Success).channels.isEmpty())
+    }
+
     private class FakeChannelRepository : ChannelRepository {
         private val channels = MutableStateFlow<List<ChannelAccount>>(emptyList())
+
+        var pages: List<FacebookPage> = emptyList()
+
+        override suspend fun fetchFacebookPages(userAccessToken: String): Result<List<FacebookPage>> =
+            Result.success(pages)
+
+        override suspend fun connectFacebookSelectedPage(
+            userAccessToken: String,
+            page: FacebookPage,
+        ): Result<ChannelAccount> {
+            val account = ChannelAccount(
+                type = ChannelType.FACEBOOK,
+                accountId = page.id,
+                displayName = page.name,
+                status = ConnectionStatus.CONNECTED,
+                capabilities = setOf(ChannelCapability.PUBLISH),
+            )
+            channels.value = channels.value + account
+            return Result.success(account)
+        }
 
         override fun getConnectedChannels(): Flow<List<ChannelAccount>> = channels.asStateFlow()
 

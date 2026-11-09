@@ -31,6 +31,8 @@
     <string name="channel_facebook_login_another">Dùng tài khoản khác</string>
     <string name="channel_facebook_connecting">Đang kết nối vào Social Agent...</string>
     <string name="channel_facebook_blocked">Tài khoản bị Facebook tạm khóa do thao tác quá nhanh. Vui lòng chờ ít phút rồi thử lại.</string>
+    <string name="channel_facebook_pick_page_title">Chọn Facebook Page</string>
+    <string name="channel_facebook_no_pages">Không tìm thấy Facebook Page nào của tài khoản này nên đã kết nối bằng hồ sơ cá nhân. Cần có Page để đăng bài.</string>
     <string name="channel_close">Đóng</string>
     <string name="channel_linkedin_cancelled">Đã hủy đăng nhập LinkedIn</string>
     <string name="channel_linkedin_login_failed">Đăng nhập LinkedIn thất bại: %1$s</string>

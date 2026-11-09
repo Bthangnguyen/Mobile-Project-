@@ -4,11 +4,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lttbdd.socialagent.core.model.ChannelAccount
 import com.lttbdd.socialagent.core.model.ChannelType
+import com.lttbdd.socialagent.data.model.FacebookPage
 import com.lttbdd.socialagent.data.network.PkceUtil
 import com.lttbdd.socialagent.data.repository.ChannelRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -35,6 +39,20 @@ class ChannelViewModel @Inject constructor(
     /** Quyền token đã được cấp thật, theo từng kênh. Rỗng/null nghĩa là chưa xác định được. */
     private var grantedScopes: Map<String, String?> = emptyMap()
 
+    /** Danh sách kênh mới nhất từ repository (dùng khi UiState đang ở trạng thái khác Success). */
+    private var knownChannels: List<ChannelAccount> = emptyList()
+
+    private val _pagePicker = MutableStateFlow<FacebookPagePicker?>(null)
+
+    /** Khác null khi cần người dùng chọn một trong nhiều Facebook Page. */
+    val pagePicker: StateFlow<FacebookPagePicker?> = _pagePicker.asStateFlow()
+
+    private val _notices = MutableSharedFlow<ChannelNotice>(extraBufferCapacity = 1)
+    val notices: SharedFlow<ChannelNotice> = _notices.asSharedFlow()
+
+    /** Token người dùng giữ tạm trong bộ nhớ trong lúc chờ chọn Page; xóa khi chọn xong hoặc hủy. */
+    private var pendingFacebookUserToken: String? = null
+
     init {
         loadChannels()
     }
@@ -42,6 +60,7 @@ class ChannelViewModel @Inject constructor(
     private fun loadChannels() {
         viewModelScope.launch {
             repository.getConnectedChannels().collect { channels ->
+                knownChannels = channels
                 // Nạp quyền thật của từng kênh trước khi phát UiState để ma trận không hiện sai.
                 grantedScopes = channels.associate { account ->
                     scopeKey(account) to repository.getGrantedScope(account.type, account.accountId)
@@ -145,6 +164,10 @@ class ChannelViewModel @Inject constructor(
             _uiState.value = ChannelUiState.Error("CSRF error: State mismatch")
             return
         }
+        if (channelType == ChannelType.FACEBOOK && redirectUri == ChannelRepository.FACEBOOK_SDK_REDIRECT) {
+            connectFacebookWithPages(userAccessToken = authCode)
+            return
+        }
         val verifier = pendingCodeVerifier ?: PkceUtil.generateCodeVerifier()
         viewModelScope.launch {
             _uiState.value = ChannelUiState.Loading
@@ -152,17 +175,76 @@ class ChannelViewModel @Inject constructor(
                 ChannelType.FACEBOOK -> repository.connectFacebookPage(authCode, verifier, redirectUri)
                 ChannelType.LINKEDIN -> repository.connectLinkedIn(authCode, verifier, redirectUri)
             }
+            applyConnectResult(result)
+        }
+    }
 
-            result.onSuccess { account ->
-                val currentChannels = (uiState.value as? ChannelUiState.Success)?.channels ?: emptyList()
-                val updatedChannels = currentChannels.filterNot { it.type == account.type && it.accountId == account.accountId } + account
-                _uiState.value = ChannelUiState.Success(
-                    channels = updatedChannels,
-                    userMessage = "Connected ${account.displayName}",
+    /**
+     * Sau khi có token người dùng Facebook: lấy các Page họ quản lý.
+     * - 0 Page: kết nối bằng hồ sơ cá nhân và báo [ChannelNotice.NO_FACEBOOK_PAGES].
+     * - 1 Page: dùng luôn Page đó.
+     * - Nhiều Page: phát [pagePicker] để người dùng chọn.
+     */
+    private fun connectFacebookWithPages(userAccessToken: String) {
+        viewModelScope.launch {
+            _uiState.value = ChannelUiState.Loading
+            val pages = repository.fetchFacebookPages(userAccessToken).getOrNull().orEmpty()
+            when {
+                pages.size > 1 -> {
+                    pendingFacebookUserToken = userAccessToken
+                    _uiState.value = ChannelUiState.Success(channels = knownChannels)
+                    _pagePicker.value = FacebookPagePicker(pages)
+                }
+                pages.size == 1 -> applyConnectResult(
+                    repository.connectFacebookSelectedPage(userAccessToken, pages.first()),
                 )
-            }.onFailure { error ->
-                _uiState.value = ChannelUiState.Error(error.message ?: "OAuth error")
+                else -> {
+                    _notices.tryEmit(ChannelNotice.NO_FACEBOOK_PAGES)
+                    val verifier = pendingCodeVerifier ?: PkceUtil.generateCodeVerifier()
+                    applyConnectResult(
+                        repository.connectFacebookPage(
+                            userAccessToken,
+                            verifier,
+                            ChannelRepository.FACEBOOK_SDK_REDIRECT,
+                        ),
+                    )
+                }
             }
+        }
+    }
+
+    /** Người dùng chọn một Page trong hộp thoại: kết nối Page đó. */
+    fun selectFacebookPage(page: FacebookPage) {
+        val token = pendingFacebookUserToken ?: return
+        pendingFacebookUserToken = null
+        _pagePicker.value = null
+        viewModelScope.launch {
+            _uiState.value = ChannelUiState.Loading
+            applyConnectResult(repository.connectFacebookSelectedPage(token, page))
+        }
+    }
+
+    /** Người dùng đóng hộp thoại chọn Page mà không chọn: không kết nối gì. */
+    fun cancelFacebookPagePicker() {
+        pendingFacebookUserToken = null
+        _pagePicker.value = null
+    }
+
+    override fun onCleared() {
+        pendingFacebookUserToken = null
+        super.onCleared()
+    }
+
+    private fun applyConnectResult(result: Result<ChannelAccount>) {
+        result.onSuccess { account ->
+            val updatedChannels = knownChannels
+                .filterNot { it.type == account.type && it.accountId == account.accountId } + account
+            _uiState.value = ChannelUiState.Success(
+                channels = updatedChannels,
+                userMessage = "Connected ${account.displayName}",
+            )
+        }.onFailure { error ->
+            _uiState.value = ChannelUiState.Error(error.message ?: "OAuth error")
         }
     }
 

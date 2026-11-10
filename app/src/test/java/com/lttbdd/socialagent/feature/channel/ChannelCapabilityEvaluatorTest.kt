@@ -29,8 +29,8 @@ class ChannelCapabilityEvaluatorTest {
         assertEquals(CapabilityStatusType.SUPPORTED, items[1].statusType)
         // 3. Reply
         assertEquals(CapabilityStatusType.SUPPORTED, items[2].statusType)
-        // 4. Mention
-        assertEquals(CapabilityStatusType.SUPPORTED, items[3].statusType)
+        // 4. Mention: chưa xác minh dù đã có quyền đăng/tương tác
+        assertEquals(CapabilityStatusType.UNVERIFIED, items[3].statusType)
         // 5. Metrics
         assertEquals(CapabilityStatusType.SUPPORTED, items[4].statusType)
     }
@@ -73,7 +73,41 @@ class ChannelCapabilityEvaluatorTest {
         assertEquals(CapabilityStatusType.SUPPORTED, items[0].statusType)
         assertEquals(CapabilityStatusType.SUPPORTED, items[1].statusType)
         assertEquals(CapabilityStatusType.SUPPORTED, items[2].statusType)
-        assertEquals(CapabilityStatusType.SUPPORTED, items[3].statusType)
+        assertEquals(CapabilityStatusType.UNVERIFIED, items[3].statusType)
         assertEquals(CapabilityStatusType.SUPPORTED, items[4].statusType)
+    }
+
+    @Test
+    fun `facebook mention khong duoc coi la supported chi vi co public_profile`() {
+        val account = ChannelAccount(
+            type = ChannelType.FACEBOOK,
+            accountId = "fb_101",
+            displayName = "Facebook Test Page",
+            status = ConnectionStatus.CONNECTED,
+            capabilities = emptySet(),
+        )
+
+        val items = ChannelCapabilityEvaluator.evaluateCapabilities(account, "public_profile")
+
+        assertEquals(CapabilityStatusType.REQUIRES_PERMISSION, items[3].statusType)
+    }
+
+    @Test
+    fun `linkedin member scope cho phep dang bai nhung mention van chua xac dinh`() {
+        val account = ChannelAccount(
+            type = ChannelType.LINKEDIN,
+            accountId = "li_member",
+            displayName = "LinkedIn Member Test",
+            status = ConnectionStatus.CONNECTED,
+            capabilities = emptySet(),
+        )
+
+        val items = ChannelCapabilityEvaluator.evaluateCapabilities(account, "openid profile w_member_social")
+
+        assertEquals(CapabilityStatusType.SUPPORTED, items[0].statusType)
+        assertEquals(CapabilityStatusType.REQUIRES_PERMISSION, items[1].statusType)
+        assertEquals(CapabilityStatusType.REQUIRES_PERMISSION, items[2].statusType)
+        assertEquals(CapabilityStatusType.UNVERIFIED, items[3].statusType)
+        assertEquals(CapabilityStatusType.REQUIRES_PERMISSION, items[4].statusType)
     }
 }

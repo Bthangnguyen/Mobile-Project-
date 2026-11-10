@@ -169,10 +169,10 @@ class LinkedInAuthDialogFragment : DialogFragment() {
         const val REDIRECT_URI = "https://www.linkedin.com/developers/tools/oauth/redirect"
 
         /**
-         * Quyền xin khi đăng nhập LinkedIn: hồ sơ (OpenID) và đăng bài thay mặt thành viên (`w_member_social`).
+         * Quyền xin khi đăng nhập LinkedIn: hồ sơ (OpenID, đúng bộ quyền App Member trong tài liệu nghiên cứu) và đăng bài thay mặt thành viên (`w_member_social`).
          * Cần bật sản phẩm "Share on LinkedIn" trong LinkedIn Developer app, nếu không LinkedIn báo lỗi scope.
          */
-        const val SCOPE = "openid profile email w_member_social"
+        const val SCOPE = "openid profile w_member_social"
         const val TAG = "LinkedInAuthDialogFragment"
 
         fun clearLinkedInCookies() {

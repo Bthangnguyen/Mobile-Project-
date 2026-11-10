@@ -9,6 +9,9 @@ enum class CapabilityStatusType {
     REQUIRES_PERMISSION,
     NOT_SUPPORTED,
     UNVERIFIED,
+
+    /** Không làm được qua API với app này: app thông báo và người dùng tự thao tác (HANDED_OFF). */
+    HANDED_OFF,
 }
 
 data class CapabilityItemUiState(
@@ -98,13 +101,13 @@ object ChannelCapabilityEvaluator {
         }
 
         // 4. Mention (Nhắc tên): tài liệu Meta chỉ mô tả mention trong bình luận khi Page bật Page Mentioning,
-        // nên dù có quyền đăng/tương tác vẫn chỉ ở mức "chưa xác định"; không tính public_profile.
+        // nên chưa xác minh được thì bàn giao thủ công (HANDED_OFF); không tính public_profile.
         val mentionState = if (scopes.contains("pages_manage_posts") || scopes.contains("pages_manage_engagement")) {
             CapabilityItemUiState(
                 capabilityNameRes = R.string.cap_mention,
-                statusTextRes = R.string.cap_status_unverified,
-                statusType = CapabilityStatusType.UNVERIFIED,
-                captionRes = R.string.cap_fb_mention_unverified,
+                statusTextRes = R.string.cap_status_handed_off,
+                statusType = CapabilityStatusType.HANDED_OFF,
+                captionRes = R.string.cap_fb_mention_handed_off,
             )
         } else {
             CapabilityItemUiState(
@@ -153,6 +156,8 @@ object ChannelCapabilityEvaluator {
             )
         }
 
+        // Các quyền đọc/trả lời comment và số liệu của LinkedIn chỉ có khi app được duyệt Community Management API
+        // (hoặc cấp riêng cho "select developers"); app không tự xin thêm được nên thiếu quyền thì bàn giao thủ công.
         // 2. Đọc comment (Read Comments) - Quyền yêu cầu: r_organization_social_feed hoặc r_member_social_feed
         val readCommentsState = if (scopes.contains("r_organization_social_feed") || scopes.contains("r_member_social_feed")) {
             CapabilityItemUiState(
@@ -164,9 +169,9 @@ object ChannelCapabilityEvaluator {
         } else {
             CapabilityItemUiState(
                 capabilityNameRes = R.string.cap_read_comments,
-                statusTextRes = R.string.cap_status_requires_perm,
-                statusType = CapabilityStatusType.REQUIRES_PERMISSION,
-                captionRes = R.string.cap_li_read_comments_no_perm,
+                statusTextRes = R.string.cap_status_handed_off,
+                statusType = CapabilityStatusType.HANDED_OFF,
+                captionRes = R.string.cap_li_read_comments_handed_off,
             )
         }
 
@@ -181,20 +186,20 @@ object ChannelCapabilityEvaluator {
         } else {
             CapabilityItemUiState(
                 capabilityNameRes = R.string.cap_reply,
-                statusTextRes = R.string.cap_status_requires_perm,
-                statusType = CapabilityStatusType.REQUIRES_PERMISSION,
-                captionRes = R.string.cap_li_reply_no_perm,
+                statusTextRes = R.string.cap_status_handed_off,
+                statusType = CapabilityStatusType.HANDED_OFF,
+                captionRes = R.string.cap_li_reply_handed_off,
             )
         }
 
         // 4. Mention (Nhắc tên): cần quyền đăng và phải biết URN của người/tổ chức được nhắc (không có API tìm URN),
-        // nên có quyền đăng vẫn chỉ ở mức "chưa xác định".
+        // nên có quyền đăng vẫn bàn giao thủ công (HANDED_OFF).
         val mentionState = if (scopes.contains("w_organization_social") || scopes.contains("w_member_social")) {
             CapabilityItemUiState(
                 capabilityNameRes = R.string.cap_mention,
-                statusTextRes = R.string.cap_status_unverified,
-                statusType = CapabilityStatusType.UNVERIFIED,
-                captionRes = R.string.cap_li_mention_unverified,
+                statusTextRes = R.string.cap_status_handed_off,
+                statusType = CapabilityStatusType.HANDED_OFF,
+                captionRes = R.string.cap_li_mention_handed_off,
             )
         } else {
             CapabilityItemUiState(
@@ -216,9 +221,9 @@ object ChannelCapabilityEvaluator {
         } else {
             CapabilityItemUiState(
                 capabilityNameRes = R.string.cap_metrics,
-                statusTextRes = R.string.cap_status_requires_perm,
-                statusType = CapabilityStatusType.REQUIRES_PERMISSION,
-                captionRes = R.string.cap_li_metrics_no_perm,
+                statusTextRes = R.string.cap_status_handed_off,
+                statusType = CapabilityStatusType.HANDED_OFF,
+                captionRes = R.string.cap_li_metrics_handed_off,
             )
         }
 

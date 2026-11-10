@@ -50,6 +50,7 @@
     <string name="cap_status_supported">Supported ✅</string>
     <string name="cap_status_requires_perm">Requires Permission ⚠️</string>
     <string name="cap_status_not_supported">Not Supported ❌</string>
+    <string name="cap_status_handed_off">Manual hand-off ✋</string>
     <string name="cap_status_unverified">Unverified ❓</string>
 
     <!-- Capability Captions -->
@@ -59,7 +60,7 @@
     <string name="cap_fb_read_comments_no_perm">Missing required permission: pages_read_engagement or pages_read_user_content</string>
     <string name="cap_fb_reply_ok">Ready to reply via POST /{comment-id}/comments (pages_manage_engagement granted)</string>
     <string name="cap_fb_reply_no_perm">Missing required permission: pages_manage_engagement</string>
-    <string name="cap_fb_mention_unverified">Mention is only documented in comments/replies when the Page has Page Mentioning enabled; needs testing, otherwise hand off to the user</string>
+    <string name="cap_fb_mention_handed_off">Mention is only documented in comments/replies when the Page has Page Mentioning enabled; not verified, so Social Agent hands it off and you add the mention yourself</string>
     <string name="cap_fb_mention_page_no_perm">Missing required permission: pages_manage_posts or pages_manage_engagement</string>
     <string name="cap_fb_metrics_ok">Ready to read insights via GET /{post-id}/insights (read_insights granted)</string>
     <string name="cap_fb_metrics_no_perm">Missing required permission: read_insights</string>
@@ -67,11 +68,11 @@
     <string name="cap_li_publish_ok">Ready to publish via POST /rest/posts (w_organization_social / w_member_social granted)</string>
     <string name="cap_li_publish_no_perm">Missing required permission: w_organization_social or w_member_social</string>
     <string name="cap_li_read_comments_ok">Ready to read comments via GET /rest/socialActions/{urn}/comments (r_organization_social_feed granted)</string>
-    <string name="cap_li_read_comments_no_perm">Missing required permission: r_organization_social_feed or r_member_social_feed</string>
+    <string name="cap_li_read_comments_handed_off">Not available through the API for this app (needs LinkedIn Community Management API approval); Social Agent notifies you and you read comments on LinkedIn yourself</string>
     <string name="cap_li_reply_ok">Ready to reply via POST /rest/socialActions/{urn}/comments (w_organization_social_feed granted)</string>
-    <string name="cap_li_reply_no_perm">Missing required permission: w_organization_social_feed or w_member_social_feed</string>
-    <string name="cap_li_mention_unverified">Mention needs the target person/organization URN (@[Name](urn:li:...)); not verified, otherwise hand off to the user</string>
+    <string name="cap_li_reply_handed_off">Not available through the API for this app (needs LinkedIn Community Management API approval); Social Agent notifies you and you reply on LinkedIn yourself</string>
+    <string name="cap_li_mention_handed_off">Mention needs the target person/organization URN and there is no API to look it up; Social Agent hands it off and you add the mention yourself</string>
     <string name="cap_li_mention_no_perm">Missing required permission: w_organization_social or w_member_social</string>
     <string name="cap_li_metrics_ok">Ready to read statistics via GET /rest/organizationalEntityShareStatistics (rw_organization_admin granted)</string>
-    <string name="cap_li_metrics_no_perm">Missing required permission: rw_organization_admin</string>
+    <string name="cap_li_metrics_handed_off">Not available through the API for this app (needs LinkedIn Community Management API approval); Social Agent notifies you and you check statistics on LinkedIn yourself</string>
 </resources>

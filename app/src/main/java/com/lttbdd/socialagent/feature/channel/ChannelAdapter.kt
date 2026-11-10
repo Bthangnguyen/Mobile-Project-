@@ -71,6 +71,7 @@ class ChannelAdapter(
                     CapabilityStatusType.REQUIRES_PERMISSION -> Pair(Color.parseColor("#FFF3E0"), Color.parseColor("#E65100"))
                     CapabilityStatusType.NOT_SUPPORTED -> Pair(Color.parseColor("#FFEBEE"), Color.parseColor("#B71C1C"))
                     CapabilityStatusType.UNVERIFIED -> Pair(Color.parseColor("#F5F5F5"), Color.parseColor("#616161"))
+                    CapabilityStatusType.HANDED_OFF -> Pair(Color.parseColor("#E3F2FD"), Color.parseColor("#0D47A1"))
                 }
                 rowBinding.tvCapStatus.setBackgroundColor(chipBgColor)
                 rowBinding.tvCapStatus.setTextColor(chipTextColor)

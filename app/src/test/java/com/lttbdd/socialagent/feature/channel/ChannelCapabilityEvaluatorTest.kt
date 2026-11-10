@@ -29,8 +29,8 @@ class ChannelCapabilityEvaluatorTest {
         assertEquals(CapabilityStatusType.SUPPORTED, items[1].statusType)
         // 3. Reply
         assertEquals(CapabilityStatusType.SUPPORTED, items[2].statusType)
-        // 4. Mention: chưa xác minh dù đã có quyền đăng/tương tác
-        assertEquals(CapabilityStatusType.UNVERIFIED, items[3].statusType)
+        // 4. Mention: chưa xác minh dù đã có quyền đăng/tương tác nên bàn giao thủ công
+        assertEquals(CapabilityStatusType.HANDED_OFF, items[3].statusType)
         // 5. Metrics
         assertEquals(CapabilityStatusType.SUPPORTED, items[4].statusType)
     }
@@ -73,7 +73,7 @@ class ChannelCapabilityEvaluatorTest {
         assertEquals(CapabilityStatusType.SUPPORTED, items[0].statusType)
         assertEquals(CapabilityStatusType.SUPPORTED, items[1].statusType)
         assertEquals(CapabilityStatusType.SUPPORTED, items[2].statusType)
-        assertEquals(CapabilityStatusType.UNVERIFIED, items[3].statusType)
+        assertEquals(CapabilityStatusType.HANDED_OFF, items[3].statusType)
         assertEquals(CapabilityStatusType.SUPPORTED, items[4].statusType)
     }
 
@@ -105,9 +105,47 @@ class ChannelCapabilityEvaluatorTest {
         val items = ChannelCapabilityEvaluator.evaluateCapabilities(account, "openid profile w_member_social")
 
         assertEquals(CapabilityStatusType.SUPPORTED, items[0].statusType)
+        assertEquals(CapabilityStatusType.HANDED_OFF, items[1].statusType)
+        assertEquals(CapabilityStatusType.HANDED_OFF, items[2].statusType)
+        assertEquals(CapabilityStatusType.HANDED_OFF, items[3].statusType)
+        assertEquals(CapabilityStatusType.HANDED_OFF, items[4].statusType)
+    }
+
+    @Test
+    fun `linkedin khong co quyen dang bai thi van la requires_permission, chi cac muc khong xin duoc moi ban giao`() {
+        val account = ChannelAccount(
+            type = ChannelType.LINKEDIN,
+            accountId = "li_member",
+            displayName = "LinkedIn Member Test",
+            status = ConnectionStatus.CONNECTED,
+            capabilities = emptySet(),
+        )
+
+        val items = ChannelCapabilityEvaluator.evaluateCapabilities(account, "openid profile")
+
+        assertEquals(CapabilityStatusType.REQUIRES_PERMISSION, items[0].statusType)
+        assertEquals(CapabilityStatusType.HANDED_OFF, items[1].statusType)
+        assertEquals(CapabilityStatusType.HANDED_OFF, items[2].statusType)
+        assertEquals(CapabilityStatusType.REQUIRES_PERMISSION, items[3].statusType)
+        assertEquals(CapabilityStatusType.HANDED_OFF, items[4].statusType)
+    }
+
+    @Test
+    fun `facebook thieu quyen van la requires_permission vi nguoi dung cap lai duoc`() {
+        val account = ChannelAccount(
+            type = ChannelType.FACEBOOK,
+            accountId = "fb_101",
+            displayName = "Facebook Test Page",
+            status = ConnectionStatus.CONNECTED,
+            capabilities = emptySet(),
+        )
+
+        val items = ChannelCapabilityEvaluator.evaluateCapabilities(account, "pages_manage_posts")
+
+        assertEquals(CapabilityStatusType.SUPPORTED, items[0].statusType)
         assertEquals(CapabilityStatusType.REQUIRES_PERMISSION, items[1].statusType)
         assertEquals(CapabilityStatusType.REQUIRES_PERMISSION, items[2].statusType)
-        assertEquals(CapabilityStatusType.UNVERIFIED, items[3].statusType)
+        assertEquals(CapabilityStatusType.HANDED_OFF, items[3].statusType)
         assertEquals(CapabilityStatusType.REQUIRES_PERMISSION, items[4].statusType)
     }
 }

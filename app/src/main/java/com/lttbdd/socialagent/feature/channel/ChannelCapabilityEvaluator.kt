@@ -97,13 +97,14 @@ object ChannelCapabilityEvaluator {
             )
         }
 
-        // 4. Mention (Nhắc tên) - Hỗ trợ Page mention qua @[page_id]
-        val mentionState = if (scopes.contains("pages_manage_posts") || scopes.contains("pages_manage_engagement") || scopes.contains("public_profile")) {
+        // 4. Mention (Nhắc tên): tài liệu Meta chỉ mô tả mention trong bình luận khi Page bật Page Mentioning,
+        // nên dù có quyền đăng/tương tác vẫn chỉ ở mức "chưa xác định"; không tính public_profile.
+        val mentionState = if (scopes.contains("pages_manage_posts") || scopes.contains("pages_manage_engagement")) {
             CapabilityItemUiState(
                 capabilityNameRes = R.string.cap_mention,
-                statusTextRes = R.string.cap_status_supported,
-                statusType = CapabilityStatusType.SUPPORTED,
-                captionRes = R.string.cap_fb_mention_page,
+                statusTextRes = R.string.cap_status_unverified,
+                statusType = CapabilityStatusType.UNVERIFIED,
+                captionRes = R.string.cap_fb_mention_unverified,
             )
         } else {
             CapabilityItemUiState(
@@ -186,13 +187,14 @@ object ChannelCapabilityEvaluator {
             )
         }
 
-        // 4. Mention (Nhắc tên) - Quyền yêu cầu: w_organization_social hoặc w_member_social
+        // 4. Mention (Nhắc tên): cần quyền đăng và phải biết URN của người/tổ chức được nhắc (không có API tìm URN),
+        // nên có quyền đăng vẫn chỉ ở mức "chưa xác định".
         val mentionState = if (scopes.contains("w_organization_social") || scopes.contains("w_member_social")) {
             CapabilityItemUiState(
                 capabilityNameRes = R.string.cap_mention,
-                statusTextRes = R.string.cap_status_supported,
-                statusType = CapabilityStatusType.SUPPORTED,
-                captionRes = R.string.cap_li_mention_ok,
+                statusTextRes = R.string.cap_status_unverified,
+                statusType = CapabilityStatusType.UNVERIFIED,
+                captionRes = R.string.cap_li_mention_unverified,
             )
         } else {
             CapabilityItemUiState(

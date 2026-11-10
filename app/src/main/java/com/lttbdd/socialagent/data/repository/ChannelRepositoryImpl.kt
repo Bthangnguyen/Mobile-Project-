@@ -201,7 +201,7 @@ class ChannelRepositoryImpl @Inject constructor(
             var expiresInSeconds = 5184000L
             var displayName = "Social Agent LinkedIn Company Page"
             var accountId = "li_org_202"
-            var grantedScope = "openid profile email w_member_social"
+            var grantedScope = "openid profile w_member_social"
 
             val clientId = com.lttbdd.socialagent.BuildConfig.LINKEDIN_CLIENT_ID
             val clientSecret = com.lttbdd.socialagent.BuildConfig.LINKEDIN_CLIENT_SECRET

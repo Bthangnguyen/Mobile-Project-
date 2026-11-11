@@ -1,6 +1,5 @@
 package com.lttbdd.socialagent.feature.channel
 
-import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -12,11 +11,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.facebook.CallbackManager
-import com.facebook.FacebookCallback
-import com.facebook.FacebookException
-import com.facebook.login.LoginManager
-import com.facebook.login.LoginResult
 import com.lttbdd.socialagent.R
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.lttbdd.socialagent.core.model.ChannelType
@@ -42,7 +36,6 @@ class ChannelFragment : Fragment() {
 
     private var facebookPageDialog: androidx.appcompat.app.AlertDialog? = null
     private lateinit var adapter: ChannelAdapter
-    private lateinit var callbackManager: CallbackManager
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -56,42 +49,9 @@ class ChannelFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        setupFacebookLoginSdk()
         setupRecyclerView()
         setupListeners()
         observeUiState()
-    }
-
-    private fun setupFacebookLoginSdk() {
-        callbackManager = CallbackManager.Factory.create()
-        LoginManager.getInstance().registerCallback(
-            callbackManager,
-            object : FacebookCallback<LoginResult> {
-                override fun onSuccess(result: LoginResult) {
-                    val accessToken = result.accessToken.token
-                    viewModel.handleOAuthCallback(
-                        channelType = ChannelType.FACEBOOK,
-                        authCode = accessToken,
-                        redirectUri = ChannelRepository.FACEBOOK_SDK_REDIRECT,
-                    )
-                }
-
-                override fun onCancel() {
-                    if (!isAdded) return
-                    // Người dùng bấm "Hủy" ở màn "Tiếp tục với tên ..." -> hỏi có muốn đăng nhập tài khoản khác không.
-                    showFacebookCancelledDialog()
-                }
-
-                override fun onError(error: FacebookException) {
-                    if (!isAdded) return
-                    Toast.makeText(
-                        requireContext(),
-                        error.message ?: getString(R.string.channel_facebook_login_error),
-                        Toast.LENGTH_LONG,
-                    ).show()
-                }
-            },
-        )
     }
 
     /**
@@ -108,12 +68,13 @@ class ChannelFragment : Fragment() {
         }
         dialog.onAuthErrorListener = { error ->
             if (isAdded) {
-                val message = if (error.startsWith("user_cancelled")) {
-                    getString(R.string.channel_facebook_cancel_title)
+                if (error.startsWith(FacebookAuthDialogFragment.USER_CANCELLED)) {
+                    // Người dùng bấm "Hủy" trên trang Facebook -> hỏi có muốn đăng nhập tài khoản khác không.
+                    showFacebookCancelledDialog()
                 } else {
-                    error.ifBlank { getString(R.string.channel_facebook_login_error) }
+                    val message = error.ifBlank { getString(R.string.channel_facebook_login_error) }
+                    Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
                 }
-                Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
             }
         }
         dialog.show(parentFragmentManager, FacebookAuthDialogFragment.TAG)
@@ -132,12 +93,6 @@ class ChannelFragment : Fragment() {
             }
             .setNegativeButton(R.string.channel_close, null)
             .show()
-    }
-
-    @Suppress("DEPRECATION")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        callbackManager.onActivityResult(requestCode, resultCode, data)
-        super.onActivityResult(requestCode, resultCode, data)
     }
 
     private fun setupRecyclerView() {

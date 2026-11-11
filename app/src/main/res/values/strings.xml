@@ -21,11 +21,8 @@
     <string name="channel_empty_title">No Channels Connected</string>
     <string name="channel_empty_desc">Connect a channel (Facebook Page or LinkedIn) to view platform capability statuses</string>
     <string name="channel_capabilities_header">Platform Capabilities Matrix:</string>
-    <string name="channel_connect_success">Channel connected successfully</string>
-    <string name="channel_connect_cancelled">Facebook login was cancelled or permission denied</string>
     <string name="channel_type_unknown">Unverified Type</string>
     <string name="channel_keystore_error">Keystore Decryption Error</string>
-    <string name="channel_connect_failed">Could not connect channel: %1$s</string>
     <string name="channel_facebook_login_error">Facebook login error</string>
     <string name="channel_facebook_cancel_title">Facebook login cancelled</string>
     <string name="channel_facebook_cancel_message">Do you want to log in with a different Facebook account?</string>

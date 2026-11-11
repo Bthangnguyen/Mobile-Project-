@@ -11,13 +11,12 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ProgressBar
-import androidx.core.net.toUri
 import androidx.fragment.app.DialogFragment
 import com.lttbdd.socialagent.R
-import java.net.URLEncoder
 
 /**
  * DialogFragment hiển thị WebView đăng nhập OAuth LinkedIn và tự động đóng khi nhận được callback code.
+ * Việc nhận diện redirect và kiểm tra `state` nằm ở [LinkedInAuthRedirect] (logic thuần, có unit test).
  */
 class LinkedInAuthDialogFragment : DialogFragment() {
 
@@ -26,6 +25,9 @@ class LinkedInAuthDialogFragment : DialogFragment() {
 
     private var webView: WebView? = null
     private var progressBar: ProgressBar? = null
+
+    /** `state` của phiên đăng nhập hiện tại; redirect chỉ được chấp nhận khi khớp giá trị này. */
+    private var expectedState: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -51,6 +53,7 @@ class LinkedInAuthDialogFragment : DialogFragment() {
         val redirectUri = REDIRECT_URI
         val scope = SCOPE
         val state = java.util.UUID.randomUUID().toString()
+        expectedState = state
 
         val authUrl = Uri.parse("https://www.linkedin.com/oauth/v2/authorization")
             .buildUpon()
@@ -62,7 +65,7 @@ class LinkedInAuthDialogFragment : DialogFragment() {
             .build()
             .toString()
 
-        android.util.Log.d("LinkedInOAuth", "Auth URL: $authUrl")
+        // Không log authUrl/code/state: chúng chứa client_id và giá trị OAuth nhạy cảm (AGENTS.md quy tắc 5).
 
         val cookieManager = android.webkit.CookieManager.getInstance()
         cookieManager.removeAllCookies(null)
@@ -124,13 +127,12 @@ class LinkedInAuthDialogFragment : DialogFragment() {
             }
 
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-                val urlString = request.url.toString()
-                return handleUrlRedirect(urlString, request.url)
+                return handleUrlRedirect(request.url.toString())
             }
 
             @Deprecated("Deprecated in API 24")
             override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
-                return handleUrlRedirect(url, url.toUri())
+                return handleUrlRedirect(url)
             }
         }
 
@@ -139,24 +141,20 @@ class LinkedInAuthDialogFragment : DialogFragment() {
         webView?.loadUrl(authUrl, extraHeaders)
     }
 
-    private fun handleUrlRedirect(url: String, uri: Uri): Boolean {
-        if (url.startsWith(REDIRECT_URI) || url.startsWith("com.lttbdd.socialagent://") || uri.getQueryParameter("code") != null) {
-            val code = uri.getQueryParameter("code")
-            val error = uri.getQueryParameter("error")
-
-            if (!code.isNullOrEmpty()) {
-                android.util.Log.d("LinkedInOAuth", "Authorization Code received: $code")
-                onAuthCodeReceivedListener?.invoke(code)
-                dismiss()
-                return true
-            } else if (!error.isNullOrEmpty()) {
-                android.util.Log.d("LinkedInOAuth", "OAuth Error: $error")
-                onAuthErrorListener?.invoke(error)
-                dismiss()
-                return true
-            }
+    /**
+     * Trả `true` (đã xử lý, WebView không tải tiếp) khi [url] là redirect đích. Chỉ URL đúng tiền tố
+     * [LinkedInAuthRedirect.REDIRECT_URI] mới được xét, và `code` chỉ được nhận khi `state` khớp.
+     * Dùng `dismissAllowingStateLoss()` vì callback có thể đến sau khi trạng thái Fragment đã được lưu.
+     */
+    private fun handleUrlRedirect(url: String): Boolean {
+        val result = LinkedInAuthRedirect.parse(url, expectedState) ?: return false
+        when (result) {
+            is LinkedInAuthRedirect.Result.Code -> onAuthCodeReceivedListener?.invoke(result.authCode)
+            LinkedInAuthRedirect.Result.Cancelled -> onAuthErrorListener?.invoke(USER_CANCELLED)
+            is LinkedInAuthRedirect.Result.Failure -> onAuthErrorListener?.invoke(result.reason.name)
         }
-        return false
+        dismissAllowingStateLoss()
+        return true
     }
 
     override fun onDestroyView() {
@@ -166,7 +164,10 @@ class LinkedInAuthDialogFragment : DialogFragment() {
     }
 
     companion object {
-        const val REDIRECT_URI = "https://www.linkedin.com/developers/tools/oauth/redirect"
+        const val REDIRECT_URI = LinkedInAuthRedirect.REDIRECT_URI
+
+        /** Giá trị báo cho Fragment khi người dùng hủy đăng nhập (Fragment so khớp bằng `startsWith`). */
+        const val USER_CANCELLED = "user_cancelled"
 
         /**
          * Quyền xin khi đăng nhập LinkedIn: hồ sơ (OpenID, đúng bộ quyền App Member trong tài liệu nghiên cứu) và đăng bài thay mặt thành viên (`w_member_social`).

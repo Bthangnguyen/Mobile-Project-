@@ -20,11 +20,8 @@
     <string name="channel_empty_title">Chưa kết nối kênh nào</string>
     <string name="channel_empty_desc">Kết nối một kênh (Facebook Page hoặc LinkedIn) để xem trạng thái chức năng theo từng nền tảng</string>
     <string name="channel_capabilities_header">Ma trận khả năng hỗ trợ:</string>
-    <string name="channel_connect_success">Kết nối kênh thành công</string>
-    <string name="channel_connect_cancelled">Đã hủy đăng nhập Facebook hoặc từ chối cấp quyền</string>
     <string name="channel_type_unknown">Chưa xác định</string>
     <string name="channel_keystore_error">Lỗi giải mã Keystore</string>
-    <string name="channel_connect_failed">Không kết nối được kênh: %1$s</string>
     <string name="channel_facebook_login_error">Lỗi đăng nhập Facebook</string>
     <string name="channel_facebook_cancel_title">Đã hủy đăng nhập Facebook</string>
     <string name="channel_facebook_cancel_message">Bạn có muốn đăng nhập bằng tài khoản Facebook khác không?</string>

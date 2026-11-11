@@ -3,7 +3,9 @@ package com.lttbdd.socialagent.feature.channel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lttbdd.socialagent.core.model.ChannelAccount
+import com.lttbdd.socialagent.R
 import com.lttbdd.socialagent.core.model.ChannelType
+import com.lttbdd.socialagent.core.model.ConnectionStatus
 import com.lttbdd.socialagent.data.model.FacebookPage
 import com.lttbdd.socialagent.data.network.PkceUtil
 import com.lttbdd.socialagent.data.repository.ChannelRepository
@@ -53,6 +55,9 @@ class ChannelViewModel @Inject constructor(
     /** Token người dùng giữ tạm trong bộ nhớ trong lúc chờ chọn Page; xóa khi chọn xong hoặc hủy. */
     private var pendingFacebookUserToken: String? = null
 
+    /** Đồng hồ để xác định token hết hạn; tách ra để unit test điều khiển được thời gian. */
+    internal var clock: () -> Long = { System.currentTimeMillis() }
+
     init {
         loadChannels()
     }
@@ -60,13 +65,25 @@ class ChannelViewModel @Inject constructor(
     private fun loadChannels() {
         viewModelScope.launch {
             repository.getConnectedChannels().collect { channels ->
-                knownChannels = channels
-                // Nạp quyền thật của từng kênh trước khi phát UiState để ma trận không hiện sai.
-                grantedScopes = channels.associate { account ->
-                    scopeKey(account) to repository.getGrantedScope(account.type, account.accountId)
-                }
-                _uiState.value = ChannelUiState.Success(channels = channels)
+                // Nạp quyền thật và trạng thái hạn token trước khi phát UiState để ma trận không hiện sai.
+                val resolved = channels.map { resolveAccount(it) }
+                knownChannels = resolved
+                _uiState.value = ChannelUiState.Success(channels = resolved)
             }
+        }
+    }
+
+    /**
+     * Nạp quyền thật của [account] vào bộ nhớ và trả về bản có trạng thái đúng:
+     * token đã quá hạn thì đổi CONNECTED thành TOKEN_EXPIRED (lưu trạng thái này ở UI, không đụng token đã lưu).
+     */
+    private suspend fun resolveAccount(account: ChannelAccount): ChannelAccount {
+        grantedScopes = grantedScopes + (scopeKey(account) to repository.getGrantedScope(account.type, account.accountId))
+        val expiresAt = repository.getTokenExpiresAt(account.type, account.accountId)
+        return if (account.status == ConnectionStatus.CONNECTED && expiresAt != null && clock() >= expiresAt) {
+            account.copy(status = ConnectionStatus.TOKEN_EXPIRED)
+        } else {
+            account
         }
     }
 
@@ -161,7 +178,7 @@ class ChannelViewModel @Inject constructor(
         redirectUri: String,
     ) {
         if (state != null && pendingState != null && state != pendingState) {
-            _uiState.value = ChannelUiState.Error("CSRF error: State mismatch")
+            _uiState.value = ChannelUiState.Error(messageRes = R.string.channel_oauth_state_mismatch)
             return
         }
         if (channelType == ChannelType.FACEBOOK && redirectUri == ChannelRepository.FACEBOOK_SDK_REDIRECT) {
@@ -188,7 +205,15 @@ class ChannelViewModel @Inject constructor(
     private fun connectFacebookWithPages(userAccessToken: String) {
         viewModelScope.launch {
             _uiState.value = ChannelUiState.Loading
-            val pages = repository.fetchFacebookPages(userAccessToken).getOrNull().orEmpty()
+            val pagesResult = repository.fetchFacebookPages(userAccessToken)
+            if (pagesResult.isFailure) {
+                // Lỗi mạng/quyền khi tải Page KHÔNG đồng nghĩa "không có Page": không nối bằng hồ sơ cá nhân,
+                // chỉ báo lỗi để người dùng thử lại.
+                _notices.tryEmit(ChannelNotice.FACEBOOK_PAGES_LOAD_FAILED)
+                _uiState.value = ChannelUiState.Success(channels = knownChannels)
+                return@launch
+            }
+            val pages = pagesResult.getOrThrow()
             when {
                 pages.size > 1 -> {
                     pendingFacebookUserToken = userAccessToken
@@ -235,16 +260,22 @@ class ChannelViewModel @Inject constructor(
         super.onCleared()
     }
 
-    private fun applyConnectResult(result: Result<ChannelAccount>) {
-        result.onSuccess { account ->
+    /**
+     * Phát trạng thái sau khi kết nối. Nạp quyền của kênh mới TRƯỚC khi phát để ma trận không đọc scope null
+     * (luồng [loadChannels] nạp bất đồng bộ nên có thể chậm hơn kết quả kết nối).
+     */
+    private suspend fun applyConnectResult(result: Result<ChannelAccount>) {
+        result.onSuccess { connected ->
+            val account = resolveAccount(connected)
             val updatedChannels = knownChannels
                 .filterNot { it.type == account.type && it.accountId == account.accountId } + account
+            knownChannels = updatedChannels
             _uiState.value = ChannelUiState.Success(
                 channels = updatedChannels,
-                userMessage = "Connected ${account.displayName}",
+                connectedName = account.displayName,
             )
         }.onFailure { error ->
-            _uiState.value = ChannelUiState.Error(error.message ?: "OAuth error")
+            _uiState.value = ChannelUiState.Error(message = error.message)
         }
     }
 

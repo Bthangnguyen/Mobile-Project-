@@ -208,6 +208,11 @@ class ChannelFragment : Fragment() {
                                 R.string.channel_facebook_no_pages,
                                 Toast.LENGTH_LONG,
                             ).show()
+                            ChannelNotice.FACEBOOK_PAGES_LOAD_FAILED -> Toast.makeText(
+                                requireContext(),
+                                R.string.channel_facebook_pages_load_failed,
+                                Toast.LENGTH_LONG,
+                            ).show()
                         }
                     }
                 }
@@ -219,19 +224,31 @@ class ChannelFragment : Fragment() {
                         }
                         is ChannelUiState.Success -> {
                             binding.progressBar.visibility = View.GONE
-                            adapter.submitList(state.channels)
+                            // DiffUtil chỉ so sánh tài khoản; quyền/ma trận lấy từ ViewModel nên có thể đổi
+                            // khi tài khoản không đổi (cấp lại quyền) -> buộc vẽ lại sau khi danh sách được áp dụng.
+                            adapter.submitList(state.channels) {
+                                adapter.notifyItemRangeChanged(0, adapter.itemCount)
+                            }
                             if (state.channels.isEmpty()) {
                                 binding.tvEmptyState.visibility = View.VISIBLE
                             } else {
                                 binding.tvEmptyState.visibility = View.GONE
                             }
-                            state.userMessage?.let { msg ->
-                                Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
+                            state.connectedName?.let { name ->
+                                Toast.makeText(
+                                    requireContext(),
+                                    getString(R.string.channel_connected_named, name),
+                                    Toast.LENGTH_SHORT,
+                                ).show()
                             }
                         }
                         is ChannelUiState.Error -> {
                             binding.progressBar.visibility = View.GONE
-                            Toast.makeText(requireContext(), state.message, Toast.LENGTH_LONG).show()
+                            Toast.makeText(
+                                requireContext(),
+                                state.message ?: getString(state.messageRes),
+                                Toast.LENGTH_LONG,
+                            ).show()
                         }
                     }
                 }

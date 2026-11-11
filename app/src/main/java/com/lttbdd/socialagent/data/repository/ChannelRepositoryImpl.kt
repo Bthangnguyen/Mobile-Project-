@@ -57,8 +57,10 @@ class ChannelRepositoryImpl @Inject constructor(
                 accessToken = authCode
                 accountId = profile.first
                 accountName = profile.second
-                // Lấy quyền người dùng thật sự đã cấp (họ có thể bỏ chọn từng quyền trên trang xác nhận).
-                scope = fetchFacebookGrantedScope(authCode) ?: "public_profile"
+                // Nhánh này chỉ chạy khi người dùng không có Page nào (xem ChannelViewModel): hồ sơ cá nhân
+                // không có Page token nên không có khả năng ở mức Page, dù quyền pages_* đã được cấp cho tài khoản.
+                // Giữ public_profile để ma trận không báo "Hỗ trợ" cho thứ không dùng được (và bớt một lần gọi mạng).
+                scope = "public_profile"
             }
 
             // Facebook trả về expires_in = 5184000s (~60 ngày) cho long-lived token
@@ -186,6 +188,14 @@ class ChannelRepositoryImpl @Inject constructor(
     override suspend fun getGrantedScope(type: ChannelType, accountId: String): String? {
         return try {
             tokenStore.getToken(type, accountId).first()?.scope
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    override suspend fun getTokenExpiresAt(type: ChannelType, accountId: String): Long? {
+        return try {
+            tokenStore.getToken(type, accountId).first()?.expiresAt
         } catch (_: Exception) {
             null
         }

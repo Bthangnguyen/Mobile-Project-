@@ -1,8 +1,10 @@
 package com.lttbdd.socialagent.di
 
 import android.content.Context
+import com.lttbdd.socialagent.data.repository.ChannelAccountStore
 import com.lttbdd.socialagent.data.repository.ChannelRepository
 import com.lttbdd.socialagent.data.repository.ChannelRepositoryImpl
+import com.lttbdd.socialagent.data.repository.DataStoreChannelAccountStore
 import com.lttbdd.socialagent.data.security.AndroidKeystoreCipher
 import com.lttbdd.socialagent.data.security.SecureTokenStore
 import com.lttbdd.socialagent.data.security.TokenStore
@@ -37,6 +39,12 @@ abstract class SocialRepositoryModule {
         fun provideAndroidKeystoreCipher(): AndroidKeystoreCipher {
             return AndroidKeystoreCipher()
         }
+
+        @Provides
+        @Singleton
+        fun provideChannelAccountStore(
+            @ApplicationContext context: Context,
+        ): ChannelAccountStore = DataStoreChannelAccountStore(context)
 
         @Provides
         @Singleton

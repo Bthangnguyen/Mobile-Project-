@@ -1,17 +1,23 @@
 package com.lttbdd.socialagent.data.repository
 
+import com.lttbdd.socialagent.BuildConfig
 import com.lttbdd.socialagent.core.model.ChannelAccount
 import com.lttbdd.socialagent.core.model.ChannelCapability
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.ConnectionStatus
 import com.lttbdd.socialagent.data.model.FacebookPage
+import com.lttbdd.socialagent.data.model.FacebookUserToken
 import com.lttbdd.socialagent.data.model.OAuthToken
+import com.lttbdd.socialagent.data.network.LinkedInNativePkce
 import com.lttbdd.socialagent.data.security.TokenStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -19,79 +25,102 @@ import kotlinx.serialization.json.JsonPrimitive
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/** LinkedIn từ chối đổi code bằng Native PKCE: app chưa được LinkedIn cấp quyền (trạng thái "blocked"). */
+class LinkedInNativePkceBlockedException : Exception("LinkedIn Native PKCE chưa được cấp cho app này")
+
 /**
- * Implementation quản lý kết nối kênh mạng xã hội và lưu trữ token bảo mật.
- * Nguồn tham chiếu kỹ thuật:
- * - RFC 6749 Section 5.1 & 4.2.2: Tính expiresAt = System.currentTimeMillis() + (expiresInSeconds * 1000L).
- * - RFC 7636: Trao đổi authorization code kèm code_verifier.
- * - Android Keystore system: Token được mã hóa và lưu thông qua TokenStore / SecureTokenStore.
+ * Implementation quản lý kết nối kênh mạng xã hội, lưu token bảo mật và metadata tài khoản.
+ * Nguồn tham chiếu:
+ * - RFC 6749 Section 5.1: hạn token tính từ `expires_in` thật của nhà cung cấp (không viết cứng 60 ngày).
+ * - RFC 7636: đổi authorization code kèm code_verifier (public client, không client_secret).
+ * - Android Keystore: token mã hóa qua TokenStore; [ChannelAccountStore] chỉ giữ metadata không bí mật.
  */
 @Singleton
 class ChannelRepositoryImpl @Inject constructor(
     private val tokenStore: TokenStore,
+    private val accountStore: ChannelAccountStore,
 ) : ChannelRepository {
 
     private val channelsFlow = MutableStateFlow<List<ChannelAccount>>(emptyList())
     private val httpClient = okhttp3.OkHttpClient()
+    private val loadMutex = Mutex()
+    private var restored = false
 
-    override fun getConnectedChannels(): Flow<List<ChannelAccount>> = channelsFlow.asStateFlow()
+    override fun getConnectedChannels(): Flow<List<ChannelAccount>> = flow {
+        ensureRestored()
+        emitAll(channelsFlow)
+    }
 
+    /**
+     * Khôi phục danh sách kênh từ metadata đã lưu, chỉ giữ tài khoản còn token đọc được
+     * (token mất/hỏng, ví dụ Keystore bị đặt lại, thì tài khoản đó coi như chưa kết nối).
+     */
+    private suspend fun ensureRestored() {
+        loadMutex.withLock {
+            if (restored) return
+            val accounts = try {
+                accountStore.load()
+            } catch (_: Exception) {
+                emptyList()
+            }
+            val restoredAccounts = accounts
+                .filter { stored -> tokenStore.getToken(stored.type, stored.accountId).first() != null }
+                .map { toChannelAccount(it.type, it.accountId, it.displayName) }
+            val connectedBeforeRestore = channelsFlow.value
+            channelsFlow.value = restoredAccounts
+                .filterNot { r -> connectedBeforeRestore.any { it.type == r.type && it.accountId == r.accountId } } +
+                connectedBeforeRestore
+            restored = true
+        }
+    }
+
+    private fun toChannelAccount(type: ChannelType, accountId: String, displayName: String) = ChannelAccount(
+        type = type,
+        accountId = accountId,
+        displayName = displayName,
+        status = ConnectionStatus.CONNECTED,
+        // Khả năng thật tính ở UI từ scope của token; ở đây chỉ liệt kê tập khả năng tối đa của kênh.
+        capabilities = ALL_CAPABILITIES,
+    )
+
+    /**
+     * Đường kết nối GIẢ cho chế độ demo (chưa cấu hình FACEBOOK_APP_ID). Luồng thật dùng
+     * [connectFacebookProfile] / [connectFacebookSelectedPage] với token từ Meta SDK.
+     */
     override suspend fun connectFacebookPage(
         authCode: String,
         codeVerifier: String,
         redirectUri: String,
     ): Result<ChannelAccount> = withContext(Dispatchers.IO) {
         try {
-            var accessToken = "fb_access_token_$authCode"
-            var accountId = "fb_page_101"
-            var accountName = "Social Agent Official Page"
-            var scope = "pages_manage_posts,pages_read_engagement"
-
-            // Luồng Facebook Login SDK: authCode thực chất là access token thật của người dùng.
-            // Gọi Graph API /me để lấy đúng id và tên tài khoản thay vì dùng tên giả.
-            if (redirectUri == ChannelRepository.FACEBOOK_SDK_REDIRECT) {
-                val profile = fetchFacebookProfile(authCode)
-                    ?: return@withContext Result.failure(
-                        IllegalStateException("Không lấy được thông tin tài khoản Facebook"),
-                    )
-                accessToken = authCode
-                accountId = profile.first
-                accountName = profile.second
-                // Nhánh này chỉ chạy khi người dùng không có Page nào (xem ChannelViewModel): hồ sơ cá nhân
-                // không có Page token nên không có khả năng ở mức Page, dù quyền pages_* đã được cấp cho tài khoản.
-                // Giữ public_profile để ma trận không báo "Hỗ trợ" cho thứ không dùng được (và bớt một lần gọi mạng).
-                scope = "public_profile"
-            }
-
-            // Facebook trả về expires_in = 5184000s (~60 ngày) cho long-lived token
             val token = OAuthToken.createFromExpiresIn(
-                accessToken = accessToken,
-                expiresInSeconds = 5184000L,
-                scope = scope,
+                accessToken = "fb_access_token_$authCode",
+                expiresInSeconds = DEMO_EXPIRES_IN_SECONDS,
+                scope = "pages_manage_posts,pages_read_engagement",
             )
-
-            tokenStore.saveToken(ChannelType.FACEBOOK, accountId, token)
-
-            val channelAccount = ChannelAccount(
-                type = ChannelType.FACEBOOK,
-                accountId = accountId,
-                displayName = accountName,
-                status = ConnectionStatus.CONNECTED,
-                capabilities = setOf(
-                    ChannelCapability.PUBLISH,
-                    ChannelCapability.READ_COMMENTS,
-                    ChannelCapability.REPLY,
-                    ChannelCapability.MENTION,
-                    ChannelCapability.METRICS,
-                ),
-            )
-
-            updateOrAddChannel(channelAccount)
-            Result.success(channelAccount)
+            saveAndRegister(ChannelType.FACEBOOK, "fb_page_101", "Social Agent Official Page", token)
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
+
+    override suspend fun connectFacebookProfile(user: FacebookUserToken): Result<ChannelAccount> =
+        withContext(Dispatchers.IO) {
+            try {
+                val profile = fetchFacebookProfile(user.accessToken)
+                    ?: return@withContext Result.failure(IllegalStateException("Không lấy được hồ sơ Facebook"))
+                // Hồ sơ cá nhân không có Page token nên không có khả năng ở mức Page: lưu public_profile
+                // để ma trận không báo "Hỗ trợ" cho thứ không dùng được. Hạn token là hạn thật từ SDK.
+                val token = OAuthToken(
+                    accessToken = user.accessToken,
+                    expiresAt = user.expiresAtMillis,
+                    scope = "public_profile",
+                )
+                saveAndRegister(ChannelType.FACEBOOK, profile.first, profile.second, token)
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
 
     /**
      * Gọi Graph API /me bằng access token để lấy (id, name). Trả null nếu lỗi.
@@ -106,25 +135,6 @@ class ChannelRepositoryImpl @Inject constructor(
             httpClient.newCall(request).execute().use { response ->
                 val body = response.body?.string()
                 if (response.isSuccessful && !body.isNullOrEmpty()) parseFacebookProfile(body) else null
-            }
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    /**
-     * Gọi Graph API /me/permissions để lấy các quyền ở trạng thái granted.
-     * Trả về chuỗi phân tách bằng dấu phẩy, hoặc null nếu lỗi.
-     */
-    private fun fetchFacebookGrantedScope(accessToken: String): String? {
-        return try {
-            val request = okhttp3.Request.Builder()
-                .url("https://graph.facebook.com/v20.0/me/permissions")
-                .header("Authorization", "Bearer $accessToken")
-                .build()
-            httpClient.newCall(request).execute().use { response ->
-                val body = response.body?.string()
-                if (response.isSuccessful && !body.isNullOrEmpty()) parseFacebookGrantedScope(body) else null
             }
         } catch (_: Exception) {
             null
@@ -152,34 +162,19 @@ class ChannelRepositoryImpl @Inject constructor(
         }
 
     override suspend fun connectFacebookSelectedPage(
-        userAccessToken: String,
+        user: FacebookUserToken,
         page: FacebookPage,
     ): Result<ChannelAccount> = withContext(Dispatchers.IO) {
         try {
-            // Quyền được cấp ở mức người dùng và áp dụng cho Page token; ma trận khả năng đọc từ đây.
-            val scope = fetchFacebookGrantedScope(userAccessToken) ?: "public_profile"
-            val token = OAuthToken.createFromExpiresIn(
+            // Quyền do Meta SDK báo là quyền thật đã cấp cho người dùng và áp dụng cho Page token.
+            // Page token lấy từ user token nên cùng hạn với user token (Meta không cấp hạn riêng ở bước này);
+            // nếu Meta rút token sớm hơn, lỗi 190 khi gọi API sẽ cho biết.
+            val token = OAuthToken(
                 accessToken = page.accessToken,
-                expiresInSeconds = 5184000L,
-                scope = scope,
+                expiresAt = user.expiresAtMillis,
+                scope = user.grantedScope ?: "public_profile",
             )
-            tokenStore.saveToken(ChannelType.FACEBOOK, page.id, token)
-
-            val channelAccount = ChannelAccount(
-                type = ChannelType.FACEBOOK,
-                accountId = page.id,
-                displayName = page.name,
-                status = ConnectionStatus.CONNECTED,
-                capabilities = setOf(
-                    ChannelCapability.PUBLISH,
-                    ChannelCapability.READ_COMMENTS,
-                    ChannelCapability.REPLY,
-                    ChannelCapability.MENTION,
-                    ChannelCapability.METRICS,
-                ),
-            )
-            updateOrAddChannel(channelAccount)
-            Result.success(channelAccount)
+            saveAndRegister(ChannelType.FACEBOOK, page.id, page.name, token)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -201,6 +196,10 @@ class ChannelRepositoryImpl @Inject constructor(
         }
     }
 
+    /**
+     * Kết nối LinkedIn. Code thật được đổi bằng Native PKCE: `code_verifier` thay cho `client_secret`.
+     * LinkedIn từ chối vì app chưa được cấp Native PKCE thì trả [LinkedInNativePkceBlockedException].
+     */
     override suspend fun connectLinkedIn(
         authCode: String,
         codeVerifier: String,
@@ -208,35 +207,38 @@ class ChannelRepositoryImpl @Inject constructor(
     ): Result<ChannelAccount> = withContext(Dispatchers.IO) {
         try {
             var accessToken = "li_access_token_$authCode"
-            var expiresInSeconds = 5184000L
+            var expiresInSeconds = DEMO_EXPIRES_IN_SECONDS
             var displayName = "Social Agent LinkedIn Company Page"
             var accountId = "li_org_202"
-            var grantedScope = "openid profile w_member_social"
+            var grantedScope: String? = LinkedInNativePkce.SCOPE
 
-            val clientId = com.lttbdd.socialagent.BuildConfig.LINKEDIN_CLIENT_ID
-            val clientSecret = com.lttbdd.socialagent.BuildConfig.LINKEDIN_CLIENT_SECRET
-            val effectiveRedirectUri = if (redirectUri.isBlank()) "https://www.linkedin.com/developers/tools/oauth/redirect" else redirectUri
+            val clientId = BuildConfig.LINKEDIN_CLIENT_ID
 
             if (!authCode.startsWith("demo_code") && !authCode.startsWith("code_li") && clientId.isNotBlank() && !clientId.contains("SOCIAL_AGENT")) {
                 // Code thật: đổi code lấy token. Lỗi thì báo lỗi, KHÔNG lưu tài khoản giả.
                 val formBody = okhttp3.FormBody.Builder()
                     .add("grant_type", "authorization_code")
                     .add("code", authCode)
-                    .add("redirect_uri", effectiveRedirectUri)
+                    .add("redirect_uri", redirectUri)
                     .add("client_id", clientId)
-                    .add("client_secret", clientSecret)
+                    .add("code_verifier", codeVerifier)
                     .build()
 
                 val tokenRequest = okhttp3.Request.Builder()
-                    .url("https://www.linkedin.com/oauth/v2/accessToken")
+                    .url(LinkedInNativePkce.TOKEN_ENDPOINT)
                     .post(formBody)
                     .build()
 
                 val tokenJson = httpClient.newCall(tokenRequest).execute().use { response ->
                     val body = response.body?.string()
                     if (!response.isSuccessful || body.isNullOrEmpty()) {
+                        val blocked = isNativePkceBlocked(response.code, body)
                         return@withContext Result.failure(
-                            IllegalStateException("LinkedIn token exchange failed (HTTP ${response.code})"),
+                            if (blocked) {
+                                LinkedInNativePkceBlockedException()
+                            } else {
+                                IllegalStateException("LinkedIn token exchange failed (HTTP ${response.code})")
+                            },
                         )
                     }
                     json.parseToJsonElement(body) as? JsonObject
@@ -246,9 +248,10 @@ class ChannelRepositoryImpl @Inject constructor(
                     return@withContext Result.failure(IllegalStateException("LinkedIn không trả về access_token"))
                 }
                 accessToken = tokenStr
-                // Dùng scope LinkedIn thực sự trả về thay vì chuỗi viết cứng.
-                tokenJson?.stringField("scope")?.takeIf { it.isNotBlank() }?.let { grantedScope = it }
-                tokenJson?.stringField("expires_in")?.toLongOrNull()?.takeIf { it > 0 }?.let { expiresInSeconds = it }
+                // Scope và hạn thật do LinkedIn trả về; thiếu thì không bịa: scope null, hạn lấy mặc định ngắn.
+                grantedScope = tokenJson?.stringField("scope")?.takeIf { it.isNotBlank() }
+                expiresInSeconds = tokenJson?.stringField("expires_in")?.toLongOrNull()?.takeIf { it > 0 }
+                    ?: FALLBACK_EXPIRES_IN_SECONDS
 
                 // Gọi UserInfo API (OpenID Connect) để lấy tên thật của người dùng
                 val userRequest = okhttp3.Request.Builder()
@@ -273,25 +276,7 @@ class ChannelRepositoryImpl @Inject constructor(
                 expiresInSeconds = expiresInSeconds,
                 scope = grantedScope,
             )
-
-            tokenStore.saveToken(ChannelType.LINKEDIN, accountId, token)
-
-            val channelAccount = ChannelAccount(
-                type = ChannelType.LINKEDIN,
-                accountId = accountId,
-                displayName = displayName,
-                status = ConnectionStatus.CONNECTED,
-                capabilities = setOf(
-                    ChannelCapability.PUBLISH,
-                    ChannelCapability.READ_COMMENTS,
-                    ChannelCapability.REPLY,
-                    ChannelCapability.MENTION,
-                    ChannelCapability.METRICS,
-                ),
-            )
-
-            updateOrAddChannel(channelAccount)
-            Result.success(channelAccount)
+            saveAndRegister(ChannelType.LINKEDIN, accountId, displayName, token)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -299,28 +284,40 @@ class ChannelRepositoryImpl @Inject constructor(
 
     override suspend fun disconnectChannel(type: ChannelType, accountId: String): Result<Unit> {
         return try {
+            ensureRestored()
             tokenStore.removeToken(type, accountId)
-            val currentList = channelsFlow.value.toMutableList()
-            currentList.removeAll { it.type == type && it.accountId == accountId }
-            channelsFlow.value = currentList
-            if (type == ChannelType.LINKEDIN) {
-                com.lttbdd.socialagent.feature.channel.LinkedInAuthDialogFragment.clearLinkedInCookies()
-            }
+            channelsFlow.value = channelsFlow.value.filterNot { it.type == type && it.accountId == accountId }
+            persistAccounts()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
-    private fun updateOrAddChannel(account: ChannelAccount) {
-        val currentList = channelsFlow.value.toMutableList()
-        val index = currentList.indexOfFirst { it.type == account.type && it.accountId == account.accountId }
-        if (index >= 0) {
-            currentList[index] = account
-        } else {
-            currentList.add(account)
+    private suspend fun saveAndRegister(
+        type: ChannelType,
+        accountId: String,
+        displayName: String,
+        token: OAuthToken,
+    ): Result<ChannelAccount> {
+        ensureRestored()
+        tokenStore.saveToken(type, accountId, token)
+        val account = toChannelAccount(type, accountId, displayName)
+        val current = channelsFlow.value.toMutableList()
+        val index = current.indexOfFirst { it.type == type && it.accountId == accountId }
+        if (index >= 0) current[index] = account else current.add(account)
+        channelsFlow.value = current
+        persistAccounts()
+        return Result.success(account)
+    }
+
+    /** Lưu metadata (loại, id, tên); không có token. Lỗi lưu không làm hỏng kết nối đang có. */
+    private suspend fun persistAccounts() {
+        try {
+            accountStore.save(channelsFlow.value.map { StoredChannelAccount(it.type, it.accountId, it.displayName) })
+        } catch (_: Exception) {
+            // Lần mở app sau sẽ phải kết nối lại kênh này; không chặn luồng kết nối hiện tại.
         }
-        channelsFlow.value = currentList
     }
 
     private fun JsonObject.stringField(key: String): String? = (this[key] as? JsonPrimitive)?.content
@@ -328,24 +325,32 @@ class ChannelRepositoryImpl @Inject constructor(
     companion object {
         private val json = Json { ignoreUnknownKeys = true }
 
+        private val ALL_CAPABILITIES = setOf(
+            ChannelCapability.PUBLISH,
+            ChannelCapability.READ_COMMENTS,
+            ChannelCapability.REPLY,
+            ChannelCapability.MENTION,
+            ChannelCapability.METRICS,
+        )
+
+        /** Chỉ dùng cho đường demo; luồng thật luôn dùng hạn do nhà cung cấp trả. */
+        private const val DEMO_EXPIRES_IN_SECONDS = 5_184_000L
+
+        /** LinkedIn không trả expires_in: dùng hạn ngắn để buộc đăng nhập lại thay vì giả định 60 ngày. */
+        private const val FALLBACK_EXPIRES_IN_SECONDS = 3_600L
+
         /**
-         * Parse JSON của Graph API /me/permissions thành chuỗi quyền đã cấp (status = granted),
-         * phân tách bằng dấu phẩy. Trả null nếu JSON sai định dạng hoặc không có quyền nào.
+         * LinkedIn báo app không được dùng Native PKCE: HTTP 4xx kèm lỗi client/không được phép
+         * (`invalid_client`, `unauthorized_client`, `access_denied`). Các lỗi khác (code hết hạn…) là lỗi thường.
          */
-        internal fun parseFacebookGrantedScope(body: String): String? {
-            return try {
-                val data = (json.parseToJsonElement(body) as? JsonObject)?.get("data") as? kotlinx.serialization.json.JsonArray
-                    ?: return null
-                val granted = data.mapNotNull { element ->
-                    val item = element as? JsonObject ?: return@mapNotNull null
-                    val permission = (item["permission"] as? JsonPrimitive)?.content
-                    val status = (item["status"] as? JsonPrimitive)?.content
-                    permission?.takeIf { it.isNotBlank() && status == "granted" }
-                }
-                if (granted.isEmpty()) null else granted.joinToString(",")
+        internal fun isNativePkceBlocked(httpCode: Int, body: String?): Boolean {
+            if (httpCode !in 400..403 || body.isNullOrEmpty()) return false
+            val error = try {
+                ((json.parseToJsonElement(body) as? JsonObject)?.get("error") as? JsonPrimitive)?.content
             } catch (_: Exception) {
                 null
             }
+            return error == "invalid_client" || error == "unauthorized_client" || error == "access_denied"
         }
 
         /**

@@ -34,9 +34,14 @@ val linkedinClientId = System.getenv("LINKEDIN_CLIENT_ID")
     ?: localProperties.getProperty("LINKEDIN_CLIENT_ID")
     ?: "SOCIAL_AGENT_LINKEDIN_CLIENT_ID"
 
-val linkedinClientSecret = System.getenv("LINKEDIN_CLIENT_SECRET")
-    ?: localProperties.getProperty("LINKEDIN_CLIENT_SECRET")
-    ?: "SOCIAL_AGENT_LINKEDIN_CLIENT_SECRET"
+// LinkedIn Native PKCE (RFC 8252 + RFC 7636) chỉ dùng được khi LinkedIn đã bật cho app này.
+// Mặc định false = "blocked": nút LinkedIn báo chưa được cấp thay vì mở trình duyệt.
+// KHÔNG có client_secret trong app: secret nhúng vào APK sẽ bị lộ (quyết định 1 trong docs/research-social-api.md).
+val linkedinNativePkceEnabled = (
+    System.getenv("LINKEDIN_NATIVE_PKCE_ENABLED")
+        ?: localProperties.getProperty("LINKEDIN_NATIVE_PKCE_ENABLED")
+        ?: "false"
+    ).trim().equals("true", ignoreCase = true)
 
 android {
     namespace = "com.lttbdd.socialagent"
@@ -56,7 +61,7 @@ android {
         buildConfigField("String", "FACEBOOK_APP_ID", "\"$facebookAppId\"")
         buildConfigField("String", "FACEBOOK_CLIENT_TOKEN", "\"$facebookClientToken\"")
         buildConfigField("String", "LINKEDIN_CLIENT_ID", "\"$linkedinClientId\"")
-        buildConfigField("String", "LINKEDIN_CLIENT_SECRET", "\"$linkedinClientSecret\"")
+        buildConfigField("boolean", "LINKEDIN_NATIVE_PKCE_ENABLED", "$linkedinNativePkceEnabled")
 
         resValue("string", "facebook_app_id", facebookAppId)
         resValue("string", "facebook_client_token", facebookClientToken)

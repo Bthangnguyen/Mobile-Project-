@@ -10,9 +10,8 @@ import dagger.hilt.android.AndroidEntryPoint
 /**
  * Activity duy nhất của app: chứa NavHostFragment và bottom navigation 5 tab.
  *
- * Không nhận deep link OAuth: đăng nhập Facebook/LinkedIn đều chặn redirect ngay trong hộp thoại
- * ([FacebookAuthRedirect], [LinkedInAuthRedirect]) và kiểm tra `state`, nên Activity exported này
- * không được phép tự kết nối kênh từ một intent bên ngoài.
+ * Không nhận deep link OAuth: Facebook đăng nhập qua Meta SDK, LinkedIn nhận redirect loopback trong ViewModel
+ * (kiểm tra `state`), nên Activity exported này không được phép tự kết nối kênh từ một intent bên ngoài.
  */
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {

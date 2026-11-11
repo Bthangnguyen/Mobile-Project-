@@ -5,6 +5,9 @@ import com.lttbdd.socialagent.core.model.ChannelCapability
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.ConnectionStatus
 import com.lttbdd.socialagent.data.model.FacebookPage
+import com.lttbdd.socialagent.data.model.FacebookUserToken
+import com.lttbdd.socialagent.data.network.RedirectListener
+import com.lttbdd.socialagent.data.repository.LinkedInNativePkceBlockedException
 import com.lttbdd.socialagent.data.repository.ChannelRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -13,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -37,6 +41,9 @@ class ChannelViewModelTest {
         Dispatchers.setMain(testDispatcher)
         fakeRepository = FakeChannelRepository()
         viewModel = ChannelViewModel(fakeRepository)
+        viewModel.ioDispatcher = testDispatcher
+        viewModel.linkedInNativePkceEnabled = true
+        viewModel.linkedInClientId = "client_that"
     }
 
     @After
@@ -44,69 +51,23 @@ class ChannelViewModelTest {
         Dispatchers.resetMain()
     }
 
-    @Test
-    fun `prepareFacebookOAuthUrl returns URL with S256 code_challenge per RFC 7636`() {
-        val redirectUri = "com.lttbdd.socialagent://oauth/callback"
-        val url = viewModel.prepareFacebookOAuthUrl(redirectUri)
-
-        assertTrue("URL contains facebook oauth endpoint", url.contains("https://www.facebook.com/v20.0/dialog/oauth"))
-        assertTrue("URL contains code_challenge_method=S256", url.contains("code_challenge_method=S256"))
-        assertTrue("URL contains code_challenge", url.contains("code_challenge="))
-    }
+    private fun user(expiresAt: Long = 9_000_000L, scope: String? = "public_profile,pages_show_list") =
+        FacebookUserToken("user_token_gia", expiresAt, scope)
 
     @Test
-    fun `prepareLinkedInOAuthUrl returns standard authorization URL per LinkedIn OAuth 2`() {
-        val redirectUri = "com.lttbdd.socialagent://oauth/callback"
-        val url = viewModel.prepareLinkedInOAuthUrl(redirectUri)
+    fun `getScopeForAccount tra ve quyen that cua token, khong viet cung`() = runTest {
+        fakeRepository.pages = listOf(FacebookPage("p1", "Page Mot", "t1"))
+        fakeRepository.scope = "pages_show_list"
 
-        assertTrue("URL contains linkedin oauth endpoint", url.contains("https://www.linkedin.com/oauth/v2/authorization"))
-        assertTrue("URL contains response_type=code", url.contains("response_type=code"))
-        assertTrue("URL contains client_id", url.contains("client_id="))
-    }
-
-    @Test
-    fun `LinkedIn xin quyen dang bai w_member_social`() {
-        val url = viewModel.prepareLinkedInOAuthUrl("com.lttbdd.socialagent://oauth/callback")
-
-        assertTrue("URL xin w_member_social", url.contains("w_member_social"))
-        assertTrue("Dialog va ViewModel dung chung scope", LinkedInAuthDialogFragment.SCOPE.contains("w_member_social"))
-    }
-
-    @Test
-    fun `handleOAuthCallback connects channel successfully and updates UiState`() = runTest {
-        viewModel.handleOAuthCallback(
-            channelType = ChannelType.FACEBOOK,
-            authCode = "code_fb_999",
-            redirectUri = "com.lttbdd.socialagent://oauth/callback",
-        )
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        val state = viewModel.uiState.value
-        assertTrue("State is Success", state is ChannelUiState.Success)
-        val successState = state as ChannelUiState.Success
-        assertEquals(1, successState.channels.size)
-        assertEquals(ChannelType.FACEBOOK, successState.channels[0].type)
-    }
-
-    @Test
-    fun `getScopeForAccount tra ve quyen that, khong viet cung`() = runTest {
-        viewModel.handleOAuthCallback(
-            channelType = ChannelType.FACEBOOK,
-            authCode = "code_fb_999",
-            redirectUri = "com.lttbdd.socialagent://oauth/callback",
-        )
+        viewModel.onFacebookLoggedIn(user())
         testDispatcher.scheduler.advanceUntilIdle()
 
         val facebook = (viewModel.uiState.value as ChannelUiState.Success).channels.first()
-        assertEquals("public_profile", viewModel.getScopeForAccount(facebook))
+        assertEquals("pages_show_list", viewModel.getScopeForAccount(facebook))
     }
 
     private fun connectWithFacebookToken() {
-        viewModel.handleOAuthCallback(
-            channelType = ChannelType.FACEBOOK,
-            authCode = "user_token_gia",
-            redirectUri = ChannelRepository.FACEBOOK_SDK_REDIRECT,
-        )
+        viewModel.onFacebookLoggedIn(user())
         testDispatcher.scheduler.advanceUntilIdle()
     }
 
@@ -224,28 +185,149 @@ class ChannelViewModelTest {
     }
 
     @Test
-    fun `state khong khop thi bao loi bang chuoi da dich, khong hard-code`() = runTest {
-        viewModel.prepareFacebookOAuthUrl("com.lttbdd.socialagent://oauth/callback")
-
-        viewModel.handleOAuthCallback(
-            channelType = ChannelType.FACEBOOK,
-            authCode = "code_fb_999",
-            state = "state_sai",
-            redirectUri = "com.lttbdd.socialagent://oauth/callback",
-        )
-
-        val state = viewModel.uiState.value as ChannelUiState.Error
-        assertNull(state.message)
-        assertEquals(com.lttbdd.socialagent.R.string.channel_oauth_state_mismatch, state.messageRes)
-    }
-
-    @Test
     fun `ket noi thanh cong tra ve ten kenh de UI ghep chuoi da dich`() = runTest {
         fakeRepository.pages = listOf(FacebookPage("p1", "Page Mot", "t1"))
 
         connectWithFacebookToken()
 
         assertEquals("Page Mot", (viewModel.uiState.value as ChannelUiState.Success).connectedName)
+    }
+
+    // ---- Facebook: hạn và quyền thật từ Meta SDK ----
+
+    @Test
+    fun `Page duoc ket noi bang han va quyen that cua phien SDK`() = runTest {
+        fakeRepository.pages = listOf(FacebookPage("p1", "Page Mot", "t1"))
+
+        viewModel.onFacebookLoggedIn(user(expiresAt = 123_456L, scope = "pages_show_list,pages_manage_posts"))
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(123_456L, fakeRepository.lastUser?.expiresAtMillis)
+        assertEquals("pages_show_list,pages_manage_posts", fakeRepository.lastUser?.grantedScope)
+    }
+
+    @Test
+    fun `huy dang nhap Facebook phat thong bao huy`() = runTest {
+        val notices = mutableListOf<ChannelNotice>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.notices.collect { notices.add(it) } }
+
+        viewModel.onFacebookLoginCancelled()
+
+        assertEquals(listOf(ChannelNotice.FACEBOOK_LOGIN_CANCELLED), notices)
+    }
+
+    // ---- LinkedIn Native PKCE ----
+
+    private class FakeRedirectListener(private val respond: (redirectUri: String, state: String) -> String?) : RedirectListener {
+        override val redirectUri = "http://127.0.0.1:50000/callback"
+        var closed = false
+        var authorizationUrl: String? = null
+
+        override fun awaitRedirect(timeoutMillis: Int): String? {
+            val state = Regex("state=([^&]+)").find(authorizationUrl.orEmpty())?.groupValues?.get(1).orEmpty()
+            return respond(redirectUri, state)
+        }
+
+        override fun close() {
+            closed = true
+        }
+    }
+
+    /** Chạy startLinkedInLogin với listener giả; trả về (listener, các URL mở trình duyệt, thông báo). */
+    private fun TestScope.runLinkedIn(
+        listener: FakeRedirectListener,
+    ): Pair<MutableList<String>, MutableList<ChannelNotice>> {
+        val urls = mutableListOf<String>()
+        val notices = mutableListOf<ChannelNotice>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.browserRequests.collect { listener.authorizationUrl = it; urls.add(it) }
+        }
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.notices.collect { notices.add(it) } }
+        viewModel.openRedirectListener = { listener }
+        viewModel.startLinkedInLogin()
+        testDispatcher.scheduler.advanceUntilIdle()
+        return urls to notices
+    }
+
+    @Test
+    fun `LinkedIn chua duoc cap Native PKCE thi bao blocked va khong mo trinh duyet`() = runTest {
+        viewModel.linkedInNativePkceEnabled = false
+        val listener = FakeRedirectListener { _, _ -> null }
+
+        val (urls, notices) = runLinkedIn(listener)
+
+        assertTrue(urls.isEmpty())
+        assertEquals(listOf(ChannelNotice.LINKEDIN_PKCE_BLOCKED), notices)
+    }
+
+    @Test
+    fun `LinkedIn mo URL Native PKCE co S256 va khong co client_secret`() = runTest {
+        val listener = FakeRedirectListener { _, _ -> null }
+
+        val (urls, _) = runLinkedIn(listener)
+
+        val url = urls.single()
+        assertTrue(url.startsWith("https://www.linkedin.com/oauth/native-pkce/authorization?"))
+        assertTrue(url.contains("code_challenge_method=S256"))
+        assertTrue(url.contains("code_challenge="))
+        assertTrue(url.contains("client_id=client_that"))
+        assertTrue(!url.contains("secret"))
+    }
+
+    @Test
+    fun `LinkedIn redirect hop le thi doi code kem verifier va redirect URI`() = runTest {
+        val listener = FakeRedirectListener { redirect, state -> "$redirect?code=ma_code&state=$state" }
+
+        runLinkedIn(listener)
+
+        val sent = fakeRepository.lastLinkedIn!!
+        assertEquals("ma_code", sent.first)
+        assertTrue("verifier dai 43..128 ky tu", sent.second.length in 43..128)
+        assertEquals(listener.redirectUri, sent.third)
+        assertEquals("LinkedIn Org Test", (viewModel.uiState.value as ChannelUiState.Success).connectedName)
+        assertTrue("cong loopback da dong", listener.closed)
+    }
+
+    @Test
+    fun `LinkedIn state sai thi bao loi va khong doi code`() = runTest {
+        val listener = FakeRedirectListener { redirect, _ -> "$redirect?code=ma_code&state=state_sai" }
+
+        runLinkedIn(listener)
+
+        assertNull(fakeRepository.lastLinkedIn)
+        val state = viewModel.uiState.value as ChannelUiState.Error
+        assertEquals(com.lttbdd.socialagent.R.string.channel_oauth_state_mismatch, state.messageRes)
+    }
+
+    @Test
+    fun `LinkedIn nguoi dung huy thi bao huy va khong ket noi`() = runTest {
+        val listener = FakeRedirectListener { redirect, state -> "$redirect?error=user_cancelled_login&state=$state" }
+
+        val (_, notices) = runLinkedIn(listener)
+
+        assertEquals(listOf(ChannelNotice.LINKEDIN_LOGIN_CANCELLED), notices)
+        assertNull(fakeRepository.lastLinkedIn)
+    }
+
+    @Test
+    fun `LinkedIn het thoi gian cho thi bao timeout`() = runTest {
+        val listener = FakeRedirectListener { _, _ -> null }
+
+        val (_, notices) = runLinkedIn(listener)
+
+        assertEquals(listOf(ChannelNotice.LINKEDIN_LOGIN_TIMEOUT), notices)
+        assertTrue(listener.closed)
+    }
+
+    @Test
+    fun `LinkedIn tu choi Native PKCE luc doi code thi bao blocked`() = runTest {
+        fakeRepository.linkedInResult = Result.failure(LinkedInNativePkceBlockedException())
+        val listener = FakeRedirectListener { redirect, state -> "$redirect?code=ma_code&state=$state" }
+
+        val (_, notices) = runLinkedIn(listener)
+
+        assertEquals(listOf(ChannelNotice.LINKEDIN_PKCE_BLOCKED), notices)
+        assertTrue(viewModel.uiState.value is ChannelUiState.Success)
     }
 
     private class FakeChannelRepository : ChannelRepository {
@@ -264,10 +346,24 @@ class ChannelViewModelTest {
         override suspend fun fetchFacebookPages(userAccessToken: String): Result<List<FacebookPage>> =
             pagesResult ?: Result.success(pages)
 
+        /** Phiên Facebook mà repository nhận lần cuối (để kiểm hạn/quyền thật được chuyển xuống). */
+        var lastUser: FacebookUserToken? = null
+
+        var scope: String? = "public_profile"
+
+        var linkedInResult: Result<ChannelAccount>? = null
+        var lastLinkedIn: Triple<String, String, String>? = null
+
+        override suspend fun connectFacebookProfile(user: FacebookUserToken): Result<ChannelAccount> {
+            lastUser = user
+            return connectFacebookPage("", "", "")
+        }
+
         override suspend fun connectFacebookSelectedPage(
-            userAccessToken: String,
+            user: FacebookUserToken,
             page: FacebookPage,
         ): Result<ChannelAccount> {
+            lastUser = user
             val account = ChannelAccount(
                 type = ChannelType.FACEBOOK,
                 accountId = page.id,
@@ -282,7 +378,7 @@ class ChannelViewModelTest {
         override fun getConnectedChannels(): Flow<List<ChannelAccount>> = channels.asStateFlow()
 
         override suspend fun getGrantedScope(type: ChannelType, accountId: String): String? =
-            if (type == ChannelType.FACEBOOK) "public_profile" else null
+            if (type == ChannelType.FACEBOOK) scope else null
 
         override suspend fun connectFacebookPage(
             authCode: String,
@@ -305,6 +401,8 @@ class ChannelViewModelTest {
             codeVerifier: String,
             redirectUri: String,
         ): Result<ChannelAccount> {
+            lastLinkedIn = Triple(authCode, codeVerifier, redirectUri)
+            linkedInResult?.let { return it }
             val account = ChannelAccount(
                 type = ChannelType.LINKEDIN,
                 accountId = "li_202",

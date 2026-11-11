@@ -4,18 +4,15 @@ import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 
 /**
- * Logic thuần (không phụ thuộc Android) phân tích URL redirect của hộp thoại OAuth LinkedIn.
+ * Logic thuần (không phụ thuộc Android) phân tích URL redirect loopback của luồng OAuth LinkedIn (RFC 8252 §7.3).
  *
- * Quy tắc an toàn (giống [FacebookAuthRedirect]):
- * - Chỉ coi URL là redirect khi nó **bắt đầu đúng** bằng [REDIRECT_URI] (đúng ranh giới),
- *   không nhận `code` từ bất kỳ URL nào khác trong WebView.
+ * Quy tắc an toàn:
+ * - Chỉ coi URL là redirect khi nó **bắt đầu đúng** bằng redirect URI app đã gửi đi (đúng ranh giới),
+ *   không nhận `code` từ bất kỳ URL nào khác.
  * - Chỉ nhận `code` khi `state` khớp với giá trị app đã gửi đi (RFC 6749 Section 10.12, chống CSRF).
  * - Lỗi/hủy từ LinkedIn được chấp nhận không cần `state`, nhưng không bao giờ tạo ra `code`.
  */
 object LinkedInAuthRedirect {
-
-    /** Redirect URI đã đăng ký trong LinkedIn Developer app. WebView chặn URL này trước khi tải. */
-    const val REDIRECT_URI = "https://www.linkedin.com/developers/tools/oauth/redirect"
 
     /** LinkedIn trả `user_cancelled_login` hoặc `user_cancelled_authorize` khi người dùng hủy. */
     private const val ERROR_USER_CANCELLED_PREFIX = "user_cancelled"
@@ -30,17 +27,17 @@ object LinkedInAuthRedirect {
     }
 
     /** URL có phải là redirect đích của luồng đăng nhập (đúng tiền tố, đúng ranh giới) hay không. */
-    fun isRedirect(url: String?): Boolean {
-        if (url.isNullOrBlank() || !url.startsWith(REDIRECT_URI)) return false
-        return url.length == REDIRECT_URI.length || url[REDIRECT_URI.length] in "?#"
+    fun isRedirect(url: String?, redirectUri: String): Boolean {
+        if (url.isNullOrBlank() || redirectUri.isEmpty() || !url.startsWith(redirectUri)) return false
+        return url.length == redirectUri.length || url[redirectUri.length] in "?#"
     }
 
     /**
-     * Phân tích [url]. Trả về `null` nếu [url] không phải redirect (WebView cứ tiếp tục tải trang).
+     * Phân tích [url]. Trả về `null` nếu [url] không phải redirect tới [redirectUri].
      * Thiếu hoặc sai [expectedState] thì không bao giờ trả về [Result.Code].
      */
-    fun parse(url: String?, expectedState: String): Result? {
-        if (url == null || !isRedirect(url)) return null
+    fun parse(url: String?, redirectUri: String, expectedState: String): Result? {
+        if (url == null || !isRedirect(url, redirectUri)) return null
 
         val query = url.substringBefore('#').substringAfter('?', "")
         val fragment = url.substringAfter('#', "").substringBefore('#')

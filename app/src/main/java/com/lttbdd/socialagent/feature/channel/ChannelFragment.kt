@@ -1,10 +1,14 @@
 package com.lttbdd.socialagent.feature.channel
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.activity.result.ActivityResultRegistryOwner
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
@@ -13,9 +17,14 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.lttbdd.socialagent.R
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.lttbdd.socialagent.core.model.ChannelType
+import com.facebook.AccessToken
+import com.facebook.CallbackManager
+import com.facebook.FacebookCallback
+import com.facebook.FacebookException
+import com.facebook.login.LoginManager
+import com.facebook.login.LoginResult
 import com.lttbdd.socialagent.data.model.FacebookPage
-import com.lttbdd.socialagent.data.repository.ChannelRepository
+import com.lttbdd.socialagent.data.model.FacebookUserToken
 import com.lttbdd.socialagent.databinding.FragmentChannelBinding
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -23,7 +32,8 @@ import kotlinx.coroutines.launch
 /**
  * Fragment hiển thị và quản lý màn hình Kênh của tôi (F1).
  * Nguồn tham chiếu:
- * - RFC 8252 Section 8.1: Mở trình duyệt ngoài (Custom Tabs / System Browser), không dùng WebView nhúng.
+ * - RFC 8252 Section 8.1: không dùng WebView nhúng. Facebook đăng nhập bằng Meta SDK (LoginManager),
+ * - LinkedIn mở trình duyệt hệ thống rồi nhận redirect loopback (xem ChannelViewModel.startLinkedInLogin).
  * - AGENTS.md: ViewModel expose StateFlow, Fragment collect bằng repeatOnLifecycle(STARTED), _binding nullable.
  */
 @AndroidEntryPoint
@@ -36,6 +46,7 @@ class ChannelFragment : Fragment() {
 
     private var facebookPageDialog: androidx.appcompat.app.AlertDialog? = null
     private lateinit var adapter: ChannelAdapter
+    private var facebookCallbackManager: CallbackManager? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -55,33 +66,47 @@ class ChannelFragment : Fragment() {
     }
 
     /**
-     * Đăng nhập Facebook: Mở FacebookAuthDialogFragment để hiển thị WebView nội bộ.
+     * Đăng nhập Facebook bằng Meta SDK (LoginManager). Hạn và quyền lấy từ AccessToken thật của SDK.
+     * Callback đăng ký theo vòng đời view và được gỡ ở onDestroyView để Fragment cũ không bị singleton giữ lại.
      */
     private fun loginWithFacebook() {
-        val dialog = FacebookAuthDialogFragment.newInstance()
-        dialog.onAuthTokenReceivedListener = { token ->
-            viewModel.handleOAuthCallback(
-                channelType = ChannelType.FACEBOOK,
-                authCode = token,
-                redirectUri = ChannelRepository.FACEBOOK_SDK_REDIRECT,
+        val manager = LoginManager.getInstance()
+        val callbackManager = facebookCallbackManager ?: CallbackManager.Factory.create().also {
+            facebookCallbackManager = it
+            manager.registerCallback(
+                it,
+                object : FacebookCallback<LoginResult> {
+                    override fun onSuccess(result: LoginResult) {
+                        viewModel.onFacebookLoggedIn(result.accessToken.toUserToken())
+                    }
+
+                    override fun onCancel() = viewModel.onFacebookLoginCancelled()
+
+                    override fun onError(error: FacebookException) = viewModel.onFacebookLoginFailed()
+                },
             )
         }
-        dialog.onAuthErrorListener = { error ->
-            if (isAdded) {
-                if (error.startsWith(FacebookAuthDialogFragment.USER_CANCELLED)) {
-                    // Người dùng bấm "Hủy" trên trang Facebook -> hỏi có muốn đăng nhập tài khoản khác không.
-                    showFacebookCancelledDialog()
-                } else {
-                    val message = error.ifBlank { getString(R.string.channel_facebook_login_error) }
-                    Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
-                }
-            }
-        }
-        dialog.show(parentFragmentManager, FacebookAuthDialogFragment.TAG)
+        manager.logIn(requireActivity() as ActivityResultRegistryOwner, callbackManager, FACEBOOK_PERMISSIONS)
     }
 
+    private fun AccessToken.toUserToken() = FacebookUserToken(
+        accessToken = token,
+        expiresAtMillis = expires.time,
+        grantedScope = permissions.filterNotNull().sorted().joinToString(",").ifEmpty { null },
+    )
+
     private fun loginWithAnotherFacebookAccount() {
+        // Đăng xuất phiên SDK để màn Facebook Login không tự dùng lại tài khoản cũ.
+        LoginManager.getInstance().logOut()
         loginWithFacebook()
+    }
+
+    private fun openInBrowser(url: String) {
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(requireContext(), R.string.channel_linkedin_no_browser, Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun showFacebookCancelledDialog() {
@@ -109,40 +134,19 @@ class ChannelFragment : Fragment() {
         binding.btnConnectFacebook.setOnClickListener {
             if (viewModel.isFacebookDemoMode()) {
                 showDemoModeNotice("FACEBOOK_APP_ID")
-                val facebookRedirectUri = "socialagent://oauth/facebook/callback"
-                viewModel.connectFacebookDemo(facebookRedirectUri)
+                viewModel.connectFacebookDemo()
             } else {
                 loginWithFacebook()
             }
         }
 
         binding.btnConnectLinkedIn.setOnClickListener {
-            val redirectUri = LinkedInAuthDialogFragment.REDIRECT_URI
             if (viewModel.isLinkedInDemoMode()) {
                 // Chưa cấu hình LINKEDIN_CLIENT_ID -> không có trang đăng nhập thật, báo rõ cho người dùng.
                 showDemoModeNotice("LINKEDIN_CLIENT_ID")
-                viewModel.connectLinkedInDemo(redirectUri)
+                viewModel.connectLinkedInDemo()
             } else {
-                val dialog = LinkedInAuthDialogFragment.newInstance()
-                dialog.onAuthCodeReceivedListener = { code ->
-                    viewModel.handleOAuthCallback(
-                        channelType = ChannelType.LINKEDIN,
-                        authCode = code,
-                        redirectUri = LinkedInAuthDialogFragment.REDIRECT_URI,
-                    )
-                }
-                dialog.onAuthErrorListener = { error ->
-                    // Lỗi/hủy đăng nhập: chỉ báo lỗi, KHÔNG tự kết nối tài khoản demo.
-                    if (isAdded) {
-                        val message = if (error.startsWith("user_cancelled")) {
-                            getString(R.string.channel_linkedin_cancelled)
-                        } else {
-                            getString(R.string.channel_linkedin_login_failed, error)
-                        }
-                        Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
-                    }
-                }
-                dialog.show(parentFragmentManager, LinkedInAuthDialogFragment.TAG)
+                viewModel.startLinkedInLogin()
             }
         }
     }
@@ -156,18 +160,13 @@ class ChannelFragment : Fragment() {
                     }
                 }
                 launch {
+                    viewModel.browserRequests.collect { url -> openInBrowser(url) }
+                }
+                launch {
                     viewModel.notices.collect { notice ->
                         when (notice) {
-                            ChannelNotice.NO_FACEBOOK_PAGES -> Toast.makeText(
-                                requireContext(),
-                                R.string.channel_facebook_no_pages,
-                                Toast.LENGTH_LONG,
-                            ).show()
-                            ChannelNotice.FACEBOOK_PAGES_LOAD_FAILED -> Toast.makeText(
-                                requireContext(),
-                                R.string.channel_facebook_pages_load_failed,
-                                Toast.LENGTH_LONG,
-                            ).show()
+                            ChannelNotice.FACEBOOK_LOGIN_CANCELLED -> showFacebookCancelledDialog()
+                            else -> Toast.makeText(requireContext(), noticeMessage(notice), Toast.LENGTH_LONG).show()
                         }
                     }
                 }
@@ -224,6 +223,17 @@ class ChannelFragment : Fragment() {
             .show()
     }
 
+    private fun noticeMessage(notice: ChannelNotice): Int = when (notice) {
+        ChannelNotice.NO_FACEBOOK_PAGES -> R.string.channel_facebook_no_pages
+        ChannelNotice.FACEBOOK_PAGES_LOAD_FAILED -> R.string.channel_facebook_pages_load_failed
+        ChannelNotice.FACEBOOK_LOGIN_CANCELLED, ChannelNotice.FACEBOOK_LOGIN_FAILED ->
+            R.string.channel_facebook_login_error
+        ChannelNotice.LINKEDIN_PKCE_BLOCKED -> R.string.channel_linkedin_pkce_blocked
+        ChannelNotice.LINKEDIN_LOGIN_CANCELLED -> R.string.channel_linkedin_cancelled
+        ChannelNotice.LINKEDIN_LOGIN_FAILED -> R.string.channel_linkedin_login_failed
+        ChannelNotice.LINKEDIN_LOGIN_TIMEOUT -> R.string.channel_linkedin_login_timeout
+    }
+
     private fun showDemoModeNotice(configKey: String) {
         Toast.makeText(
             requireContext(),
@@ -237,6 +247,20 @@ class ChannelFragment : Fragment() {
         // dismiss() không gọi onCancel nên lựa chọn Page vẫn được giữ trong ViewModel.
         facebookPageDialog?.dismiss()
         facebookPageDialog = null
+        facebookCallbackManager?.let { LoginManager.getInstance().unregisterCallback(it) }
+        facebookCallbackManager = null
         _binding = null
+    }
+
+    private companion object {
+        /** Quyền xin khi đăng nhập Facebook; quyền thật được cấp nằm trong AccessToken.permissions. */
+        val FACEBOOK_PERMISSIONS = listOf(
+            "public_profile",
+            "pages_show_list",
+            "pages_read_engagement",
+            "pages_manage_posts",
+            "pages_manage_engagement",
+            "read_insights",
+        )
     }
 }

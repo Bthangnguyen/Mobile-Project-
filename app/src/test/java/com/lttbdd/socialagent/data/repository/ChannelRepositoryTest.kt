@@ -3,6 +3,8 @@ package com.lttbdd.socialagent.data.repository
 import com.lttbdd.socialagent.core.model.ChannelCapability
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.ConnectionStatus
+import com.lttbdd.socialagent.data.model.FacebookPage
+import com.lttbdd.socialagent.data.model.FacebookUserToken
 import com.lttbdd.socialagent.data.model.OAuthToken
 import com.lttbdd.socialagent.data.security.TokenStore
 import kotlinx.coroutines.flow.Flow
@@ -18,11 +20,18 @@ import org.junit.Test
 class ChannelRepositoryTest {
 
     private lateinit var repository: ChannelRepositoryImpl
+    private lateinit var fakeTokenStore: FakeTokenStore
+    private lateinit var fakeAccountStore: FakeAccountStore
 
-    @Before
-    fun setUp() {
-        val fakeTokenStore = object : TokenStore {
-            private val storage = mutableMapOf<String, OAuthToken>()
+    private class FakeAccountStore(var saved: List<StoredChannelAccount> = emptyList()) : ChannelAccountStore {
+        override suspend fun load(): List<StoredChannelAccount> = saved
+        override suspend fun save(accounts: List<StoredChannelAccount>) {
+            saved = accounts
+        }
+    }
+
+    private class FakeTokenStore : TokenStore {
+            val storage = mutableMapOf<String, OAuthToken>()
 
             override suspend fun saveToken(channelType: ChannelType, accountId: String, token: OAuthToken) {
                 storage["${channelType.name}_$accountId"] = token
@@ -35,9 +44,81 @@ class ChannelRepositoryTest {
             override suspend fun removeToken(channelType: ChannelType, accountId: String) {
                 storage.remove("${channelType.name}_$accountId")
             }
-        }
+    }
 
-        repository = ChannelRepositoryImpl(fakeTokenStore)
+    @Before
+    fun setUp() {
+        fakeTokenStore = FakeTokenStore()
+        fakeAccountStore = FakeAccountStore()
+        repository = ChannelRepositoryImpl(fakeTokenStore, fakeAccountStore)
+    }
+
+    @Test
+    fun `Page ket noi luu han va quyen that cua phien SDK, khong gan cung 60 ngay`() = runTest {
+        val user = FacebookUserToken("user_tok", expiresAtMillis = 1_234_567L, grantedScope = "pages_show_list,read_insights")
+
+        val result = repository.connectFacebookSelectedPage(user, FacebookPage("p9", "Page Chin", "page_tok"))
+
+        assertTrue(result.isSuccess)
+        val token = fakeTokenStore.storage["FACEBOOK_p9"]!!
+        assertEquals("page_tok", token.accessToken)
+        assertEquals(1_234_567L, token.expiresAt)
+        assertEquals("pages_show_list,read_insights", token.scope)
+    }
+
+    @Test
+    fun `phien SDK khong tra quyen thi chi luu public_profile`() = runTest {
+        repository.connectFacebookSelectedPage(FacebookUserToken("u", 5L, null), FacebookPage("p1", "A", "t"))
+
+        assertEquals("public_profile", fakeTokenStore.storage["FACEBOOK_p1"]!!.scope)
+    }
+
+    @Test
+    fun `metadata tai khoan duoc luu va khong chua token`() = runTest {
+        repository.connectFacebookSelectedPage(FacebookUserToken("u", 5L, "x"), FacebookPage("p1", "Page Mot", "bi_mat_123"))
+
+        assertEquals(listOf(StoredChannelAccount(ChannelType.FACEBOOK, "p1", "Page Mot")), fakeAccountStore.saved)
+        assertTrue(!fakeAccountStore.saved.toString().contains("bi_mat_123"))
+    }
+
+    @Test
+    fun `mo lai app khoi phuc kenh con token`() = runTest {
+        fakeAccountStore.saved = listOf(StoredChannelAccount(ChannelType.FACEBOOK, "p1", "Page Mot"))
+        fakeTokenStore.saveToken(ChannelType.FACEBOOK, "p1", OAuthToken("t", 10L, "pages_show_list"))
+        val restarted = ChannelRepositoryImpl(fakeTokenStore, fakeAccountStore)
+
+        val channels = restarted.getConnectedChannels().first()
+
+        assertEquals(listOf("Page Mot"), channels.map { it.displayName })
+        assertEquals(ConnectionStatus.CONNECTED, channels.single().status)
+    }
+
+    @Test
+    fun `tai khoan mat token thi khong khoi phuc`() = runTest {
+        fakeAccountStore.saved = listOf(StoredChannelAccount(ChannelType.LINKEDIN, "li1", "Nguoi Dung"))
+        val restarted = ChannelRepositoryImpl(fakeTokenStore, fakeAccountStore)
+
+        assertTrue(restarted.getConnectedChannels().first().isEmpty())
+    }
+
+    @Test
+    fun `ngat ket noi xoa token va metadata da luu`() = runTest {
+        repository.connectFacebookSelectedPage(FacebookUserToken("u", 5L, "x"), FacebookPage("p1", "A", "t"))
+
+        repository.disconnectChannel(ChannelType.FACEBOOK, "p1")
+
+        assertTrue(fakeAccountStore.saved.isEmpty())
+        assertNull(fakeTokenStore.storage["FACEBOOK_p1"])
+    }
+
+    @Test
+    fun `isNativePkceBlocked nhan ra loi tu choi cua LinkedIn va bo qua loi thuong`() {
+        assertTrue(ChannelRepositoryImpl.isNativePkceBlocked(401, """{"error":"invalid_client"}"""))
+        assertTrue(ChannelRepositoryImpl.isNativePkceBlocked(400, """{"error":"unauthorized_client"}"""))
+        assertTrue(!ChannelRepositoryImpl.isNativePkceBlocked(400, """{"error":"invalid_request"}"""))
+        assertTrue(!ChannelRepositoryImpl.isNativePkceBlocked(500, """{"error":"invalid_client"}"""))
+        assertTrue(!ChannelRepositoryImpl.isNativePkceBlocked(401, null))
+        assertTrue(!ChannelRepositoryImpl.isNativePkceBlocked(401, "khong phai json"))
     }
 
     @Test
@@ -108,30 +189,6 @@ class ChannelRepositoryTest {
         assertNull(ChannelRepositoryImpl.parseFacebookProfile("""{"name":"Agent"}"""))
         assertNull(ChannelRepositoryImpl.parseFacebookProfile("""{"id":"","name":"Agent"}"""))
         assertNull(ChannelRepositoryImpl.parseFacebookProfile("""{"id":"123","name":" "}"""))
-    }
-
-    @Test
-    fun `parseFacebookGrantedScope chi lay quyen granted`() {
-        val json = """{"data":[
-            {"permission":"public_profile","status":"granted"},
-            {"permission":"pages_manage_posts","status":"declined"},
-            {"permission":"read_insights","status":"granted"}
-        ]}"""
-
-        assertEquals("public_profile,read_insights", ChannelRepositoryImpl.parseFacebookGrantedScope(json))
-    }
-
-    @Test
-    fun `parseFacebookGrantedScope tra null khi khong co quyen hoac json sai`() {
-        assertNull(ChannelRepositoryImpl.parseFacebookGrantedScope(""))
-        assertNull(ChannelRepositoryImpl.parseFacebookGrantedScope("not_json"))
-        assertNull(ChannelRepositoryImpl.parseFacebookGrantedScope("""{"data":[]}"""))
-        assertNull(
-            ChannelRepositoryImpl.parseFacebookGrantedScope(
-                """{"data":[{"permission":"read_insights","status":"declined"}]}""",
-            ),
-        )
-        assertNull(ChannelRepositoryImpl.parseFacebookGrantedScope("""{"error":{"code":190}}"""))
     }
 
     @Test

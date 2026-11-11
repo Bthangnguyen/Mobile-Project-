@@ -3,6 +3,7 @@ package com.lttbdd.socialagent.data.repository
 import com.lttbdd.socialagent.core.model.ChannelAccount
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.data.model.FacebookPage
+import com.lttbdd.socialagent.data.model.FacebookUserToken
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -20,7 +21,8 @@ interface ChannelRepository {
     fun getConnectedChannels(): Flow<List<ChannelAccount>>
 
     /**
-     * Kết nối kênh Facebook Page qua OAuth code và PKCE verifier.
+     * Chỉ cho chế độ demo (chưa cấu hình FACEBOOK_APP_ID): tạo kênh Facebook giả.
+     * Đăng nhập thật dùng Meta SDK rồi [connectFacebookProfile] / [connectFacebookSelectedPage].
      */
     suspend fun connectFacebookPage(
         authCode: String,
@@ -29,7 +31,8 @@ interface ChannelRepository {
     ): Result<ChannelAccount>
 
     /**
-     * Kết nối kênh LinkedIn qua OAuth code và PKCE verifier.
+     * Kết nối kênh LinkedIn: đổi authorization code bằng Native PKCE (code_verifier, không client_secret).
+     * Thất bại với [LinkedInNativePkceBlockedException] khi LinkedIn chưa cấp Native PKCE cho app.
      */
     suspend fun connectLinkedIn(
         authCode: String,
@@ -62,15 +65,16 @@ interface ChannelRepository {
         Result.success(emptyList())
 
     /**
-     * Kết nối một Page đã chọn: lưu Page access token và hiển thị tên Page làm tài khoản đang dùng.
+     * Kết nối một Page đã chọn: lưu Page access token, quyền thật và hạn thật lấy từ phiên [user] (Meta SDK).
      */
     suspend fun connectFacebookSelectedPage(
-        userAccessToken: String,
+        user: FacebookUserToken,
         page: FacebookPage,
     ): Result<ChannelAccount> = Result.failure(UnsupportedOperationException("Chưa hỗ trợ chọn Page"))
 
-    companion object {
-        /** redirectUri đánh dấu authCode là access token lấy từ Facebook Login SDK. */
-        const val FACEBOOK_SDK_REDIRECT = "facebook_sdk"
-    }
+    /**
+     * Người dùng không quản lý Page nào: kết nối bằng hồ sơ cá nhân (chỉ `public_profile`, chưa có khả năng ở mức Page).
+     */
+    suspend fun connectFacebookProfile(user: FacebookUserToken): Result<ChannelAccount> =
+        Result.failure(UnsupportedOperationException("Chưa hỗ trợ kết nối hồ sơ"))
 }

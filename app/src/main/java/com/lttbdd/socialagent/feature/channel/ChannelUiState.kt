@@ -30,4 +30,13 @@ sealed interface ChannelUiState {
 data class FacebookPagePicker(val pages: List<FacebookPage>)
 
 /** Thông báo một lần cho UI (không lưu lại trạng thái). */
-enum class ChannelNotice { NO_FACEBOOK_PAGES, FACEBOOK_PAGES_LOAD_FAILED }
+enum class ChannelNotice {
+    NO_FACEBOOK_PAGES,
+    FACEBOOK_PAGES_LOAD_FAILED,
+    FACEBOOK_LOGIN_CANCELLED,
+    FACEBOOK_LOGIN_FAILED,
+    LINKEDIN_PKCE_BLOCKED,
+    LINKEDIN_LOGIN_CANCELLED,
+    LINKEDIN_LOGIN_FAILED,
+    LINKEDIN_LOGIN_TIMEOUT,
+}

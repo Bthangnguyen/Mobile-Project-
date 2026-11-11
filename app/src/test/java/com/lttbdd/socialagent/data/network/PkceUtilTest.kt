@@ -1,15 +1,12 @@
 package com.lttbdd.socialagent.data.network
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.nio.charset.StandardCharsets
-import java.security.MessageDigest
-import java.util.Base64
 
 /**
- * Unit test kiểm tra PKCE util theo RFC 7636 Section 4.1 & 4.2.
+ * Unit test kiểm tra PKCE util theo RFC 7636 Section 4.1 & 4.2.
  */
 class PkceUtilTest {
 
@@ -41,16 +38,29 @@ class PkceUtilTest {
     }
 
     @Test
-    fun `generateCodeChallengeS256 matches manual SHA256 Base64URL transformation`() {
+    fun `generateCodeChallengeS256 khop vector kiem thu RFC 7636 Phu luc B`() {
+        // Vector chính thức của RFC 7636 Appendix B: gọi hàm thật, không tự tính lại ở trong test.
         val verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
-        
-        // Manual computation per RFC 7636 Section 4.2:
-        val bytes = verifier.toByteArray(StandardCharsets.US_ASCII)
-        val hash = MessageDigest.getInstance("SHA-256").digest(bytes)
-        val expectedChallenge = Base64.getUrlEncoder().withoutPadding().encodeToString(hash)
 
-        // Verifying S256 challenge generation
-        assertNotNull(verifier)
-        assertTrue(expectedChallenge.isNotEmpty())
+        assertEquals(
+            "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuEJSJAbmw-M",
+            PkceUtil.generateCodeChallengeS256(verifier),
+        )
+    }
+
+    @Test
+    fun `generateCodeChallengeS256 khong co padding va chi dung ky tu base64url`() {
+        val challenge = PkceUtil.generateCodeChallengeS256(PkceUtil.generateCodeVerifier(64))
+
+        assertEquals(43, challenge.length) // SHA-256 = 32 byte -> 43 ký tự Base64URL không padding
+        assertTrue(challenge.matches(Regex("^[A-Za-z0-9_-]+$")))
+    }
+
+    @Test
+    fun `generateCodeChallengeS256 khac nhau voi verifier khac nhau`() {
+        val a = PkceUtil.generateCodeChallengeS256("a".repeat(43))
+        val b = PkceUtil.generateCodeChallengeS256("b".repeat(43))
+
+        assertNotEquals(a, b)
     }
 }

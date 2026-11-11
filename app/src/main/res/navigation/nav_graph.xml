@@ -55,12 +55,21 @@
 
     <fragment
         android:id="@+id/settingsFragment"
-        android:name="com.lttbdd.socialagent.feature.channel.ChannelFragment"
-        android:label="@string/channel_title">
+        android:name="com.lttbdd.socialagent.core.ui.PlaceholderFragment"
+        android:label="@string/nav_settings">
         <argument
             android:name="titleRes"
-            android:defaultValue="@string/channel_title"
+            android:defaultValue="@string/nav_settings"
             app:argType="reference" />
     </fragment>
+
+    <!--
+      Kênh của tôi (B, F1): không phải tab. Màn Cài đặt (A, F9) mở bằng
+      findNavController().navigate(R.id.channelFragment) từ mục "Kênh của tôi".
+    -->
+    <fragment
+        android:id="@+id/channelFragment"
+        android:name="com.lttbdd.socialagent.feature.channel.ChannelFragment"
+        android:label="@string/channel_title" />
 
 </navigation>

@@ -43,7 +43,7 @@ class PkceUtilTest {
         val verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
 
         assertEquals(
-            "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuEJSJAbmw-M",
+            "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
             PkceUtil.generateCodeChallengeS256(verifier),
         )
     }

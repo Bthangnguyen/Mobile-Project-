@@ -165,13 +165,104 @@ class ChannelViewModelTest {
         assertTrue((viewModel.uiState.value as ChannelUiState.Success).channels.isEmpty())
     }
 
+    @Test
+    fun `loi tai danh sach Page thi bao loi va khong ket noi bang ho so`() = runTest {
+        val notices = mutableListOf<ChannelNotice>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.notices.collect { notices.add(it) } }
+        fakeRepository.pagesResult = Result.failure(java.io.IOException("mat mang"))
+
+        connectWithFacebookToken()
+
+        assertEquals(listOf(ChannelNotice.FACEBOOK_PAGES_LOAD_FAILED), notices)
+        assertTrue((viewModel.uiState.value as ChannelUiState.Success).channels.isEmpty())
+    }
+
+    @Test
+    fun `token qua han thi kenh hien TOKEN_EXPIRED`() = runTest {
+        fakeRepository.pages = listOf(FacebookPage("p1", "Page Mot", "t1"))
+        fakeRepository.expiresAt = 1_000L
+        viewModel.clock = { 2_000L }
+
+        connectWithFacebookToken()
+
+        val channel = (viewModel.uiState.value as ChannelUiState.Success).channels.single()
+        assertEquals(ConnectionStatus.TOKEN_EXPIRED, channel.status)
+    }
+
+    @Test
+    fun `token con han thi kenh giu CONNECTED`() = runTest {
+        fakeRepository.pages = listOf(FacebookPage("p1", "Page Mot", "t1"))
+        fakeRepository.expiresAt = 5_000L
+        viewModel.clock = { 2_000L }
+
+        connectWithFacebookToken()
+
+        val channel = (viewModel.uiState.value as ChannelUiState.Success).channels.single()
+        assertEquals(ConnectionStatus.CONNECTED, channel.status)
+    }
+
+    @Test
+    fun `khong doc duoc han token thi khong bao het han`() = runTest {
+        fakeRepository.pages = listOf(FacebookPage("p1", "Page Mot", "t1"))
+        fakeRepository.expiresAt = null
+        viewModel.clock = { Long.MAX_VALUE }
+
+        connectWithFacebookToken()
+
+        val channel = (viewModel.uiState.value as ChannelUiState.Success).channels.single()
+        assertEquals(ConnectionStatus.CONNECTED, channel.status)
+    }
+
+    @Test
+    fun `ngay sau khi ket noi Page, getScopeForAccount da co quyen`() = runTest {
+        fakeRepository.pages = listOf(FacebookPage("p1", "Page Mot", "t1"))
+
+        connectWithFacebookToken()
+
+        val channel = (viewModel.uiState.value as ChannelUiState.Success).channels.single()
+        assertEquals("public_profile", viewModel.getScopeForAccount(channel))
+    }
+
+    @Test
+    fun `state khong khop thi bao loi bang chuoi da dich, khong hard-code`() = runTest {
+        viewModel.prepareFacebookOAuthUrl("com.lttbdd.socialagent://oauth/callback")
+
+        viewModel.handleOAuthCallback(
+            channelType = ChannelType.FACEBOOK,
+            authCode = "code_fb_999",
+            state = "state_sai",
+            redirectUri = "com.lttbdd.socialagent://oauth/callback",
+        )
+
+        val state = viewModel.uiState.value as ChannelUiState.Error
+        assertNull(state.message)
+        assertEquals(com.lttbdd.socialagent.R.string.channel_oauth_state_mismatch, state.messageRes)
+    }
+
+    @Test
+    fun `ket noi thanh cong tra ve ten kenh de UI ghep chuoi da dich`() = runTest {
+        fakeRepository.pages = listOf(FacebookPage("p1", "Page Mot", "t1"))
+
+        connectWithFacebookToken()
+
+        assertEquals("Page Mot", (viewModel.uiState.value as ChannelUiState.Success).connectedName)
+    }
+
     private class FakeChannelRepository : ChannelRepository {
         private val channels = MutableStateFlow<List<ChannelAccount>>(emptyList())
 
         var pages: List<FacebookPage> = emptyList()
 
+        /** Khác null thì [fetchFacebookPages] trả kết quả này thay cho [pages]. */
+        var pagesResult: Result<List<FacebookPage>>? = null
+
+        /** Thời điểm hết hạn token giả; null nghĩa là repository không đọc được. */
+        var expiresAt: Long? = null
+
+        override suspend fun getTokenExpiresAt(type: ChannelType, accountId: String): Long? = expiresAt
+
         override suspend fun fetchFacebookPages(userAccessToken: String): Result<List<FacebookPage>> =
-            Result.success(pages)
+            pagesResult ?: Result.success(pages)
 
         override suspend fun connectFacebookSelectedPage(
             userAccessToken: String,

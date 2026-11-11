@@ -34,6 +34,10 @@
     <string name="channel_facebook_blocked">Facebook has temporarily blocked this account for acting too fast. Please wait a few minutes and try again.</string>
     <string name="channel_facebook_pick_page_title">Choose a Facebook Page</string>
     <string name="channel_facebook_no_pages">No Facebook Page was found for this account, so it was connected with the personal profile. A Page is required to publish.</string>
+    <string name="channel_facebook_pages_load_failed">Could not load your Facebook Pages. Check your connection and try again.</string>
+    <string name="channel_connected_named">Connected %1$s</string>
+    <string name="channel_oauth_state_mismatch">Login could not be verified (state mismatch). Please try again.</string>
+    <string name="channel_oauth_error_generic">Could not connect the channel. Please try again.</string>
     <string name="channel_close">Close</string>
     <string name="channel_linkedin_cancelled">LinkedIn login was cancelled</string>
     <string name="channel_linkedin_login_failed">LinkedIn login failed: %1$s</string>

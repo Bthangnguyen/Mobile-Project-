@@ -33,6 +33,10 @@
     <string name="channel_facebook_blocked">Tài khoản bị Facebook tạm khóa do thao tác quá nhanh. Vui lòng chờ ít phút rồi thử lại.</string>
     <string name="channel_facebook_pick_page_title">Chọn Facebook Page</string>
     <string name="channel_facebook_no_pages">Không tìm thấy Facebook Page nào của tài khoản này nên đã kết nối bằng hồ sơ cá nhân. Cần có Page để đăng bài.</string>
+    <string name="channel_facebook_pages_load_failed">Không tải được danh sách Facebook Page. Hãy kiểm tra kết nối mạng và thử lại.</string>
+    <string name="channel_connected_named">Đã kết nối %1$s</string>
+    <string name="channel_oauth_state_mismatch">Không xác minh được phiên đăng nhập (state không khớp). Vui lòng thử lại.</string>
+    <string name="channel_oauth_error_generic">Không kết nối được kênh. Vui lòng thử lại.</string>
     <string name="channel_close">Đóng</string>
     <string name="channel_linkedin_cancelled">Đã hủy đăng nhập LinkedIn</string>
     <string name="channel_linkedin_login_failed">Đăng nhập LinkedIn thất bại: %1$s</string>

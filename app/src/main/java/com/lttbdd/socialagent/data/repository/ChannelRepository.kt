@@ -49,6 +49,12 @@ interface ChannelRepository {
     suspend fun getGrantedScope(type: ChannelType, accountId: String): String? = null
 
     /**
+     * Thời điểm (epoch millis) token của kênh hết hạn, đọc từ token đã lưu.
+     * Trả về null nếu chưa có token hoặc không đọc được (khi đó coi như chưa xác định, không báo hết hạn).
+     */
+    suspend fun getTokenExpiresAt(type: ChannelType, accountId: String): Long? = null
+
+    /**
      * Lấy danh sách Facebook Page mà người dùng quản lý (Graph API `/me/accounts`).
      * Thất bại (lỗi mạng, thiếu quyền `pages_show_list`) trả về Result.failure.
      */

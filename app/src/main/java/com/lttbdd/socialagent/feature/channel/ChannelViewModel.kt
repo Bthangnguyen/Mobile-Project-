@@ -68,7 +68,8 @@ class ChannelViewModel @Inject constructor(
                 // Nạp quyền thật và trạng thái hạn token trước khi phát UiState để ma trận không hiện sai.
                 val resolved = channels.map { resolveAccount(it) }
                 knownChannels = resolved
-                _uiState.value = ChannelUiState.Success(channels = resolved)
+                val currentConnectedName = (_uiState.value as? ChannelUiState.Success)?.connectedName
+                _uiState.value = ChannelUiState.Success(channels = resolved, connectedName = currentConnectedName)
             }
         }
     }

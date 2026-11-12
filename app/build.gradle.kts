@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     // AGP 9 đã tích hợp sẵn Kotlin, không cần plugin org.jetbrains.kotlin.android.
     alias(libs.plugins.android.application)
@@ -5,6 +7,41 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
 }
+
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.inputStream().use { localProperties.load(it) }
+}
+
+val facebookAppId = System.getenv("FACEBOOK_APP_ID")
+    ?: localProperties.getProperty("FACEBOOK_APP_ID")
+    ?: "SOCIAL_AGENT_FB_APP_ID"
+
+// Scheme của intent-filter phải chữ thường và chỉ gồm ký tự hợp lệ (lint AppLinkUrlError).
+// App ID thật là chuỗi số; khi chưa cấu hình (placeholder, ví dụ trên CI) dùng scheme cố định.
+val facebookLoginScheme = if (facebookAppId.isNotEmpty() && facebookAppId.all { it.isDigit() }) {
+    "fb$facebookAppId"
+} else {
+    "fbplaceholder"
+}
+
+val facebookClientToken = System.getenv("FACEBOOK_CLIENT_TOKEN")
+    ?: localProperties.getProperty("FACEBOOK_CLIENT_TOKEN")
+    ?: "SOCIAL_AGENT_CLIENT_TOKEN"
+
+val linkedinClientId = System.getenv("LINKEDIN_CLIENT_ID")
+    ?: localProperties.getProperty("LINKEDIN_CLIENT_ID")
+    ?: "SOCIAL_AGENT_LINKEDIN_CLIENT_ID"
+
+// LinkedIn Native PKCE (RFC 8252 + RFC 7636) chỉ dùng được khi LinkedIn đã bật cho app này.
+// Mặc định false = "blocked": nút LinkedIn báo chưa được cấp thay vì mở trình duyệt.
+// KHÔNG có client_secret trong app: secret nhúng vào APK sẽ bị lộ (quyết định 1 trong docs/research-social-api.md).
+val linkedinNativePkceEnabled = (
+    System.getenv("LINKEDIN_NATIVE_PKCE_ENABLED")
+        ?: localProperties.getProperty("LINKEDIN_NATIVE_PKCE_ENABLED")
+        ?: "false"
+    ).trim().equals("true", ignoreCase = true)
 
 android {
     namespace = "com.lttbdd.socialagent"
@@ -18,6 +55,17 @@ android {
         versionName = "0.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        manifestPlaceholders["facebookAppId"] = facebookAppId
+        manifestPlaceholders["facebookClientToken"] = facebookClientToken
+        buildConfigField("String", "FACEBOOK_APP_ID", "\"$facebookAppId\"")
+        buildConfigField("String", "FACEBOOK_CLIENT_TOKEN", "\"$facebookClientToken\"")
+        buildConfigField("String", "LINKEDIN_CLIENT_ID", "\"$linkedinClientId\"")
+        buildConfigField("boolean", "LINKEDIN_NATIVE_PKCE_ENABLED", "$linkedinNativePkceEnabled")
+
+        resValue("string", "facebook_app_id", facebookAppId)
+        resValue("string", "facebook_client_token", facebookClientToken)
+        resValue("string", "fb_login_protocol_scheme", facebookLoginScheme)
     }
 
     buildTypes {
@@ -37,6 +85,8 @@ android {
 
     buildFeatures {
         viewBinding = true
+        buildConfig = true
+        resValues = true
     }
 
     androidResources {
@@ -59,6 +109,9 @@ dependencies {
 
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.okhttp)
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.facebook.login)
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

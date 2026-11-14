@@ -10,12 +10,14 @@
         android:padding="24dp">
 
         <TextView
+            android:id="@+id/settings_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/nav_settings"
             android:textAppearance="?attr/textAppearanceHeadlineSmall" />
 
         <TextView
+            android:id="@+id/language_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"

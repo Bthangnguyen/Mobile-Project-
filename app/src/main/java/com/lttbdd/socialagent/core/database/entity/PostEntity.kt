@@ -24,21 +24,32 @@ import com.lttbdd.socialagent.core.model.PostStatus
     ],
     indices = [
         Index("draftId"),
+        Index("status"),
         Index(value = ["idempotencyKey"], unique = true),
     ],
 )
 data class PostEntity(
     @PrimaryKey val id: String,
-    /** null khi bản nháp gốc đã bị xoá sau khi đăng xong. */
+    /** null khi bản nháp gốc đã bị xoá sau khi đăng xong (chỉ xảy ra với bài [PostStatus.PUBLISHED]). */
     val draftId: String?,
     val channel: ChannelType,
     val status: PostStatus,
     val idempotencyKey: String,
     val remotePostId: String?,
     val url: String?,
-    /** Lý do lỗi cuối cùng để hiển thị cho người dùng; không chứa token hay key. */
+    /** Lý do lỗi cuối cùng để hiển thị cho người dùng; repository phải lọc bỏ token/key trước khi lưu. */
     val errorMessage: String?,
     val attemptCount: Int,
     val createdAtMillis: Long,
     val updatedAtMillis: Long,
+    /**
+     * Theo giao thức chống đăng trùng trong docs/research-social-api.md: worker ghi thời điểm bắt đầu
+     * gọi API trước khi gửi, để biết lần thử nào bị gián đoạn giữa chừng.
+     */
+    val attemptStartedAtMillis: Long? = null,
+    /**
+     * true khi lần gọi API gần nhất không rõ kết quả (ví dụ timeout sau khi đã gửi): server có thể
+     * đã nhận bài, nên phải kiểm tra trên mạng xã hội trước khi thử lại thay vì đăng lại ngay.
+     */
+    val outcomeUnknown: Boolean = false,
 )

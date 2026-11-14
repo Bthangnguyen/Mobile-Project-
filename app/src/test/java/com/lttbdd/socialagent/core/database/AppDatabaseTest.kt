@@ -119,14 +119,31 @@ class AppDatabaseTest {
     }
 
     @Test
-    fun `draft with a queued or publishing post cannot be deleted`() = runTest {
+    fun `draft cannot be deleted while any of its posts is not yet published`() = runTest {
+        PostStatus.entries.filter { it != PostStatus.PUBLISHED }.forEachIndexed { index, status ->
+            val draftId = "d$index"
+            db.draftDao().upsert(draft(draftId, updatedAt = 0).copy(topicId = "t$index"))
+            db.postDao().insertIfAbsent(
+                post(id = "p$index", key = "key-$index").copy(draftId = draftId, status = status),
+            )
+
+            val deleted = db.draftDao().deleteById(draftId)
+
+            assertEquals("status $status phải chặn xoá", 0, deleted)
+            assertNotNull(db.draftDao().getById(draftId))
+        }
+    }
+
+    @Test
+    fun `inserting a post with an existing id is also ignored`() = runTest {
         db.draftDao().upsert(draft("d1", updatedAt = 0))
-        db.postDao().insertIfAbsent(post(id = "p1", key = "key-1").copy(status = PostStatus.PUBLISHING))
+        val dao = db.postDao()
+        dao.insertIfAbsent(post(id = "p1", key = "key-1"))
 
-        val deleted = db.draftDao().deleteById("d1")
+        val result = dao.insertIfAbsent(post(id = "p1", key = "key-2"))
 
-        assertEquals(0, deleted)
-        assertNotNull(db.draftDao().getById("d1"))
+        assertEquals(-1L, result)
+        assertNull(dao.getByIdempotencyKey("key-2"))
     }
 
     @Test

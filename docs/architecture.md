@@ -17,7 +17,8 @@ UI layer                          Data layer
 - **Repository / Client** nói chuyện với mạng, DB, WorkManager.
 - **Offline-first:** UI đọc từ Room; mạng chỉ cập nhật Room. Nhờ đó app vẫn xem được dữ liệu khi mất mạng (F9).
   Repository của từng tính năng inject DAO (`DraftDao`, `PostDao`, `CommentDao`, `MetricsDao`) từ `di/DatabaseModule.kt`,
-  đọc bằng `Flow` và đổi entity ↔ model qua `core/database/Mappers.kt`. Đổi schema thì tăng `version` trong
+  đọc bằng `Flow` và đổi entity ↔ model qua `core/database/Mappers.kt`. Riêng bài đăng chưa có model trong
+  `core/model`, nên repository F5 dùng thẳng `PostEntity` (muốn có model `Post` thì mở issue `contract`). Đổi schema thì tăng `version` trong
   `AppDatabase`, thêm migration và commit file mới trong `app/schemas/`.
 
 ## Hợp đồng chung (`core/`)

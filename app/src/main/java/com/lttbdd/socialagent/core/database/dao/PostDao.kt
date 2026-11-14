@@ -25,8 +25,9 @@ interface PostDao {
     suspend fun getByIdempotencyKey(idempotencyKey: String): PostEntity?
 
     /**
-     * Thêm bài đăng mới. Trả về -1 khi [PostEntity.idempotencyKey] đã tồn tại,
-     * tức lần bấm đăng này đã được ghi trước đó và không được tạo bài trùng.
+     * Thêm bài đăng mới; chặn tạo **bản ghi** trùng (chặn đăng trùng thật sự cần thêm `outcomeUnknown`, xem #38).
+     * Trả về -1 khi [PostEntity.idempotencyKey] hoặc [PostEntity.id] đã tồn tại. Khi nhận -1, gọi
+     * [getByIdempotencyKey] để xác nhận đây đúng là lần bấm đăng cũ trước khi coi là trùng.
      * `IGNORE` không áp dụng cho khoá ngoại: [PostEntity.draftId] trỏ tới bản nháp không tồn tại
      * vẫn ném `SQLiteConstraintException`, nên phải lưu bản nháp trước.
      */

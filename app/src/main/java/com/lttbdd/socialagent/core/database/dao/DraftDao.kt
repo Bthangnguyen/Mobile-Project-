@@ -7,6 +7,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
 import com.lttbdd.socialagent.core.database.entity.DraftEntity
+import com.lttbdd.socialagent.core.model.PostStatus
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -39,20 +40,24 @@ abstract class DraftDao {
     }
 
     /**
-     * Xoá bản nháp, trừ khi nó đang có bài chờ đăng hoặc đang đăng (sẽ mất nội dung cần đăng).
-     * Trả về số dòng đã xoá: 0 nghĩa là không tồn tại hoặc bị chặn.
+     * Xoá bản nháp, chỉ khi mọi bài đăng của nó đã [PostStatus.PUBLISHED]. Bảng `posts` không lưu nội dung,
+     * nên bài còn ở trạng thái khác (QUEUED, PUBLISHING, FAILED chờ thử lại, HANDED_OFF chờ người dùng tự đăng…)
+     * vẫn cần bản nháp. Trả về số dòng đã xoá: 0 nghĩa là không tồn tại hoặc bị chặn.
      */
+    open suspend fun deleteById(id: String): Int = deleteIfAllPostsIn(id, PostStatus.PUBLISHED)
+
+    /** Truyền trạng thái bằng tham số thay vì viết cứng chuỗi trong SQL, để đổi tên enum không làm mất tác dụng. */
     @Query(
         """
         DELETE FROM drafts
         WHERE id = :id
           AND NOT EXISTS (
             SELECT 1 FROM posts
-            WHERE posts.draftId = :id AND posts.status IN ('QUEUED', 'PUBLISHING')
+            WHERE posts.draftId = :id AND posts.status != :finishedStatus
           )
         """,
     )
-    abstract suspend fun deleteById(id: String): Int
+    protected abstract suspend fun deleteIfAllPostsIn(id: String, finishedStatus: PostStatus): Int
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     protected abstract suspend fun insert(draft: DraftEntity)

@@ -55,12 +55,7 @@
 
     <fragment
         android:id="@+id/settingsFragment"
-        android:name="com.lttbdd.socialagent.core.ui.PlaceholderFragment"
-        android:label="@string/nav_settings">
-        <argument
-            android:name="titleRes"
-            android:defaultValue="@string/nav_settings"
-            app:argType="reference" />
-    </fragment>
+        android:name="com.lttbdd.socialagent.feature.settings.SettingsFragment"
+        android:label="@string/nav_settings" />
 
 </navigation>

@@ -135,6 +135,50 @@ class AppDatabaseTest {
     }
 
     @Test
+    fun `one unpublished post among published ones still blocks deletion`() = runTest {
+        db.draftDao().upsert(draft("d1", updatedAt = 0))
+        db.postDao().insertIfAbsent(post(id = "p1", key = "k1").copy(status = PostStatus.PUBLISHED))
+        db.postDao().insertIfAbsent(post(id = "p2", key = "k2").copy(status = PostStatus.FAILED))
+
+        assertEquals(0, db.draftDao().deleteById("d1"))
+        assertEquals(1, db.draftDao().countPendingPosts("d1"))
+    }
+
+    @Test
+    fun `confirmed delete removes unpublished posts and keeps published ones`() = runTest {
+        db.draftDao().upsert(draft("d1", updatedAt = 0))
+        db.postDao().insertIfAbsent(post(id = "p1", key = "k1").copy(status = PostStatus.PUBLISHED))
+        db.postDao().insertIfAbsent(post(id = "p2", key = "k2").copy(status = PostStatus.HANDED_OFF))
+
+        val deleted = db.draftDao().deleteWithPendingPosts("d1")
+
+        assertEquals(1, deleted)
+        assertNull(db.draftDao().getById("d1"))
+        assertNull(db.postDao().getByIdempotencyKey("k2"))
+        assertNull(db.postDao().getByIdempotencyKey("k1")?.draftId)
+        assertNotNull(db.postDao().getByIdempotencyKey("k1"))
+    }
+
+    @Test
+    fun `attempt fields are stored and read back`() = runTest {
+        db.draftDao().upsert(draft("d1", updatedAt = 0))
+        val dao = db.postDao()
+        dao.insertIfAbsent(post(id = "p1", key = "k1"))
+
+        dao.update(
+            post(id = "p1", key = "k1").copy(
+                status = PostStatus.PUBLISHING,
+                attemptStartedAtMillis = 1_234,
+                outcomeUnknown = true,
+            ),
+        )
+
+        val stored = dao.getByIdempotencyKey("k1")
+        assertEquals(1_234L, stored?.attemptStartedAtMillis)
+        assertEquals(true, stored?.outcomeUnknown)
+    }
+
+    @Test
     fun `inserting a post with an existing id is also ignored`() = runTest {
         db.draftDao().upsert(draft("d1", updatedAt = 0))
         val dao = db.postDao()

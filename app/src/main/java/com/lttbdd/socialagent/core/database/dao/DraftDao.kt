@@ -42,9 +42,30 @@ abstract class DraftDao {
     /**
      * Xoá bản nháp, chỉ khi mọi bài đăng của nó đã [PostStatus.PUBLISHED]. Bảng `posts` không lưu nội dung,
      * nên bài còn ở trạng thái khác (QUEUED, PUBLISHING, FAILED chờ thử lại, HANDED_OFF chờ người dùng tự đăng…)
-     * vẫn cần bản nháp. Trả về số dòng đã xoá: 0 nghĩa là không tồn tại hoặc bị chặn.
+     * vẫn cần bản nháp. Trả về số dòng đã xoá: 0 nghĩa là không tồn tại hoặc bị chặn — dùng [countPendingPosts]
+     * để biết lý do, và [deleteWithPendingPosts] khi người dùng xác nhận bỏ luôn các bài chưa đăng.
      */
     open suspend fun deleteById(id: String): Int = deleteIfAllPostsIn(id, PostStatus.PUBLISHED)
+
+    /** Số bài của bản nháp chưa [PostStatus.PUBLISHED] — lớn hơn 0 thì [deleteById] sẽ bị chặn. */
+    open suspend fun countPendingPosts(draftId: String): Int = countPostsNotIn(draftId, PostStatus.PUBLISHED)
+
+    /**
+     * Lối thoát có chủ đích: xoá bản nháp kèm mọi bài chưa đăng của nó (bỏ bài lỗi, huỷ bài bàn giao…).
+     * Chỉ gọi sau khi người dùng xác nhận. Bài đã [PostStatus.PUBLISHED] vẫn được giữ, `draftId` chuyển thành null.
+     * Trả về số bản nháp đã xoá (0 hoặc 1).
+     */
+    @Transaction
+    open suspend fun deleteWithPendingPosts(id: String): Int {
+        deletePostsNotIn(id, PostStatus.PUBLISHED)
+        return deleteIfAllPostsIn(id, PostStatus.PUBLISHED)
+    }
+
+    @Query("SELECT COUNT(*) FROM posts WHERE draftId = :draftId AND status != :finishedStatus")
+    protected abstract suspend fun countPostsNotIn(draftId: String, finishedStatus: PostStatus): Int
+
+    @Query("DELETE FROM posts WHERE draftId = :draftId AND status != :finishedStatus")
+    protected abstract suspend fun deletePostsNotIn(draftId: String, finishedStatus: PostStatus)
 
     /** Truyền trạng thái bằng tham số thay vì viết cứng chuỗi trong SQL, để đổi tên enum không làm mất tác dụng. */
     @Query(

@@ -1,4 +1,4 @@
-package com.lttbdd.socialagent.feature.settings
+package com.lttbdd.socialagent.data.settings
 
 /** Đọc và đổi ngôn ngữ giao diện của app. Tách thành interface để ViewModel test được không cần Android. */
 interface LanguageManager {

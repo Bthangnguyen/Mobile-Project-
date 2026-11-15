@@ -2,8 +2,6 @@ package com.lttbdd.socialagent.data.settings
 
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
-import com.lttbdd.socialagent.feature.settings.AppLanguage
-import com.lttbdd.socialagent.feature.settings.LanguageManager
 import javax.inject.Inject
 
 /**

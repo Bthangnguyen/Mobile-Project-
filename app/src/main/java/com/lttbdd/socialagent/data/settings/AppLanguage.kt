@@ -1,4 +1,4 @@
-package com.lttbdd.socialagent.feature.settings
+package com.lttbdd.socialagent.data.settings
 
 /** Ngôn ngữ giao diện người dùng chọn trong Cài đặt (F9). [tag] là BCP 47; rỗng nghĩa là theo hệ thống. */
 enum class AppLanguage(val tag: String) {

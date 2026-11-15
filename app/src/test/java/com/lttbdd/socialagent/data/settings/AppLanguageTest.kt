@@ -1,4 +1,4 @@
-package com.lttbdd.socialagent.feature.settings
+package com.lttbdd.socialagent.data.settings
 
 import org.junit.Assert.assertEquals
 import org.junit.Test

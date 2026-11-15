@@ -1,5 +1,7 @@
 package com.lttbdd.socialagent.feature.settings
 
+import com.lttbdd.socialagent.data.settings.AppLanguage
+import com.lttbdd.socialagent.data.settings.LanguageManager
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

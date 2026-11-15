@@ -1,6 +1,8 @@
 package com.lttbdd.socialagent.feature.settings
 
 import androidx.lifecycle.ViewModel
+import com.lttbdd.socialagent.data.settings.AppLanguage
+import com.lttbdd.socialagent.data.settings.LanguageManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

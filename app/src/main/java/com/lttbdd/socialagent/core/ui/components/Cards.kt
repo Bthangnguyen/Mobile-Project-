@@ -50,7 +50,6 @@ class AppDivider @JvmOverloads constructor(
 
     init {
         setBackgroundColor(context.getColor(R.color.brand_surface_variant))
-        contentDescription = context.getString(R.string.ui_divider_description)
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {

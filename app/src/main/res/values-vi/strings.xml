@@ -8,4 +8,30 @@
     <string name="nav_settings">Cài đặt</string>
 
     <string name="placeholder_coming_soon">Sắp ra mắt</string>
+    <string name="action_done">Xong</string>
+    <string name="action_cancel">Hủy</string>
+
+    <string name="status_connected">Đã kết nối</string>
+    <string name="status_disconnected">Đã ngắt kết nối</string>
+    <string name="status_connecting">Đang kết nối</string>
+    <string name="status_expired">Đã hết hạn</string>
+    <string name="status_draft">Bản nháp</string>
+    <string name="status_queued">Đang chờ đăng</string>
+    <string name="status_pending_approval">Chờ duyệt</string>
+    <string name="status_publishing">Đang đăng</string>
+    <string name="status_published">Đã đăng</string>
+    <string name="status_failed">Thất bại</string>
+    <string name="status_handed_off">Đã bàn giao</string>
+    <string name="agent_step_creating_brief">Đang tạo tóm tắt</string>
+    <string name="agent_step_generating_outline">Đang tạo dàn ý</string>
+    <string name="agent_step_writing_draft">Đang viết bản nháp</string>
+    <string name="agent_step_reviewing_content">Đang rà soát nội dung</string>
+    <string name="agent_step_generating_image_prompt">Đang tạo mô tả hình ảnh</string>
+    <string name="agent_step_generating_image">Đang tạo hình ảnh</string>
+    <string name="agent_step_completing_result">Đang hoàn tất kết quả</string>
+    <string name="agent_progress_waiting">Đang chờ</string>
+    <string name="agent_progress_in_progress">Đang thực hiện</string>
+    <string name="agent_progress_completed">Hoàn tất</string>
+    <string name="agent_progress_failed">Thất bại</string>
+    <string name="channel_status_content_description">Tài khoản %2$s trên %1$s, %3$s</string>
 </resources>

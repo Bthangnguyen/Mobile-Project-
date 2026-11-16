@@ -1,0 +1,254 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="@dimen/screen_padding">
+
+        <com.lttbdd.socialagent.core.ui.components.AppToolbar
+            android:id="@+id/demo_toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:title="@string/ui_demo_title" />
+
+        <com.google.android.material.textview.MaterialTextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing"
+            android:text="@string/ui_demo_buttons"
+            android:textAppearance="@style/TextAppearance.SocialAgent.Headline" />
+
+        <com.lttbdd.socialagent.core.ui.components.PrimaryButton
+            android:id="@+id/button_primary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/ui_demo_primary_button" />
+
+        <com.lttbdd.socialagent.core.ui.components.SecondaryButton
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/ui_demo_secondary_button" />
+
+        <com.lttbdd.socialagent.core.ui.components.OutlinedButton
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/ui_demo_outlined_button" />
+
+        <com.lttbdd.socialagent.core.ui.components.TextButton
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/ui_demo_text_button" />
+
+        <com.lttbdd.socialagent.core.ui.components.IconButton
+            android:id="@+id/icon_button"
+            android:layout_width="@dimen/button_height"
+            android:layout_height="@dimen/button_height"
+            android:contentDescription="@string/ui_demo_icon_button"
+            app:icon="@drawable/ic_search_24" />
+
+        <com.google.android.material.textview.MaterialTextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing"
+            android:text="@string/ui_demo_inputs"
+            android:textAppearance="@style/TextAppearance.SocialAgent.Headline" />
+
+        <com.lttbdd.socialagent.core.ui.components.AppTextField
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/ui_demo_text_hint">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="textCapSentences" />
+        </com.lttbdd.socialagent.core.ui.components.AppTextField>
+
+        <com.lttbdd.socialagent.core.ui.components.AppPasswordField
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/ui_demo_password_hint">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+        </com.lttbdd.socialagent.core.ui.components.AppPasswordField>
+
+        <com.lttbdd.socialagent.core.ui.components.AppSearchField
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/ui_demo_search_hint">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:imeOptions="actionSearch"
+                android:inputType="text" />
+        </com.lttbdd.socialagent.core.ui.components.AppSearchField>
+
+        <com.google.android.material.textview.MaterialTextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing"
+            android:text="@string/ui_demo_cards"
+            android:textAppearance="@style/TextAppearance.SocialAgent.Headline" />
+
+        <com.lttbdd.socialagent.core.ui.components.AppSection
+            android:id="@+id/section_channels"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/section_description"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textAppearance="@style/TextAppearance.SocialAgent.Body" />
+        </com.lttbdd.socialagent.core.ui.components.AppSection>
+
+        <com.lttbdd.socialagent.core.ui.components.AppCard
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/card_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textAppearance="@style/TextAppearance.SocialAgent.Body" />
+        </com.lttbdd.socialagent.core.ui.components.AppCard>
+
+        <com.lttbdd.socialagent.core.ui.components.AppDivider
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing" />
+
+        <com.google.android.material.textview.MaterialTextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing"
+            android:text="@string/ui_demo_navigation"
+            android:textAppearance="@style/TextAppearance.SocialAgent.Headline" />
+
+        <com.lttbdd.socialagent.core.ui.components.AppBottomNavigation
+            android:id="@+id/bottom_navigation"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <com.google.android.material.textview.MaterialTextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing"
+            android:text="@string/ui_demo_feedback"
+            android:textAppearance="@style/TextAppearance.SocialAgent.Headline" />
+
+        <com.lttbdd.socialagent.core.ui.components.AppLoading
+            android:id="@+id/loading_indicator"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/ui_demo_progress_label" />
+
+        <com.lttbdd.socialagent.core.ui.components.AppProgressIndicator
+            android:id="@+id/progress_indicator"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/ui_demo_progress_label" />
+
+        <com.lttbdd.socialagent.core.ui.components.AppEmptyState
+            android:id="@+id/empty_state"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing" />
+
+        <com.lttbdd.socialagent.core.ui.components.AppErrorState
+            android:id="@+id/error_state"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing" />
+
+        <com.lttbdd.socialagent.core.ui.components.PrimaryButton
+            android:id="@+id/feedback_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/ui_demo_feedback_action" />
+
+        <com.lttbdd.socialagent.core.ui.components.PrimaryButton
+            android:id="@+id/dialog_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/ui_demo_dialog_action" />
+
+        <com.google.android.material.textview.MaterialTextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing"
+            android:text="@string/ui_demo_status"
+            android:textAppearance="@style/TextAppearance.SocialAgent.Headline" />
+
+        <com.lttbdd.socialagent.core.ui.components.AppSection
+            android:id="@+id/status_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <com.google.android.material.textview.MaterialTextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing"
+            android:text="@string/ui_demo_selection"
+            android:textAppearance="@style/TextAppearance.SocialAgent.Headline" />
+
+        <com.lttbdd.socialagent.core.ui.components.StyledCheckbox
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/ui_demo_checkbox" />
+
+        <com.lttbdd.socialagent.core.ui.components.StyledRadioButton
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/ui_demo_radio" />
+
+        <com.lttbdd.socialagent.core.ui.components.StyledSwitch
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/ui_demo_switch" />
+
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.SocialAgent.TextInputLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/ui_demo_dropdown_hint">
+
+            <com.lttbdd.socialagent.core.ui.components.AppDropdown
+                android:id="@+id/dropdown"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textview.MaterialTextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing"
+            android:text="@string/ui_demo_ai"
+            android:textAppearance="@style/TextAppearance.SocialAgent.Headline" />
+
+        <com.lttbdd.socialagent.core.ui.components.ai.AgentProgress
+            android:id="@+id/agent_progress"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <com.lttbdd.socialagent.core.ui.components.AppSection
+            android:id="@+id/channel_status_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <com.lttbdd.socialagent.core.ui.components.ai.ChannelStatus
+                android:id="@+id/channel_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+        </com.lttbdd.socialagent.core.ui.components.AppSection>
+    </LinearLayout>
+</ScrollView>

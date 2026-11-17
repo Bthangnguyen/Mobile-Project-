@@ -154,7 +154,7 @@ class AppDatabaseTest {
 
         val result = db.draftDao().deleteWithPendingPosts("d1")
 
-        assertEquals(DraftDeletion(deleted = true, postsInFlight = 0), result)
+        assertEquals(DraftDeletion(deleted = true, postsRemoved = 2, postsInFlight = 0), result)
         assertNull(db.draftDao().getById("d1"))
         assertNull(db.postDao().getByIdempotencyKey("k2"))
         assertNull(db.postDao().getByIdempotencyKey("k3"))
@@ -173,7 +173,7 @@ class AppDatabaseTest {
 
         val result = db.draftDao().deleteWithPendingPosts("d1")
 
-        assertEquals(DraftDeletion(deleted = false, postsInFlight = 2), result)
+        assertEquals(DraftDeletion(deleted = false, postsRemoved = 1, postsInFlight = 2), result)
         assertNotNull(db.draftDao().getById("d1"))
         assertNotNull(db.postDao().getByIdempotencyKey("k1"))
         assertNotNull(db.postDao().getByIdempotencyKey("k2"))
@@ -191,7 +191,7 @@ class AppDatabaseTest {
 
     @Test
     fun `confirmed delete of a missing draft does nothing`() = runTest {
-        assertEquals(DraftDeletion(deleted = false, postsInFlight = 0), db.draftDao().deleteWithPendingPosts("missing"))
+        assertEquals(DraftDeletion(deleted = false, postsRemoved = 0, postsInFlight = 0), db.draftDao().deleteWithPendingPosts("missing"))
     }
 
     @Test

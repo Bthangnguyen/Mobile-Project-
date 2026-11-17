@@ -11,10 +11,12 @@ import com.lttbdd.socialagent.core.model.PostStatus
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Kết quả của [DraftDao.deleteWithPendingPosts]. [deleted] = false và [postsInFlight] > 0 nghĩa là còn bài
- * đang đăng hoặc chưa rõ kết quả, UI nên báo "đang đăng, thử lại sau".
+ * Kết quả của [DraftDao.deleteWithPendingPosts].
+ * - [postsRemoved]: số bài chưa đăng đã bị bỏ — **luôn được bỏ**, kể cả khi bản nháp được giữ lại.
+ * - [postsInFlight] > 0 (khi đó [deleted] = false): còn bài đang đăng hoặc chưa rõ kết quả nên bản nháp được giữ;
+ *   UI nên báo "đã bỏ [postsRemoved] bài, còn [postsInFlight] bài đang đăng, thử lại sau".
  */
-data class DraftDeletion(val deleted: Boolean, val postsInFlight: Int)
+data class DraftDeletion(val deleted: Boolean, val postsRemoved: Int, val postsInFlight: Int)
 
 @Dao
 abstract class DraftDao {
@@ -59,15 +61,16 @@ abstract class DraftDao {
     /**
      * Lối thoát có chủ đích khi người dùng xác nhận bỏ các bài chưa đăng (bài lỗi, bài bàn giao, bài còn trong hàng đợi…).
      * Không bao giờ bỏ bài đang [PostStatus.PUBLISHING] hoặc có `outcomeUnknown = true`: bài đó có thể đã lên mạng xã hội,
-     * xoá đi sẽ mất khoá chống đăng trùng. Khi còn bài như vậy, bản nháp được giữ lại để thử lại sau.
+     * xoá đi sẽ mất khoá chống đăng trùng. Khi còn bài như vậy, bản nháp được giữ lại để thử lại sau, nhưng các bài
+     * khác vẫn đã bị bỏ — xem [DraftDeletion.postsRemoved] để báo đúng cho người dùng.
      * Caller nên huỷ job đăng (WorkManager) của các bài `QUEUED` trước khi gọi.
      */
     @Transaction
     open suspend fun deleteWithPendingPosts(id: String): DraftDeletion {
-        deleteAbandonablePosts(id, PostStatus.PUBLISHED, PostStatus.PUBLISHING)
+        val removed = deleteAbandonablePosts(id, PostStatus.PUBLISHED, PostStatus.PUBLISHING)
         val inFlight = countPostsNotIn(id, PostStatus.PUBLISHED)
         val deleted = deleteIfAllPostsIn(id, PostStatus.PUBLISHED) > 0
-        return DraftDeletion(deleted = deleted, postsInFlight = inFlight)
+        return DraftDeletion(deleted = deleted, postsRemoved = removed, postsInFlight = inFlight)
     }
 
     @Query("SELECT COUNT(*) FROM posts WHERE draftId = :draftId AND status != :finishedStatus")
@@ -86,7 +89,7 @@ abstract class DraftDao {
         draftId: String,
         finishedStatus: PostStatus,
         inFlightStatus: PostStatus,
-    )
+    ): Int
 
     /** Truyền trạng thái bằng tham số thay vì viết cứng chuỗi trong SQL, để đổi tên enum không làm mất tác dụng. */
     @Query(

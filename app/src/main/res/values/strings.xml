@@ -10,6 +10,13 @@
 
     <string name="placeholder_coming_soon">Coming soon</string>
 
+    <string name="settings_language_title">Language</string>
+    <string name="settings_language_description">Choose the language of the app. The screen reloads after you change it.</string>
+    <string name="settings_language_system">System default</string>
+    <!-- Tên ngôn ngữ viết bằng chính ngôn ngữ đó để người dùng luôn nhận ra. -->
+    <string name="settings_language_vietnamese">Tiếng Việt</string>
+    <string name="settings_language_english">English</string>
+
     <!-- Quản lý BYOK, Issue #53. -->
     <string name="api_keys_title">LLM API keys</string>
     <string name="api_keys_openai">OpenAI</string>

@@ -20,6 +20,12 @@ const crypto = require('node:crypto');
 const AUTHORIZATION_TTL_MS = 10 * 60 * 1000;
 const EXCHANGE_TTL_MS = 60 * 1000;
 const MAX_PENDING = 1000;
+// Giới hạn theo IP để một người không làm đầy kho phiên của mọi người (xem review PR #22).
+const MAX_PENDING_PER_IP = 20;
+const START_LIMIT_PER_MINUTE = 20;
+const TOKEN_LIMIT_PER_MINUTE = 60;
+const RATE_WINDOW_MS = 60 * 1000;
+const MAX_TRACKED_IPS = 10000;
 const MAX_BODY_BYTES = 4096;
 const LINKEDIN_TOKEN_ENDPOINT = 'https://www.linkedin.com/oauth/v2/accessToken';
 
@@ -60,11 +66,50 @@ class ExpiringStore {
     return entry.expiresAt > this.now() ? entry.value : null;
   }
 
+  /** Số mục còn hạn thỏa điều kiện [predicate]. */
+  countWhere(predicate) {
+    this.sweep();
+    let n = 0;
+    for (const entry of this.items.values()) {
+      if (predicate(entry.value)) n += 1;
+    }
+    return n;
+  }
+
   sweep() {
     const t = this.now();
     for (const [key, entry] of this.items) {
       if (entry.expiresAt <= t) this.items.delete(key);
     }
+  }
+}
+
+/** Giới hạn tần suất theo khóa (IP) bằng cửa sổ cố định; bộ nhớ bị chặn trên bởi MAX_TRACKED_IPS. */
+class RateLimiter {
+  constructor(now, limit, windowMs) {
+    this.now = now;
+    this.limit = limit;
+    this.windowMs = windowMs;
+    this.hits = new Map();
+  }
+
+  /** Trả true nếu lần gọi này còn trong hạn mức. */
+  allow(key) {
+    const t = this.now();
+    if (this.hits.size >= MAX_TRACKED_IPS) {
+      for (const [k, entry] of this.hits) {
+        if (entry.resetAt <= t) this.hits.delete(k);
+      }
+      // Vẫn đầy sau khi dọn: từ chối khóa mới thay vì phình bộ nhớ.
+      if (this.hits.size >= MAX_TRACKED_IPS && !this.hits.has(key)) return false;
+    }
+    const entry = this.hits.get(key);
+    if (!entry || entry.resetAt <= t) {
+      this.hits.set(key, { count: 1, resetAt: t + this.windowMs });
+      return true;
+    }
+    entry.count += 1;
+    return entry.count <= this.limit;
   }
 }
 
@@ -76,6 +121,24 @@ function createApp({ config, fetchImpl = globalThis.fetch, now = Date.now, rando
   const callbackUrl = `${config.publicUrl.replace(/\/+$/, '')}/auth/linkedin/callback`;
   const pending = new ExpiringStore(now, AUTHORIZATION_TTL_MS);
   const exchanges = new ExpiringStore(now, EXCHANGE_TTL_MS);
+  const startLimiter = new RateLimiter(now, START_LIMIT_PER_MINUTE, RATE_WINDOW_MS);
+  const tokenLimiter = new RateLimiter(now, TOKEN_LIMIT_PER_MINUTE, RATE_WINDOW_MS);
+  const proxyHops = Number.isInteger(config.trustedProxyHops) ? config.trustedProxyHops : 0;
+
+  /**
+   * IP của người gọi. Chỉ tin X-Forwarded-For khi đứng sau proxy tin cậy (proxyHops > 0): lấy phần tử
+   * thứ proxyHops tính từ cuối, vì đó là giá trị do proxy của hosting thêm vào (các giá trị bên trái có thể bị giả mạo).
+   */
+  function clientIp(req) {
+    if (proxyHops > 0) {
+      const parts = String(req.headers['x-forwarded-for'] || '')
+        .split(',')
+        .map((p) => p.trim())
+        .filter(Boolean);
+      if (parts.length >= proxyHops) return parts[parts.length - proxyHops];
+    }
+    return (req.socket && req.socket.remoteAddress) || 'unknown';
+  }
 
   function sendJson(res, status, body) {
     const payload = JSON.stringify(body);
@@ -130,6 +193,11 @@ function createApp({ config, fetchImpl = globalThis.fetch, now = Date.now, rando
   }
 
   async function handleStart(req, res) {
+    const ip = clientIp(req);
+    if (!startLimiter.allow(ip)) {
+      res.setHeader('Retry-After', '60');
+      return sendJson(res, 429, { error: 'rate_limited' });
+    }
     let body;
     try {
       body = await readJson(req);
@@ -139,7 +207,12 @@ function createApp({ config, fetchImpl = globalThis.fetch, now = Date.now, rando
     if (!STATE_PATTERN.test(String(body.state)) || !CHALLENGE_PATTERN.test(String(body.code_challenge))) {
       return sendJson(res, 400, { error: 'invalid_request' });
     }
-    if (!pending.put(body.state, { challenge: body.code_challenge })) {
+    // Mỗi IP chỉ được giữ một số phiên đang chờ nhất định, để một người không chiếm hết MAX_PENDING.
+    if (pending.countWhere((v) => v.ip === ip) >= MAX_PENDING_PER_IP) {
+      res.setHeader('Retry-After', '60');
+      return sendJson(res, 429, { error: 'rate_limited' });
+    }
+    if (!pending.put(body.state, { challenge: body.code_challenge, ip })) {
       return sendJson(res, 503, { error: 'busy' });
     }
     return sendJson(res, 200, { ok: true });
@@ -194,11 +267,18 @@ function createApp({ config, fetchImpl = globalThis.fetch, now = Date.now, rando
     if (!token) return redirectToApp(res, { error: 'exchange_failed', state });
 
     const exchangeCode = makeToken();
-    exchanges.put(exchangeCode, { state, challenge: session.challenge, token });
+    // Kho mã đổi đầy thì không được chuyển exchange_code "ma" về app: báo busy để người dùng thử lại.
+    if (!exchanges.put(exchangeCode, { state, challenge: session.challenge, token })) {
+      return redirectToApp(res, { error: 'busy', state });
+    }
     return redirectToApp(res, { exchange_code: exchangeCode, state });
   }
 
   async function handleToken(req, res) {
+    if (!tokenLimiter.allow(clientIp(req))) {
+      res.setHeader('Retry-After', '60');
+      return sendJson(res, 429, { error: 'rate_limited' });
+    }
     let body;
     try {
       body = await readJson(req);
@@ -237,4 +317,4 @@ function createApp({ config, fetchImpl = globalThis.fetch, now = Date.now, rando
   };
 }
 
-module.exports = { createApp, sha256Base64Url, EXCHANGE_TTL_MS, AUTHORIZATION_TTL_MS, LINKEDIN_TOKEN_ENDPOINT };
+module.exports = { createApp, RateLimiter, MAX_PENDING_PER_IP, START_LIMIT_PER_MINUTE, sha256Base64Url, EXCHANGE_TTL_MS, AUTHORIZATION_TTL_MS, LINKEDIN_TOKEN_ENDPOINT };

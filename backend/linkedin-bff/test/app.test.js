@@ -13,7 +13,7 @@ const VERIFIER = 'verifier-hop-le-0123456789-0123456789-0123456789-abcdef';
 const CHALLENGE = sha256Base64Url(VERIFIER);
 
 /** Dựng server thật trên cổng ngẫu nhiên, LinkedIn giả và đồng hồ điều khiển được. */
-async function setup({ linkedIn } = {}) {
+async function setup({ linkedIn, trustedProxyHops } = {}) {
   const clock = { t: 1_000_000 };
   const calls = [];
   const fetchImpl = async (url, init) => {
@@ -21,16 +21,20 @@ async function setup({ linkedIn } = {}) {
     return (linkedIn || (async () => ({ ok: true, json: async () => ({ access_token: 'AQtoken', expires_in: 5184000, scope: 'openid,profile,w_member_social', refresh_token: 'KHONG-DUOC-CHUYEN-TIEP' }) })))();
   };
   const handler = createApp({
-    config: { clientId: 'client_id_cong_khai', clientSecret: SECRET, publicUrl: 'https://bff.example.com/', appRedirectUri: APP_REDIRECT },
+    config: { clientId: 'client_id_cong_khai', clientSecret: SECRET, publicUrl: 'https://bff.example.com/', appRedirectUri: APP_REDIRECT, trustedProxyHops },
     fetchImpl,
     now: () => clock.t,
   });
   const server = http.createServer(handler);
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
-  const post = (path, body, headers = { 'Content-Type': 'application/json' }) =>
-    fetch(base + path, { method: 'POST', headers, body: typeof body === 'string' ? body : JSON.stringify(body) });
-  const get = (path) => fetch(base + path, { redirect: 'manual' });
+  const post = (path, body, headers = {}) =>
+    fetch(base + path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: typeof body === 'string' ? body : JSON.stringify(body),
+    });
+  const get = (path, headers = {}) => fetch(base + path, { redirect: 'manual', headers });
   return { server, post, get, clock, calls, close: () => new Promise((r) => server.close(r)) };
 }
 
@@ -289,4 +293,93 @@ test('đường dẫn lạ trả 404; healthz trả ok', async () => {
 test('sha256Base64Url khớp vector RFC 7636 Phụ lục B', () => {
   assert.equal(sha256Base64Url('dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk'), 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM');
   assert.equal(crypto.createHash('sha256').update('').digest('hex').length, 64);
+});
+
+// ---- Giới hạn tần suất và kho đầy (review PR #22) ----
+
+const stateN = (i) => `state_nhieu_phien_${String(i).padStart(6, '0')}_abcdef`;
+const ipN = (i) => `10.1.${i >> 8}.${i & 255}`;
+
+test('/start bị giới hạn 20 lần mỗi phút cho mỗi IP rồi trả 429, sang phút mới dùng lại được', async () => {
+  const ctx = await setup();
+  try {
+    for (let i = 0; i < 20; i += 1) {
+      const res = await ctx.post('/auth/linkedin/start', { state: stateN(i), code_challenge: CHALLENGE });
+      assert.equal(res.status, 200, `lần ${i + 1}`);
+    }
+    const blocked = await ctx.post('/auth/linkedin/start', { state: stateN(99), code_challenge: CHALLENGE });
+    assert.equal(blocked.status, 429);
+    assert.equal(blocked.headers.get('retry-after'), '60');
+
+    ctx.clock.t += 61 * 1000;
+    // Cửa sổ mới, nhưng IP này vẫn đang giữ 20 phiên chờ nên bị chặn theo hạn mức phiên chờ.
+    const stillBlocked = await ctx.post('/auth/linkedin/start', { state: stateN(100), code_challenge: CHALLENGE });
+    assert.equal(stillBlocked.status, 429);
+
+    ctx.clock.t += 10 * 60 * 1000;
+    const again = await ctx.post('/auth/linkedin/start', { state: stateN(101), code_challenge: CHALLENGE });
+    assert.equal(again.status, 200);
+  } finally {
+    await ctx.close();
+  }
+});
+
+test('một IP chiếm hạn mức không làm IP khác bị chặn (tin X-Forwarded-For phía proxy)', async () => {
+  const ctx = await setup({ trustedProxyHops: 1 });
+  try {
+    for (let i = 0; i < 21; i += 1) {
+      await ctx.post('/auth/linkedin/start', { state: stateN(i), code_challenge: CHALLENGE }, { 'X-Forwarded-For': '203.0.113.7' });
+    }
+    const attacker = await ctx.post('/auth/linkedin/start', { state: stateN(50), code_challenge: CHALLENGE }, { 'X-Forwarded-For': '203.0.113.7' });
+    assert.equal(attacker.status, 429);
+
+    const other = await ctx.post('/auth/linkedin/start', { state: stateN(51), code_challenge: CHALLENGE }, { 'X-Forwarded-For': '198.51.100.9' });
+    assert.equal(other.status, 200);
+  } finally {
+    await ctx.close();
+  }
+});
+
+test('giả mạo phần tử bên trái X-Forwarded-For không né được giới hạn', async () => {
+  const ctx = await setup({ trustedProxyHops: 1 });
+  try {
+    for (let i = 0; i < 20; i += 1) {
+      const res = await ctx.post(
+        '/auth/linkedin/start',
+        { state: stateN(i), code_challenge: CHALLENGE },
+        { 'X-Forwarded-For': `1.2.3.${i}, 203.0.113.7` },
+      );
+      assert.equal(res.status, 200);
+    }
+    const spoofed = await ctx.post(
+      '/auth/linkedin/start',
+      { state: stateN(60), code_challenge: CHALLENGE },
+      { 'X-Forwarded-For': '9.9.9.9, 203.0.113.7' },
+    );
+    assert.equal(spoofed.status, 429);
+  } finally {
+    await ctx.close();
+  }
+});
+
+test('kho mã đổi đầy: callback chuyển về app với error=busy, không có exchange_code', async () => {
+  const ctx = await setup({ trustedProxyHops: 1 });
+  try {
+    for (let i = 0; i < 1000; i += 1) {
+      const headers = { 'X-Forwarded-For': ipN(i) };
+      const st = await ctx.post('/auth/linkedin/start', { state: stateN(i), code_challenge: CHALLENGE }, headers);
+      assert.equal(st.status, 200, `start ${i}`);
+      const cb = await ctx.get(`/auth/linkedin/callback?code=c${i}&state=${stateN(i)}`, headers);
+      assert.ok(parseLocation(cb).get('exchange_code'), `callback ${i}`);
+    }
+    const headers = { 'X-Forwarded-For': ipN(2000) };
+    await ctx.post('/auth/linkedin/start', { state: stateN(2000), code_challenge: CHALLENGE }, headers);
+    const cb = await ctx.get(`/auth/linkedin/callback?code=cuoi&state=${stateN(2000)}`, headers);
+    const params = parseLocation(cb);
+    assert.equal(params.get('error'), 'busy');
+    assert.equal(params.get('state'), stateN(2000));
+    assert.equal(params.get('exchange_code'), null);
+  } finally {
+    await ctx.close();
+  }
 });

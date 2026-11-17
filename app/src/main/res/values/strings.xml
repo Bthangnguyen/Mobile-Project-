@@ -18,11 +18,8 @@
     <string name="channel_status_connected">Connected</string>
     <string name="channel_status_expired">Token Expired</string>
     <string name="channel_status_disconnected">Disconnected</string>
-    <string name="channel_empty_title">No Channels Connected</string>
     <string name="channel_empty_desc">Connect a channel (Facebook Page or LinkedIn) to view platform capability statuses</string>
     <string name="channel_capabilities_header">Platform Capabilities Matrix:</string>
-    <string name="channel_type_unknown">Unverified Type</string>
-    <string name="channel_keystore_error">Keystore Decryption Error</string>
     <string name="channel_facebook_login_error">Facebook login error</string>
     <string name="channel_facebook_cancel_title">Facebook login cancelled</string>
     <string name="channel_facebook_cancel_message">Do you want to log in with a different Facebook account?</string>
@@ -50,9 +47,7 @@
     <!-- Capability Statuses -->
     <string name="cap_status_supported">Supported ✅</string>
     <string name="cap_status_requires_perm">Requires Permission ⚠️</string>
-    <string name="cap_status_not_supported">Not Supported ❌</string>
     <string name="cap_status_handed_off">Manual hand-off ✋</string>
-    <string name="cap_status_unverified">Unverified ❓</string>
 
     <!-- Capability Captions -->
     <string name="cap_fb_publish_ok">Ready to publish via POST /{page-id}/feed (pages_manage_posts granted)</string>

@@ -10,6 +10,8 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.data.model.OAuthToken
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
 import javax.inject.Inject
@@ -66,7 +68,7 @@ class SecureTokenStore @Inject constructor(
             } catch (e: Exception) {
                 null
             }
-        }
+        }.flowOn(Dispatchers.IO) // Giải mã Keystore chạy ngoài Main thread.
     }
 
     /**

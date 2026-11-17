@@ -16,7 +16,7 @@ Fragment → ViewModel → Repository / ContentAgent → LlmClient
   mỗi request, không giữ key trong cấu hình, disk, UiState hay cache của router.
 - #53 nối `LlmModule.apiKeys(store)` với `ApiKeyStore.read(provider)` từ secure storage.
   Chỉ một binding `ApiKeySource`; mỗi request đọc lại bản mã và giải mã tạm thời, không đổi `core/`.
-  Chi tiết storage, quản lý key và bằng chứng kiểm thử tại [báo cáo #53](pr-53.md).
+  Storage/verifier ở `data/apikeys/`; màn quản lý key ở `feature/apikeys/`, mở từ mục API key trong Cài đặt.
 - Không có key/model mặc định. Thiếu cấu hình trả `MISSING_CONFIGURATION`; thiếu key trả
   `MISSING_API_KEY`, không ngầm dùng Fake hoặc provider khác.
 - `WRITE_POST` phục vụ chat/soạn trả lời; `CLASSIFY_COMMENT` phục vụ phân loại. `GENERATE_IMAGE`

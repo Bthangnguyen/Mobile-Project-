@@ -49,4 +49,7 @@
     <string name="api_keys_network">UNVERIFIED — network unavailable. Check your connection. Nothing was saved.</string>
     <string name="api_keys_timeout">UNVERIFIED — request timed out. Retry. Nothing was saved.</string>
     <string name="api_keys_unverified">UNVERIFIED — authentication could not be confirmed. Nothing was saved.</string>
+    <!-- Mục API key trong màn Cài đặt. -->
+    <string name="api_keys_settings_description">Add, check, replace or delete your own OpenAI and Gemini keys. Keys are encrypted and stored only on this device.</string>
+    <string name="api_keys_settings_manage">Manage API keys</string>
 </resources>

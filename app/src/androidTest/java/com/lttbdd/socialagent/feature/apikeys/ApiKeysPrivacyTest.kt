@@ -7,6 +7,7 @@ import android.widget.EditText
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
+import androidx.test.espresso.action.ViewActions.scrollTo
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
@@ -28,7 +29,8 @@ class ApiKeysPrivacyTest {
     fun passwordIsNotRestoredAfterActivityRecreation() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             onView(withId(R.id.settingsFragment)).perform(click())
-            onView(withId(R.id.manage_api_keys)).perform(click())
+            // Mục API key nằm trong ScrollView của màn Cài đặt, cuộn tới trước khi bấm.
+            onView(withId(R.id.manage_api_keys)).perform(scrollTo(), click())
             onView(withId(R.id.key_input)).check(matches(isDisplayed()))
             onView(withId(R.id.open_ai_button)).check(matches(withText(R.string.api_keys_openai)))
             onView(withId(R.id.gemini_button)).check(matches(withText(R.string.api_keys_gemini)))

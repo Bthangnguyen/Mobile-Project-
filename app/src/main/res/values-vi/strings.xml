@@ -47,4 +47,7 @@
     <string name="api_keys_network">CHƯA XÁC MINH — không có kết nối mạng. Kiểm tra kết nối. Chưa lưu key.</string>
     <string name="api_keys_timeout">CHƯA XÁC MINH — yêu cầu hết thời gian chờ. Hãy thử lại. Chưa lưu key.</string>
     <string name="api_keys_unverified">CHƯA XÁC MINH — chưa thể xác nhận xác thực. Chưa lưu key.</string>
+    <!-- Mục API key trong màn Cài đặt. -->
+    <string name="api_keys_settings_description">Thêm, kiểm tra, thay thế hoặc xóa key OpenAI và Gemini của bạn. Key được mã hóa và chỉ lưu trên thiết bị này.</string>
+    <string name="api_keys_settings_manage">Quản lý API key</string>
 </resources>

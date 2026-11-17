@@ -47,4 +47,19 @@ class FacebookPagesParserTest {
     fun `toString khong lo page token`() {
         assertFalse(FacebookPage("1", "A", "bi-mat").toString().contains("bi-mat"))
     }
+
+    @Test
+    fun `doc Page task, thieu truong tasks thi la null (chua biet), mang rong thi la rong`() {
+        val body = """{"data":[
+            {"id":"1","name":"A","access_token":"t1","tasks":["ANALYZE","MODERATE"]},
+            {"id":"2","name":"B","access_token":"t2"},
+            {"id":"3","name":"C","access_token":"t3","tasks":[]}
+        ]}"""
+
+        val pages = FacebookPagesParser.parse(body)
+
+        assertEquals(listOf("ANALYZE", "MODERATE"), pages[0].tasks)
+        assertEquals(null, pages[1].tasks)
+        assertEquals(emptyList<String>(), pages[2].tasks)
+    }
 }

@@ -4,6 +4,8 @@ import com.lttbdd.socialagent.core.model.ChannelAccount
 import com.lttbdd.socialagent.core.model.ChannelCapability
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.ConnectionStatus
+import com.lttbdd.socialagent.data.model.ChannelError
+import com.lttbdd.socialagent.data.model.ChannelException
 import com.lttbdd.socialagent.data.model.FacebookPage
 import com.lttbdd.socialagent.data.model.FacebookUserToken
 import com.lttbdd.socialagent.data.network.LinkedInBffAuth
@@ -187,12 +189,18 @@ class ChannelViewModelTest {
     }
 
     @Test
-    fun `ket noi thanh cong tra ve ten kenh de UI ghep chuoi da dich`() = runTest {
+    fun `ket noi thanh cong phat mot lan ten kenh, khong nam trong UiState`() = runTest {
         fakeRepository.pages = listOf(FacebookPage("p1", "Page Mot", "t1"))
+        val names = mutableListOf<String>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.connectedEvents.collect { names.add(it) } }
 
         connectWithFacebookToken()
 
-        assertEquals("Page Mot", (viewModel.uiState.value as ChannelUiState.Success).connectedName)
+        assertEquals(listOf("Page Mot"), names)
+        // Người đăng ký sau (Fragment được tạo lại) không nhận lại sự kiện cũ.
+        val late = mutableListOf<String>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.connectedEvents.collect { late.add(it) } }
+        assertTrue(late.isEmpty())
     }
 
     // ---- Facebook: hạn và quyền thật từ Meta SDK ----
@@ -277,7 +285,7 @@ class ChannelViewModelTest {
         assertEquals(state, sent.second)
         assertTrue("verifier dai 43..128 ky tu", sent.third.length in 43..128)
         assertEquals(fakeRepository.sessions.single().second, PkceUtil.generateCodeChallengeS256(sent.third))
-        assertEquals("LinkedIn Org Test", (viewModel.uiState.value as ChannelUiState.Success).connectedName)
+        assertEquals("LinkedIn Org Test", (viewModel.uiState.value as ChannelUiState.Success).channels.single().displayName)
     }
 
     @Test
@@ -293,14 +301,15 @@ class ChannelViewModelTest {
 
     @Test
     fun `state sai thi bao loi, khong doi ma va van giu phien dang cho`() = runTest {
+        val errors = mutableListOf<Int>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.errors.collect { errors.add(it) } }
         val (urls, _) = startLinkedIn()
         val state = stateOf(urls.single())
 
         callback("exchange_code=ma_gia&state=state_gia")
 
         assertNull(fakeRepository.lastBff)
-        val error = viewModel.uiState.value as ChannelUiState.Error
-        assertEquals(com.lttbdd.socialagent.R.string.channel_oauth_state_mismatch, error.messageRes)
+        assertEquals(listOf(com.lttbdd.socialagent.R.string.channel_oauth_state_mismatch), errors)
 
         callback("exchange_code=ma_that&state=$state")
         testDispatcher.scheduler.runCurrent()
@@ -332,12 +341,25 @@ class ChannelViewModelTest {
 
     @Test
     fun `nguoi dung huy thi bao huy va khong ket noi`() = runTest {
-        val (_, notices) = startLinkedIn()
+        val (urls, notices) = startLinkedIn()
 
-        callback("error=access_denied")
+        callback("error=access_denied&state=${stateOf(urls.single())}")
 
         assertEquals(listOf(ChannelNotice.LINKEDIN_LOGIN_CANCELLED), notices)
         assertNull(fakeRepository.lastBff)
+    }
+
+    @Test
+    fun `deep link huy khong kem state hoac sai state khong huy duoc phien dang cho`() = runTest {
+        val (urls, notices) = startLinkedIn()
+
+        callback("error=access_denied")
+        callback("error=access_denied&state=ke-tan-cong")
+
+        assertTrue(notices.isEmpty())
+        // Phiên thật vẫn dùng được sau các deep link giả.
+        callback("exchange_code=${"a".repeat(43)}&state=${stateOf(urls.single())}")
+        assertNotNull(fakeRepository.lastBff)
     }
 
     @Test
@@ -385,14 +407,41 @@ class ChannelViewModelTest {
     }
 
     @Test
-    fun `doi token that bai thi hien loi va khong them kenh`() = runTest {
-        fakeRepository.bffResult = Result.failure(IllegalStateException("BFF tu choi"))
+    fun `doi token that bai thi bao loi co kieu bang chuoi da dich va khong them kenh`() = runTest {
+        fakeRepository.bffResult = Result.failure(ChannelException(ChannelError.LINKEDIN_TOKEN_EXCHANGE_FAILED))
+        val errors = mutableListOf<Int>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.errors.collect { errors.add(it) } }
         val (urls, _) = startLinkedIn()
 
         callback("exchange_code=ma_doi&state=${stateOf(urls.single())}")
         testDispatcher.scheduler.runCurrent()
 
-        assertEquals("BFF tu choi", (viewModel.uiState.value as ChannelUiState.Error).message)
+        assertEquals(listOf(com.lttbdd.socialagent.R.string.channel_error_linkedin_exchange), errors)
+        assertTrue((viewModel.uiState.value as ChannelUiState.Success).channels.isEmpty())
+    }
+
+    @Test
+    fun `loi mang va loi la duoc anh xa sang chuoi chung, khong lo noi dung loi goc`() = runTest {
+        val errors = mutableListOf<Int>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.errors.collect { errors.add(it) } }
+
+        fakeRepository.bffResult = Result.failure(java.io.IOException("chi tiet noi bo cua OkHttp"))
+        val (urls, _) = startLinkedIn()
+        callback("exchange_code=ma_doi&state=${stateOf(urls.single())}")
+        testDispatcher.scheduler.runCurrent()
+
+        fakeRepository.bffResult = Result.failure(IllegalStateException("loi la"))
+        val (urls2, _) = startLinkedIn()
+        callback("exchange_code=ma_doi2&state=${stateOf(urls2.last())}")
+        testDispatcher.scheduler.runCurrent()
+
+        assertEquals(
+            listOf(
+                com.lttbdd.socialagent.R.string.channel_error_network,
+                com.lttbdd.socialagent.R.string.channel_oauth_error_generic,
+            ),
+            errors,
+        )
     }
 
     private class FakeChannelRepository : ChannelRepository {

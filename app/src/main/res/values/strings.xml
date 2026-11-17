@@ -64,7 +64,7 @@
     <string name="cap_fb_mention_handed_off">Mention is only documented in comments/replies when the Page has Page Mentioning enabled; not verified, so Social Agent hands it off and you add the mention yourself</string>
     <string name="cap_fb_mention_page_no_perm">Missing required permission: pages_manage_posts or pages_manage_engagement</string>
     <string name="cap_fb_metrics_ok">Ready to read insights via GET /{post-id}/insights (read_insights granted)</string>
-    <string name="cap_fb_metrics_no_perm">Missing required permission: read_insights</string>
+    <string name="cap_fb_metrics_no_perm">Missing required permission: read_insights, pages_read_engagement</string>
 
     <string name="cap_li_publish_ok">Ready to publish via POST /rest/posts (w_organization_social / w_member_social granted)</string>
     <string name="cap_li_publish_no_perm">Missing required permission: w_organization_social or w_member_social</string>
@@ -76,4 +76,15 @@
     <string name="cap_li_mention_no_perm">Missing required permission: w_organization_social or w_member_social</string>
     <string name="cap_li_metrics_ok">Ready to read statistics via GET /rest/organizationalEntityShareStatistics (rw_organization_admin granted)</string>
     <string name="cap_li_metrics_handed_off">Not available through the API for this app (needs LinkedIn Community Management API approval); Social Agent notifies you and you check statistics on LinkedIn yourself</string>
+    <string name="channel_error_network">Network error. Check your connection and try again.</string>
+    <string name="channel_error_linkedin_config">LinkedIn sign-in is not configured correctly (the server address must be HTTPS).</string>
+    <string name="channel_error_linkedin_session">Could not start the LinkedIn sign-in. Please try again.</string>
+    <string name="channel_error_linkedin_exchange">Could not complete the LinkedIn sign-in. Please sign in again.</string>
+    <string name="channel_error_linkedin_token_invalid">The sign-in server returned an invalid response. Please try again.</string>
+    <string name="channel_error_linkedin_profile">Could not read your LinkedIn account information. Please try again.</string>
+    <string name="channel_error_facebook_profile">Could not read your Facebook profile. Please try again.</string>
+    <string name="cap_fb_publish_no_task">Your Facebook account needs the Page task CREATE_CONTENT on this Page</string>
+    <string name="cap_fb_read_comments_no_task">Your Facebook account needs the Page task MODERATE on this Page</string>
+    <string name="cap_fb_reply_no_task">Your Facebook account needs the Page tasks MODERATE and CREATE_CONTENT on this Page</string>
+    <string name="cap_fb_metrics_no_task">Your Facebook account needs the Page task ANALYZE on this Page</string>
 </resources>

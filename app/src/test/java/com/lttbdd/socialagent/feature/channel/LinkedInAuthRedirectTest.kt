@@ -67,11 +67,18 @@ class LinkedInAuthRedirectTest {
     }
 
     @Test
-    fun `huy dang nhap hoac huy cap quyen duoc nhan dien la Cancelled khong can state`() {
+    fun `huy dang nhap hoac huy cap quyen duoc nhan dien la Cancelled khi state khop`() {
         listOf("user_cancelled_login", "user_cancelled_authorize", "access_denied").forEach { error ->
-            val url = "$base?error=$error&error_description=x"
+            val url = "$base?error=$error&error_description=x&state=$state"
 
             assertEquals(error, Result.Cancelled, LinkedInAuthRedirect.parse(url, base, state))
+        }
+    }
+
+    @Test
+    fun `huy hoac loi thieu state hay sai state thi that bai STATE_MISMATCH, khong huy duoc phien`() {
+        listOf("$base?error=access_denied", "$base?error=access_denied&state=ke-tan-cong", "$base?error=server_error").forEach { url ->
+            assertEquals(url, Result.Failure(FailureReason.STATE_MISMATCH), LinkedInAuthRedirect.parse(url, base, state))
         }
     }
 

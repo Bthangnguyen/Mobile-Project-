@@ -8,7 +8,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
-import androidx.activity.result.ActivityResultRegistryOwner
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
@@ -46,7 +45,38 @@ class ChannelFragment : Fragment() {
 
     private var facebookPageDialog: androidx.appcompat.app.AlertDialog? = null
     private lateinit var adapter: ChannelAdapter
-    private var facebookCallbackManager: CallbackManager? = null
+    private val facebookCallbackManager: CallbackManager = CallbackManager.Factory.create()
+
+    /**
+     * Launcher đăng nhập Facebook đăng ký ngay khi Fragment được tạo (không phải lúc bấm nút), để khi Activity
+     * bị tạo lại giữa chừng (xoay màn hình, đổi dark mode, bị hệ thống kill) kết quả vẫn trả về đúng chỗ.
+     * Kết quả được CallbackManager chuyển tới [FacebookCallback] đăng ký ở [onCreate]; lambda này không cần làm gì thêm.
+     */
+    private val facebookLoginLauncher = registerForActivityResult(
+        LoginManager.getInstance().createLogInActivityResultContract(facebookCallbackManager),
+    ) { }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        LoginManager.getInstance().registerCallback(
+            facebookCallbackManager,
+            object : FacebookCallback<LoginResult> {
+                override fun onSuccess(result: LoginResult) {
+                    viewModel.onFacebookLoggedIn(result.accessToken.toUserToken())
+                }
+
+                override fun onCancel() = viewModel.onFacebookLoginCancelled()
+
+                override fun onError(error: FacebookException) = viewModel.onFacebookLoginFailed()
+            },
+        )
+    }
+
+    override fun onDestroy() {
+        // Gỡ callback khỏi singleton LoginManager để Fragment cũ không bị giữ lại.
+        LoginManager.getInstance().unregisterCallback(facebookCallbackManager)
+        super.onDestroy()
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -65,28 +95,9 @@ class ChannelFragment : Fragment() {
         observeUiState()
     }
 
-    /**
-     * Đăng nhập Facebook bằng Meta SDK (LoginManager). Hạn và quyền lấy từ AccessToken thật của SDK.
-     * Callback đăng ký theo vòng đời view và được gỡ ở onDestroyView để Fragment cũ không bị singleton giữ lại.
-     */
+    /** Đăng nhập Facebook bằng Meta SDK (LoginManager). Hạn và quyền lấy từ AccessToken thật của SDK. */
     private fun loginWithFacebook() {
-        val manager = LoginManager.getInstance()
-        val callbackManager = facebookCallbackManager ?: CallbackManager.Factory.create().also {
-            facebookCallbackManager = it
-            manager.registerCallback(
-                it,
-                object : FacebookCallback<LoginResult> {
-                    override fun onSuccess(result: LoginResult) {
-                        viewModel.onFacebookLoggedIn(result.accessToken.toUserToken())
-                    }
-
-                    override fun onCancel() = viewModel.onFacebookLoginCancelled()
-
-                    override fun onError(error: FacebookException) = viewModel.onFacebookLoginFailed()
-                },
-            )
-        }
-        manager.logIn(requireActivity() as ActivityResultRegistryOwner, callbackManager, FACEBOOK_PERMISSIONS)
+        facebookLoginLauncher.launch(FACEBOOK_PERMISSIONS)
     }
 
     private fun AccessToken.toUserToken() = FacebookUserToken(
@@ -125,6 +136,7 @@ class ChannelFragment : Fragment() {
             getScopeForAccount = { account ->
                 viewModel.getScopeForAccount(account)
             },
+            getTasksForAccount = { account -> viewModel.getTasksForAccount(account) },
         )
         binding.rvChannels.layoutManager = LinearLayoutManager(requireContext())
         binding.rvChannels.adapter = adapter
@@ -160,6 +172,14 @@ class ChannelFragment : Fragment() {
                     }
                 }
                 launch {
+                    viewModel.connectedEvents.collect { name ->
+                        Toast.makeText(requireContext(), getString(R.string.channel_connected_named, name), Toast.LENGTH_SHORT).show()
+                    }
+                }
+                launch {
+                    viewModel.errors.collect { res -> Toast.makeText(requireContext(), res, Toast.LENGTH_LONG).show() }
+                }
+                launch {
                     viewModel.browserRequests.collect { url -> openInBrowser(url) }
                 }
                 launch {
@@ -188,21 +208,6 @@ class ChannelFragment : Fragment() {
                             } else {
                                 binding.tvEmptyState.visibility = View.GONE
                             }
-                            state.connectedName?.let { name ->
-                                Toast.makeText(
-                                    requireContext(),
-                                    getString(R.string.channel_connected_named, name),
-                                    Toast.LENGTH_SHORT,
-                                ).show()
-                            }
-                        }
-                        is ChannelUiState.Error -> {
-                            binding.progressBar.visibility = View.GONE
-                            Toast.makeText(
-                                requireContext(),
-                                state.message ?: getString(state.messageRes),
-                                Toast.LENGTH_LONG,
-                            ).show()
                         }
                     }
                 }
@@ -246,8 +251,6 @@ class ChannelFragment : Fragment() {
         // dismiss() không gọi onCancel nên lựa chọn Page vẫn được giữ trong ViewModel.
         facebookPageDialog?.dismiss()
         facebookPageDialog = null
-        facebookCallbackManager?.let { LoginManager.getInstance().unregisterCallback(it) }
-        facebookCallbackManager = null
         _binding = null
     }
 
@@ -257,6 +260,7 @@ class ChannelFragment : Fragment() {
             "public_profile",
             "pages_show_list",
             "pages_read_engagement",
+            "pages_read_user_content",
             "pages_manage_posts",
             "pages_manage_engagement",
             "read_insights",

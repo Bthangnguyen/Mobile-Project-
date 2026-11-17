@@ -16,6 +16,8 @@ data class OAuthToken(
     val expiresAt: Long,
     val scope: String? = null,
     val tokenType: String = "Bearer",
+    /** Page task của người dùng trên Page (chỉ Facebook Page); null nếu chưa biết (token cũ, hồ sơ cá nhân). */
+    val pageTasks: List<String>? = null,
 ) {
     /**
      * Kiểm tra xem token đã hết hạn chưa.

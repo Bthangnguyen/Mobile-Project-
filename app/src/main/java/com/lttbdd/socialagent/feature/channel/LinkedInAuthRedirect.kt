@@ -45,14 +45,16 @@ object LinkedInAuthRedirect {
         val fragment = url.substringAfter('#', "").substringBefore('#')
         val values = parseParams(query) + parseParams(fragment)
 
+        // BFF luôn gửi kèm state (cả khi lỗi/hủy), nên state phải khớp ở MỌI nhánh: nếu không, app khác
+        // chỉ cần mở deep link "...callback?error=access_denied" là hủy được phiên đang chờ.
+        if (expectedState.isEmpty() || values["state"] != expectedState) {
+            return Result.Failure(FailureReason.STATE_MISMATCH)
+        }
+
         val error = values["error"]
         if (!error.isNullOrEmpty()) {
             val cancelled = error == ERROR_ACCESS_DENIED || error.startsWith(ERROR_USER_CANCELLED_PREFIX)
             return if (cancelled) Result.Cancelled else Result.Failure(FailureReason.OAUTH_ERROR)
-        }
-
-        if (expectedState.isEmpty() || values["state"] != expectedState) {
-            return Result.Failure(FailureReason.STATE_MISMATCH)
         }
 
         val code = values["exchange_code"]

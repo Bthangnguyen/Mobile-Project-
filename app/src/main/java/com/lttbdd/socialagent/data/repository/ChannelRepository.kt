@@ -73,6 +73,12 @@ interface ChannelRepository {
     suspend fun getTokenExpiresAt(type: ChannelType, accountId: String): Long? = null
 
     /**
+     * Page task của người dùng trên Page đã kết nối (lưu cùng token). Trả về null nếu chưa biết
+     * (khi đó ma trận chỉ xét quyền của app, không giả định có hay không có task).
+     */
+    suspend fun getPageTasks(type: ChannelType, accountId: String): List<String>? = null
+
+    /**
      * Lấy danh sách Facebook Page mà người dùng quản lý (Graph API `/me/accounts`).
      * Thất bại (lỗi mạng, thiếu quyền `pages_show_list`) trả về Result.failure.
      */

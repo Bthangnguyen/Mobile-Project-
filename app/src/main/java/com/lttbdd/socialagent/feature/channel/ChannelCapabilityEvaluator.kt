@@ -39,66 +39,67 @@ object ChannelCapabilityEvaluator {
     fun evaluateCapabilities(
         account: ChannelAccount,
         scopeString: String?,
+        pageTasks: List<String>? = null,
     ): List<CapabilityItemUiState> {
         val scopes = parseScopes(scopeString)
 
         return when (account.type) {
-            ChannelType.FACEBOOK -> evaluateFacebook(scopes)
+            ChannelType.FACEBOOK -> evaluateFacebook(scopes, pageTasks?.toSet())
             ChannelType.LINKEDIN -> evaluateLinkedIn(scopes)
         }
     }
 
-    private fun evaluateFacebook(scopes: Set<String>): List<CapabilityItemUiState> {
-        // 1. Đăng bài (Publish) - Quyền yêu cầu: pages_manage_posts
-        val publishState = if (scopes.contains("pages_manage_posts")) {
-            CapabilityItemUiState(
-                capabilityNameRes = R.string.cap_publish,
-                statusTextRes = R.string.cap_status_supported,
-                statusType = CapabilityStatusType.SUPPORTED,
-                captionRes = R.string.cap_fb_publish_ok,
-            )
-        } else {
-            CapabilityItemUiState(
-                capabilityNameRes = R.string.cap_publish,
-                statusTextRes = R.string.cap_status_requires_perm,
-                statusType = CapabilityStatusType.REQUIRES_PERMISSION,
-                captionRes = R.string.cap_fb_publish_no_perm,
-            )
+    /**
+     * Facebook: một khả năng chỉ "Hỗ trợ" khi vừa có quyền của app vừa có Page task của người dùng trên Page
+     * (docs/research-social-api.md, mục Page Tasks): đăng bài cần CREATE_CONTENT; đọc comment cần MODERATE;
+     * trả lời cần MODERATE và CREATE_CONTENT; số liệu cần ANALYZE kèm `read_insights` và `pages_read_engagement`.
+     * [tasks] là null khi chưa biết (token cũ, hồ sơ cá nhân): khi đó chỉ xét quyền, không đoán task.
+     */
+    private fun evaluateFacebook(scopes: Set<String>, tasks: Set<String>?): List<CapabilityItemUiState> {
+        fun hasTasks(vararg required: String) = tasks == null || tasks.containsAll(required.toList())
+
+        fun item(
+            nameRes: Int,
+            hasPerm: Boolean,
+            hasTask: Boolean,
+            okCaption: Int,
+            noPermCaption: Int,
+            noTaskCaption: Int,
+        ): CapabilityItemUiState = when {
+            !hasPerm -> CapabilityItemUiState(nameRes, R.string.cap_status_requires_perm, CapabilityStatusType.REQUIRES_PERMISSION, noPermCaption)
+            !hasTask -> CapabilityItemUiState(nameRes, R.string.cap_status_requires_perm, CapabilityStatusType.REQUIRES_PERMISSION, noTaskCaption)
+            else -> CapabilityItemUiState(nameRes, R.string.cap_status_supported, CapabilityStatusType.SUPPORTED, okCaption)
         }
 
-        // 2. Đọc comment (Read Comments) - Quyền yêu cầu: pages_read_engagement hoặc pages_read_user_content
-        val readCommentsState = if (scopes.contains("pages_read_engagement") || scopes.contains("pages_read_user_content")) {
-            CapabilityItemUiState(
-                capabilityNameRes = R.string.cap_read_comments,
-                statusTextRes = R.string.cap_status_supported,
-                statusType = CapabilityStatusType.SUPPORTED,
-                captionRes = R.string.cap_fb_read_comments_ok,
-            )
-        } else {
-            CapabilityItemUiState(
-                capabilityNameRes = R.string.cap_read_comments,
-                statusTextRes = R.string.cap_status_requires_perm,
-                statusType = CapabilityStatusType.REQUIRES_PERMISSION,
-                captionRes = R.string.cap_fb_read_comments_no_perm,
-            )
-        }
+        // 1. Đăng bài: pages_manage_posts + task CREATE_CONTENT
+        val publishState = item(
+            R.string.cap_publish,
+            scopes.contains("pages_manage_posts"),
+            hasTasks("CREATE_CONTENT"),
+            R.string.cap_fb_publish_ok,
+            R.string.cap_fb_publish_no_perm,
+            R.string.cap_fb_publish_no_task,
+        )
 
-        // 3. Trả lời comment (Reply) - Quyền yêu cầu: pages_manage_engagement
-        val replyState = if (scopes.contains("pages_manage_engagement")) {
-            CapabilityItemUiState(
-                capabilityNameRes = R.string.cap_reply,
-                statusTextRes = R.string.cap_status_supported,
-                statusType = CapabilityStatusType.SUPPORTED,
-                captionRes = R.string.cap_fb_reply_ok,
-            )
-        } else {
-            CapabilityItemUiState(
-                capabilityNameRes = R.string.cap_reply,
-                statusTextRes = R.string.cap_status_requires_perm,
-                statusType = CapabilityStatusType.REQUIRES_PERMISSION,
-                captionRes = R.string.cap_fb_reply_no_perm,
-            )
-        }
+        // 2. Đọc comment: pages_read_engagement hoặc pages_read_user_content + task MODERATE
+        val readCommentsState = item(
+            R.string.cap_read_comments,
+            scopes.contains("pages_read_engagement") || scopes.contains("pages_read_user_content"),
+            hasTasks("MODERATE"),
+            R.string.cap_fb_read_comments_ok,
+            R.string.cap_fb_read_comments_no_perm,
+            R.string.cap_fb_read_comments_no_task,
+        )
+
+        // 3. Trả lời comment: pages_manage_engagement + task MODERATE và CREATE_CONTENT
+        val replyState = item(
+            R.string.cap_reply,
+            scopes.contains("pages_manage_engagement"),
+            hasTasks("MODERATE", "CREATE_CONTENT"),
+            R.string.cap_fb_reply_ok,
+            R.string.cap_fb_reply_no_perm,
+            R.string.cap_fb_reply_no_task,
+        )
 
         // 4. Mention (Nhắc tên): tài liệu Meta chỉ mô tả mention trong bình luận khi Page bật Page Mentioning,
         // nên chưa xác minh được thì bàn giao thủ công (HANDED_OFF); không tính public_profile.
@@ -118,22 +119,15 @@ object ChannelCapabilityEvaluator {
             )
         }
 
-        // 5. Số liệu (Metrics) - Quyền yêu cầu: read_insights
-        val metricsState = if (scopes.contains("read_insights")) {
-            CapabilityItemUiState(
-                capabilityNameRes = R.string.cap_metrics,
-                statusTextRes = R.string.cap_status_supported,
-                statusType = CapabilityStatusType.SUPPORTED,
-                captionRes = R.string.cap_fb_metrics_ok,
-            )
-        } else {
-            CapabilityItemUiState(
-                capabilityNameRes = R.string.cap_metrics,
-                statusTextRes = R.string.cap_status_requires_perm,
-                statusType = CapabilityStatusType.REQUIRES_PERMISSION,
-                captionRes = R.string.cap_fb_metrics_no_perm,
-            )
-        }
+        // 5. Số liệu: read_insights + pages_read_engagement + task ANALYZE
+        val metricsState = item(
+            R.string.cap_metrics,
+            scopes.contains("read_insights") && scopes.contains("pages_read_engagement"),
+            hasTasks("ANALYZE"),
+            R.string.cap_fb_metrics_ok,
+            R.string.cap_fb_metrics_no_perm,
+            R.string.cap_fb_metrics_no_task,
+        )
 
         return listOf(publishState, readCommentsState, replyState, mentionState, metricsState)
     }

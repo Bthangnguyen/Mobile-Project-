@@ -5,9 +5,12 @@ import com.lttbdd.socialagent.core.model.ChannelAccount
 import com.lttbdd.socialagent.core.model.ChannelCapability
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.ConnectionStatus
+import com.lttbdd.socialagent.data.model.ChannelError
+import com.lttbdd.socialagent.data.model.ChannelException
 import com.lttbdd.socialagent.data.model.FacebookPage
 import com.lttbdd.socialagent.data.model.FacebookUserToken
 import com.lttbdd.socialagent.data.model.OAuthToken
+import com.lttbdd.socialagent.data.model.toChannelError
 import com.lttbdd.socialagent.data.network.LinkedInBffAuth
 import com.lttbdd.socialagent.data.security.TokenStore
 import kotlinx.coroutines.Dispatchers
@@ -43,7 +46,8 @@ class ChannelRepositoryImpl @Inject constructor(
 ) : ChannelRepository {
 
     private val channelsFlow = MutableStateFlow<List<ChannelAccount>>(emptyList())
-    private val httpClient = okhttp3.OkHttpClient()
+    /** Khách HTTP; tách ra (internal var) để unit test thay bằng bản giả trả phản hồi có sẵn, không gọi mạng thật. */
+    internal var httpClient: okhttp3.OkHttpClient = okhttp3.OkHttpClient()
     private val loadMutex = Mutex()
     private var restored = false
 
@@ -101,7 +105,7 @@ class ChannelRepositoryImpl @Inject constructor(
             )
             saveAndRegister(ChannelType.FACEBOOK, "fb_page_101", "Social Agent Official Page", token)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(ChannelException(e.toChannelError(), e))
         }
     }
 
@@ -109,7 +113,7 @@ class ChannelRepositoryImpl @Inject constructor(
         withContext(Dispatchers.IO) {
             try {
                 val profile = fetchFacebookProfile(user.accessToken)
-                    ?: return@withContext Result.failure(IllegalStateException("Không lấy được hồ sơ Facebook"))
+                    ?: return@withContext Result.failure(ChannelException(ChannelError.FACEBOOK_PROFILE_FAILED))
                 // Hồ sơ cá nhân không có Page token nên không có khả năng ở mức Page: lưu public_profile
                 // để ma trận không báo "Hỗ trợ" cho thứ không dùng được. Hạn token là hạn thật từ SDK.
                 val token = OAuthToken(
@@ -119,7 +123,7 @@ class ChannelRepositoryImpl @Inject constructor(
                 )
                 saveAndRegister(ChannelType.FACEBOOK, profile.first, profile.second, token)
             } catch (e: Exception) {
-                Result.failure(e)
+                Result.failure(ChannelException(e.toChannelError(), e))
             }
         }
 
@@ -146,7 +150,7 @@ class ChannelRepositoryImpl @Inject constructor(
         withContext(Dispatchers.IO) {
             try {
                 val request = okhttp3.Request.Builder()
-                    .url("https://graph.facebook.com/v20.0/me/accounts?fields=id,name,access_token&limit=100")
+                    .url("https://graph.facebook.com/v20.0/me/accounts?fields=id,name,access_token,tasks&limit=100")
                     .header("Authorization", "Bearer $userAccessToken")
                     .build()
                 httpClient.newCall(request).execute().use { response ->
@@ -154,11 +158,11 @@ class ChannelRepositoryImpl @Inject constructor(
                     if (response.isSuccessful && !body.isNullOrEmpty()) {
                         Result.success(FacebookPagesParser.parse(body))
                     } else {
-                        Result.failure(IllegalStateException("Không tải được danh sách Page (HTTP ${response.code})"))
+                        Result.failure(ChannelException(ChannelError.FACEBOOK_PAGES_LOAD_FAILED))
                     }
                 }
             } catch (e: Exception) {
-                Result.failure(e)
+                Result.failure(ChannelException(e.toChannelError(), e))
             }
         }
 
@@ -168,16 +172,19 @@ class ChannelRepositoryImpl @Inject constructor(
     ): Result<ChannelAccount> = withContext(Dispatchers.IO) {
         try {
             // Quyền do Meta SDK báo là quyền thật đã cấp cho người dùng và áp dụng cho Page token.
-            // Page token lấy từ user token nên cùng hạn với user token (Meta không cấp hạn riêng ở bước này);
-            // nếu Meta rút token sớm hơn, lỗi 190 khi gọi API sẽ cho biết.
+            // GIẢ ĐỊNH (research doc TEST-02 chưa xác minh): hạn Page token được gán bằng hạn user token. Theo tài liệu Meta,
+            // Page token lấy từ long-lived user token có thể không hết hạn; nếu đúng thì sau hạn này màn hình sẽ báo
+            // "Hết hạn" sớm. Nút "Kết nối lại" xử lý được, nhưng cần kiểm bằng debug_token (expires_at) khi có điều kiện.
+            // Nếu Meta rút token sớm hơn, lỗi 190 khi gọi API sẽ cho biết.
             val token = OAuthToken(
                 accessToken = page.accessToken,
                 expiresAt = user.expiresAtMillis,
                 scope = user.grantedScope ?: "public_profile",
+                pageTasks = page.tasks,
             )
             saveAndRegister(ChannelType.FACEBOOK, page.id, page.name, token)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(ChannelException(e.toChannelError(), e))
         }
     }
 
@@ -192,6 +199,14 @@ class ChannelRepositoryImpl @Inject constructor(
     override suspend fun getTokenExpiresAt(type: ChannelType, accountId: String): Long? {
         return try {
             tokenStore.getToken(type, accountId).first()?.expiresAt
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    override suspend fun getPageTasks(type: ChannelType, accountId: String): List<String>? {
+        return try {
+            tokenStore.getToken(type, accountId).first()?.pageTasks
         } catch (_: Exception) {
             null
         }
@@ -214,7 +229,7 @@ class ChannelRepositoryImpl @Inject constructor(
             )
             saveAndRegister(ChannelType.LINKEDIN, "li_org_202", "Social Agent LinkedIn Company Page", token)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(ChannelException(e.toChannelError(), e))
         }
     }
 
@@ -229,7 +244,7 @@ class ChannelRepositoryImpl @Inject constructor(
         withContext(Dispatchers.IO) {
             try {
                 if (!LinkedInBffAuth.isValidBaseUrl(linkedInBffUrl)) {
-                    return@withContext Result.failure(IllegalStateException("LINKEDIN_BFF_URL chưa hợp lệ (cần HTTPS)"))
+                    return@withContext Result.failure(ChannelException(ChannelError.LINKEDIN_CONFIG_INVALID))
                 }
                 val body = buildJsonObject {
                     put("state", state)
@@ -239,11 +254,11 @@ class ChannelRepositoryImpl @Inject constructor(
                     if (response.isSuccessful) {
                         Result.success(Unit)
                     } else {
-                        Result.failure(IllegalStateException("Không bắt đầu được phiên đăng nhập LinkedIn (HTTP ${response.code})"))
+                        Result.failure(ChannelException(ChannelError.LINKEDIN_SESSION_START_FAILED))
                     }
                 }
             } catch (e: Exception) {
-                Result.failure(e)
+                Result.failure(ChannelException(e.toChannelError(), e))
             }
         }
 
@@ -259,7 +274,7 @@ class ChannelRepositoryImpl @Inject constructor(
     ): Result<ChannelAccount> = withContext(Dispatchers.IO) {
         try {
             if (!LinkedInBffAuth.isValidBaseUrl(linkedInBffUrl)) {
-                return@withContext Result.failure(IllegalStateException("LINKEDIN_BFF_URL chưa hợp lệ (cần HTTPS)"))
+                return@withContext Result.failure(ChannelException(ChannelError.LINKEDIN_CONFIG_INVALID))
             }
             val requestBody = buildJsonObject {
                 put("exchange_code", exchangeCode)
@@ -268,10 +283,10 @@ class ChannelRepositoryImpl @Inject constructor(
             }
             val tokenResult = postJson<BffToken>(LinkedInBffAuth.tokenUrl(linkedInBffUrl), requestBody.toString()) { response, body ->
                 if (!response.isSuccessful || body.isNullOrEmpty()) {
-                    Result.failure(IllegalStateException("Không đổi được token LinkedIn qua BFF (HTTP ${response.code})"))
+                    Result.failure(ChannelException(ChannelError.LINKEDIN_TOKEN_EXCHANGE_FAILED))
                 } else {
                     parseBffToken(body)?.let { Result.success(it) }
-                        ?: Result.failure(IllegalStateException("BFF không trả về access_token"))
+                        ?: Result.failure(ChannelException(ChannelError.LINKEDIN_TOKEN_INVALID))
                 }
             }
             val bffToken = tokenResult.getOrElse { return@withContext Result.failure(it) }
@@ -283,14 +298,12 @@ class ChannelRepositoryImpl @Inject constructor(
             val userObj = httpClient.newCall(userRequest).execute().use { response ->
                 val body = response.body?.string()
                 if (!response.isSuccessful || body.isNullOrEmpty()) {
-                    return@withContext Result.failure(
-                        IllegalStateException("Không lấy được thông tin tài khoản LinkedIn (HTTP ${response.code})"),
-                    )
+                    return@withContext Result.failure(ChannelException(ChannelError.LINKEDIN_PROFILE_FAILED))
                 }
                 json.parseToJsonElement(body) as? JsonObject
             }
             val accountId = userObj?.stringField("sub")?.takeIf { it.isNotEmpty() }
-                ?: return@withContext Result.failure(IllegalStateException("LinkedIn không trả về mã thành viên"))
+                ?: return@withContext Result.failure(ChannelException(ChannelError.LINKEDIN_PROFILE_FAILED))
             val displayName = userObj?.stringField("name")?.takeIf { it.isNotEmpty() } ?: accountId
 
             val token = OAuthToken.createFromExpiresIn(
@@ -300,7 +313,7 @@ class ChannelRepositoryImpl @Inject constructor(
             )
             saveAndRegister(ChannelType.LINKEDIN, accountId, displayName, token)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(ChannelException(e.toChannelError(), e))
         }
     }
 
@@ -325,7 +338,7 @@ class ChannelRepositoryImpl @Inject constructor(
             persistAccounts()
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(ChannelException(e.toChannelError(), e))
         }
     }
 

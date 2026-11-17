@@ -26,7 +26,8 @@ object FacebookPagesParser {
                 if (id.isNullOrBlank() || name.isNullOrBlank() || token.isNullOrBlank()) {
                     null
                 } else {
-                    FacebookPage(id = id, name = name, accessToken = token)
+                    val tasks = (item["tasks"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content }
+                    FacebookPage(id = id, name = name, accessToken = token, tasks = tasks)
                 }
             }.distinctBy { it.id }
         } catch (_: Exception) {

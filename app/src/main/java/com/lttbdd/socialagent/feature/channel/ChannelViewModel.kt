@@ -5,8 +5,10 @@ import androidx.lifecycle.viewModelScope
 import com.lttbdd.socialagent.core.model.ChannelAccount
 import com.lttbdd.socialagent.BuildConfig
 import com.lttbdd.socialagent.R
+import com.lttbdd.socialagent.data.model.toChannelError
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.ConnectionStatus
+import com.lttbdd.socialagent.data.model.ChannelError
 import com.lttbdd.socialagent.data.model.FacebookPage
 import com.lttbdd.socialagent.data.model.FacebookUserToken
 import com.lttbdd.socialagent.data.network.LinkedInBffAuth
@@ -43,6 +45,9 @@ class ChannelViewModel @Inject constructor(
     /** Quyền token đã được cấp thật, theo từng kênh. Rỗng/null nghĩa là chưa xác định được. */
     private var grantedScopes: Map<String, String?> = emptyMap()
 
+    /** Page task đã lưu theo từng kênh (null/vắng = chưa biết). */
+    private var pageTasks: Map<String, List<String>?> = emptyMap()
+
     /** Danh sách kênh mới nhất từ repository (dùng khi UiState đang ở trạng thái khác Success). */
     private var knownChannels: List<ChannelAccount> = emptyList()
 
@@ -53,6 +58,16 @@ class ChannelViewModel @Inject constructor(
 
     private val _notices = MutableSharedFlow<ChannelNotice>(extraBufferCapacity = 1)
     val notices: SharedFlow<ChannelNotice> = _notices.asSharedFlow()
+
+    private val _connected = MutableSharedFlow<String>(extraBufferCapacity = 1)
+
+    /** Phát một lần tên kênh vừa kết nối xong (không nằm trong UiState nên không hiện lại khi quay màn hình). */
+    val connectedEvents: SharedFlow<String> = _connected.asSharedFlow()
+
+    private val _errors = MutableSharedFlow<Int>(extraBufferCapacity = 1)
+
+    /** Phát một lần mã chuỗi lỗi ([androidx.annotation.StringRes]) cần báo cho người dùng. */
+    val errors: SharedFlow<Int> = _errors.asSharedFlow()
 
     private val _browserRequests = MutableSharedFlow<String>(extraBufferCapacity = 1)
 
@@ -92,8 +107,7 @@ class ChannelViewModel @Inject constructor(
                 // Nạp quyền thật và trạng thái hạn token trước khi phát UiState để ma trận không hiện sai.
                 val resolved = channels.map { resolveAccount(it) }
                 knownChannels = resolved
-                val currentConnectedName = (_uiState.value as? ChannelUiState.Success)?.connectedName
-                _uiState.value = ChannelUiState.Success(channels = resolved, connectedName = currentConnectedName)
+                _uiState.value = ChannelUiState.Success(channels = resolved)
             }
         }
     }
@@ -104,6 +118,7 @@ class ChannelViewModel @Inject constructor(
      */
     private suspend fun resolveAccount(account: ChannelAccount): ChannelAccount {
         grantedScopes = grantedScopes + (scopeKey(account) to repository.getGrantedScope(account.type, account.accountId))
+        pageTasks = pageTasks + (scopeKey(account) to repository.getPageTasks(account.type, account.accountId))
         val expiresAt = repository.getTokenExpiresAt(account.type, account.accountId)
         return if (account.status == ConnectionStatus.CONNECTED && expiresAt != null && clock() >= expiresAt) {
             account.copy(status = ConnectionStatus.TOKEN_EXPIRED)
@@ -119,6 +134,9 @@ class ChannelViewModel @Inject constructor(
      * (khi đó ma trận hiển thị "Cần cấp thêm quyền", không giả định đã đủ quyền).
      */
     fun getScopeForAccount(account: ChannelAccount): String? = grantedScopes[scopeKey(account)]
+
+    /** Page task của người dùng trên Page này; null nếu chưa biết (ma trận khi đó chỉ xét quyền của app). */
+    fun getTasksForAccount(account: ChannelAccount): List<String>? = pageTasks[scopeKey(account)]
 
     fun isFacebookDemoMode(): Boolean {
         val id = BuildConfig.FACEBOOK_APP_ID
@@ -188,7 +206,7 @@ class ChannelViewModel @Inject constructor(
             is LinkedInAuthRedirect.Result.Failure -> {
                 if (result.reason == LinkedInAuthRedirect.FailureReason.STATE_MISMATCH) {
                     // Giữ phiên đang chờ: intent giả mạo không được làm hỏng lần đăng nhập thật.
-                    _uiState.value = ChannelUiState.Error(messageRes = R.string.channel_oauth_state_mismatch)
+                    _errors.tryEmit(R.string.channel_oauth_state_mismatch)
                 } else {
                     finishLinkedInLogin(ChannelNotice.LINKEDIN_LOGIN_FAILED)
                 }
@@ -287,13 +305,25 @@ class ChannelViewModel @Inject constructor(
             val updatedChannels = knownChannels
                 .filterNot { it.type == account.type && it.accountId == account.accountId } + account
             knownChannels = updatedChannels
-            _uiState.value = ChannelUiState.Success(
-                channels = updatedChannels,
-                connectedName = account.displayName,
-            )
+            _uiState.value = ChannelUiState.Success(channels = updatedChannels)
+            _connected.tryEmit(account.displayName)
         }.onFailure { error ->
-            _uiState.value = ChannelUiState.Error(message = error.message)
+            // Quay về danh sách hiện có (thoát Loading) và báo lỗi bằng chuỗi đã dịch, một lần.
+            _uiState.value = ChannelUiState.Success(channels = knownChannels)
+            _errors.tryEmit(errorMessageRes(error.toChannelError()))
         }
+    }
+
+    private fun errorMessageRes(error: ChannelError): Int = when (error) {
+        ChannelError.NETWORK -> R.string.channel_error_network
+        ChannelError.LINKEDIN_CONFIG_INVALID -> R.string.channel_error_linkedin_config
+        ChannelError.LINKEDIN_SESSION_START_FAILED -> R.string.channel_error_linkedin_session
+        ChannelError.LINKEDIN_TOKEN_EXCHANGE_FAILED -> R.string.channel_error_linkedin_exchange
+        ChannelError.LINKEDIN_TOKEN_INVALID -> R.string.channel_error_linkedin_token_invalid
+        ChannelError.LINKEDIN_PROFILE_FAILED -> R.string.channel_error_linkedin_profile
+        ChannelError.FACEBOOK_PROFILE_FAILED -> R.string.channel_error_facebook_profile
+        ChannelError.FACEBOOK_PAGES_LOAD_FAILED -> R.string.channel_facebook_pages_load_failed
+        ChannelError.UNKNOWN -> R.string.channel_oauth_error_generic
     }
 
     fun disconnectChannel(type: ChannelType, accountId: String) {

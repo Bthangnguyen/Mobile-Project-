@@ -10,6 +10,12 @@ import com.lttbdd.socialagent.core.database.entity.DraftEntity
 import com.lttbdd.socialagent.core.model.PostStatus
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * Kết quả của [DraftDao.deleteWithPendingPosts]. [deleted] = false và [postsInFlight] > 0 nghĩa là còn bài
+ * đang đăng hoặc chưa rõ kết quả, UI nên báo "đang đăng, thử lại sau".
+ */
+data class DraftDeletion(val deleted: Boolean, val postsInFlight: Int)
+
 @Dao
 abstract class DraftDao {
 
@@ -51,21 +57,36 @@ abstract class DraftDao {
     open suspend fun countPendingPosts(draftId: String): Int = countPostsNotIn(draftId, PostStatus.PUBLISHED)
 
     /**
-     * Lối thoát có chủ đích: xoá bản nháp kèm mọi bài chưa đăng của nó (bỏ bài lỗi, huỷ bài bàn giao…).
-     * Chỉ gọi sau khi người dùng xác nhận. Bài đã [PostStatus.PUBLISHED] vẫn được giữ, `draftId` chuyển thành null.
-     * Trả về số bản nháp đã xoá (0 hoặc 1).
+     * Lối thoát có chủ đích khi người dùng xác nhận bỏ các bài chưa đăng (bài lỗi, bài bàn giao, bài còn trong hàng đợi…).
+     * Không bao giờ bỏ bài đang [PostStatus.PUBLISHING] hoặc có `outcomeUnknown = true`: bài đó có thể đã lên mạng xã hội,
+     * xoá đi sẽ mất khoá chống đăng trùng. Khi còn bài như vậy, bản nháp được giữ lại để thử lại sau.
+     * Caller nên huỷ job đăng (WorkManager) của các bài `QUEUED` trước khi gọi.
      */
     @Transaction
-    open suspend fun deleteWithPendingPosts(id: String): Int {
-        deletePostsNotIn(id, PostStatus.PUBLISHED)
-        return deleteIfAllPostsIn(id, PostStatus.PUBLISHED)
+    open suspend fun deleteWithPendingPosts(id: String): DraftDeletion {
+        deleteAbandonablePosts(id, PostStatus.PUBLISHED, PostStatus.PUBLISHING)
+        val inFlight = countPostsNotIn(id, PostStatus.PUBLISHED)
+        val deleted = deleteIfAllPostsIn(id, PostStatus.PUBLISHED) > 0
+        return DraftDeletion(deleted = deleted, postsInFlight = inFlight)
     }
 
     @Query("SELECT COUNT(*) FROM posts WHERE draftId = :draftId AND status != :finishedStatus")
     protected abstract suspend fun countPostsNotIn(draftId: String, finishedStatus: PostStatus): Int
 
-    @Query("DELETE FROM posts WHERE draftId = :draftId AND status != :finishedStatus")
-    protected abstract suspend fun deletePostsNotIn(draftId: String, finishedStatus: PostStatus)
+    @Query(
+        """
+        DELETE FROM posts
+        WHERE draftId = :draftId
+          AND status != :finishedStatus
+          AND status != :inFlightStatus
+          AND outcomeUnknown = 0
+        """,
+    )
+    protected abstract suspend fun deleteAbandonablePosts(
+        draftId: String,
+        finishedStatus: PostStatus,
+        inFlightStatus: PostStatus,
+    )
 
     /** Truyền trạng thái bằng tham số thay vì viết cứng chuỗi trong SQL, để đổi tên enum không làm mất tác dụng. */
     @Query(

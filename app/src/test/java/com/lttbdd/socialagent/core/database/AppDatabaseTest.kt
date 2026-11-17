@@ -5,6 +5,7 @@ import android.content.Context
 import android.database.sqlite.SQLiteConstraintException
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.lttbdd.socialagent.core.database.dao.DraftDeletion
 import com.lttbdd.socialagent.core.database.entity.CommentEntity
 import com.lttbdd.socialagent.core.database.entity.DraftEntity
 import com.lttbdd.socialagent.core.database.entity.MetricsSnapshotEntity
@@ -149,14 +150,48 @@ class AppDatabaseTest {
         db.draftDao().upsert(draft("d1", updatedAt = 0))
         db.postDao().insertIfAbsent(post(id = "p1", key = "k1").copy(status = PostStatus.PUBLISHED))
         db.postDao().insertIfAbsent(post(id = "p2", key = "k2").copy(status = PostStatus.HANDED_OFF))
+        db.postDao().insertIfAbsent(post(id = "p3", key = "k3").copy(status = PostStatus.QUEUED))
 
-        val deleted = db.draftDao().deleteWithPendingPosts("d1")
+        val result = db.draftDao().deleteWithPendingPosts("d1")
 
-        assertEquals(1, deleted)
+        assertEquals(DraftDeletion(deleted = true, postsInFlight = 0), result)
         assertNull(db.draftDao().getById("d1"))
         assertNull(db.postDao().getByIdempotencyKey("k2"))
+        assertNull(db.postDao().getByIdempotencyKey("k3"))
         assertNull(db.postDao().getByIdempotencyKey("k1")?.draftId)
         assertNotNull(db.postDao().getByIdempotencyKey("k1"))
+    }
+
+    @Test
+    fun `confirmed delete keeps posts that are publishing or have an unknown outcome`() = runTest {
+        db.draftDao().upsert(draft("d1", updatedAt = 0))
+        db.postDao().insertIfAbsent(post(id = "p1", key = "k1").copy(status = PostStatus.PUBLISHING))
+        db.postDao().insertIfAbsent(
+            post(id = "p2", key = "k2").copy(status = PostStatus.FAILED, outcomeUnknown = true),
+        )
+        db.postDao().insertIfAbsent(post(id = "p3", key = "k3").copy(status = PostStatus.FAILED))
+
+        val result = db.draftDao().deleteWithPendingPosts("d1")
+
+        assertEquals(DraftDeletion(deleted = false, postsInFlight = 2), result)
+        assertNotNull(db.draftDao().getById("d1"))
+        assertNotNull(db.postDao().getByIdempotencyKey("k1"))
+        assertNotNull(db.postDao().getByIdempotencyKey("k2"))
+        assertNull(db.postDao().getByIdempotencyKey("k3"))
+    }
+
+    @Test
+    fun `pending count is zero when all posts are published or there are none`() = runTest {
+        db.draftDao().upsert(draft("d1", updatedAt = 0))
+        assertEquals(0, db.draftDao().countPendingPosts("d1"))
+
+        db.postDao().insertIfAbsent(post(id = "p1", key = "k1").copy(status = PostStatus.PUBLISHED))
+        assertEquals(0, db.draftDao().countPendingPosts("d1"))
+    }
+
+    @Test
+    fun `confirmed delete of a missing draft does nothing`() = runTest {
+        assertEquals(DraftDeletion(deleted = false, postsInFlight = 0), db.draftDao().deleteWithPendingPosts("missing"))
     }
 
     @Test

@@ -8,4 +8,10 @@
     <string name="nav_settings">Cài đặt</string>
 
     <string name="placeholder_coming_soon">Sắp ra mắt</string>
+
+    <string name="settings_language_title">Ngôn ngữ</string>
+    <string name="settings_language_description">Chọn ngôn ngữ hiển thị của ứng dụng. Màn hình sẽ tải lại sau khi đổi.</string>
+    <string name="settings_language_system">Theo hệ thống</string>
+    <string name="settings_language_vietnamese">Tiếng Việt</string>
+    <string name="settings_language_english">English</string>
 </resources>

@@ -4,9 +4,10 @@
   "private": true,
   "description": "BFF tối giản cho đăng nhập LinkedIn (Standard OAuth 2.0). Giữ client_secret ở server, không giữ token lâu dài.",
   "type": "commonjs",
-  "engines": { "node": ">=18" },
+  "engines": { "node": ">=22" },
   "scripts": {
     "start": "node src/server.js",
+    "start:local": "node --env-file=.env src/server.js",
     "test": "node --test"
   }
 }

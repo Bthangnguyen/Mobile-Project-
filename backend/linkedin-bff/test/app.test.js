@@ -295,7 +295,7 @@ test('sha256Base64Url khớp vector RFC 7636 Phụ lục B', () => {
   assert.equal(crypto.createHash('sha256').update('').digest('hex').length, 64);
 });
 
-// ---- Giới hạn tần suất và kho đầy (review PR #22) ----
+// ---- Giới hạn tần suất và kho đầy (theo review của PR BFF) ----
 
 const stateN = (i) => `state_nhieu_phien_${String(i).padStart(6, '0')}_abcdef`;
 const ipN = (i) => `10.1.${i >> 8}.${i & 255}`;
@@ -382,4 +382,164 @@ test('kho mã đổi đầy: callback chuyển về app với error=busy, không
   } finally {
     await ctx.close();
   }
+});
+
+// ---- Các nhánh bổ sung theo review ----
+
+const {
+  RateLimiter, rateKey, MAX_PENDING, MAX_TRACKED_IPS, TOKEN_LIMIT_PER_MINUTE, START_LIMIT_PER_MINUTE,
+  AUTHORIZATION_TTL_MS, UPSTREAM_TIMEOUT_MS,
+} = require('../src/app');
+const { parseTrustedProxyHops } = require('../src/config');
+
+test('/token bị giới hạn 60 lần mỗi phút cho mỗi IP rồi trả 429, sang phút mới dùng lại được', async () => {
+  const ctx = await setup();
+  try {
+    const body = { exchange_code: 'x'.repeat(40), state: STATE, code_verifier: VERIFIER };
+    for (let i = 0; i < TOKEN_LIMIT_PER_MINUTE; i += 1) {
+      const res = await ctx.post('/auth/linkedin/token', body);
+      assert.equal(res.status, 400, `lần ${i + 1}`);
+    }
+    const blocked = await ctx.post('/auth/linkedin/token', body);
+    assert.equal(blocked.status, 429);
+    assert.equal(blocked.headers.get('retry-after'), '60');
+
+    ctx.clock.t += 61 * 1000;
+    assert.equal((await ctx.post('/auth/linkedin/token', body)).status, 400);
+  } finally {
+    await ctx.close();
+  }
+});
+
+test('kho phiên chờ đầy: /start trả 503 busy; có chỗ trống sau khi phiên hết hạn', async () => {
+  const ctx = await setup({ trustedProxyHops: 1 });
+  try {
+    for (let i = 0; i < MAX_PENDING; i += 1) {
+      const res = await ctx.post('/auth/linkedin/start', { state: stateN(i), code_challenge: CHALLENGE }, { 'X-Forwarded-For': ipN(i) });
+      assert.equal(res.status, 200, `start ${i}`);
+    }
+    const full = await ctx.post('/auth/linkedin/start', { state: stateN(5000), code_challenge: CHALLENGE }, { 'X-Forwarded-For': ipN(5000) });
+    assert.equal(full.status, 503);
+    assert.deepEqual(await full.json(), { error: 'busy' });
+
+    ctx.clock.t += AUTHORIZATION_TTL_MS + 1;
+    const again = await ctx.post('/auth/linkedin/start', { state: stateN(5001), code_challenge: CHALLENGE }, { 'X-Forwarded-For': ipN(5001) });
+    assert.equal(again.status, 200);
+  } finally {
+    await ctx.close();
+  }
+});
+
+test('/start với state đang chờ bị từ chối (409) và không ghi đè challenge của phiên cũ', async () => {
+  const ctx = await setup();
+  try {
+    assert.equal((await ctx.post('/auth/linkedin/start', { state: STATE, code_challenge: CHALLENGE })).status, 200);
+    const otherChallenge = sha256Base64Url('verifier-cua-ke-tan-cong-0123456789-0123456789-abcdef');
+    const dup = await ctx.post('/auth/linkedin/start', { state: STATE, code_challenge: otherChallenge });
+    assert.equal(dup.status, 409);
+    assert.deepEqual(await dup.json(), { error: 'state_in_use' });
+
+    // Phiên gốc vẫn dùng được với verifier gốc.
+    const cb = await ctx.get(`/auth/linkedin/callback?code=abc&state=${STATE}`);
+    const exchangeCode = parseLocation(cb).get('exchange_code');
+    assert.ok(exchangeCode);
+    const token = await ctx.post('/auth/linkedin/token', { exchange_code: exchangeCode, state: STATE, code_verifier: VERIFIER });
+    assert.equal(token.status, 200);
+  } finally {
+    await ctx.close();
+  }
+});
+
+test('gọi LinkedIn có timeout: fetch treo thì callback chuyển về app với error=exchange_failed', async () => {
+  const clock = { t: 1_000_000 };
+  let sawSignal = false;
+  const fetchImpl = (url, init) => new Promise((resolve, reject) => {
+    sawSignal = init.signal instanceof AbortSignal;
+    init.signal.addEventListener('abort', () => reject(init.signal.reason));
+  });
+  const handler = createApp({
+    config: { clientId: 'client_id_cong_khai', clientSecret: SECRET, publicUrl: 'https://bff.example.com', appRedirectUri: APP_REDIRECT },
+    fetchImpl,
+    now: () => clock.t,
+    upstreamTimeoutMs: 50,
+  });
+  const server = http.createServer(handler);
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    await fetch(`${base}/auth/linkedin/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state: STATE, code_challenge: CHALLENGE }),
+    });
+    const started = Date.now();
+    const cb = await fetch(`${base}/auth/linkedin/callback?code=abc&state=${STATE}`, { redirect: 'manual' });
+    const params = new URL(cb.headers.get('location')).searchParams;
+    assert.equal(params.get('error'), 'exchange_failed');
+    assert.ok(sawSignal, 'phải truyền AbortSignal cho fetch');
+    assert.ok(Date.now() - started < 5000, 'không được chờ lâu hơn timeout');
+  } finally {
+    await new Promise((r) => server.close(r));
+  }
+  assert.equal(UPSTREAM_TIMEOUT_MS, 10000);
+});
+
+test('RateLimiter đầy MAX_TRACKED_IPS: từ chối khóa mới, khóa cũ vẫn được tính, dọn mục hết hạn thì nhận lại', () => {
+  let t = 0;
+  const limiter = new RateLimiter(() => t, START_LIMIT_PER_MINUTE, 60_000);
+  for (let i = 0; i < MAX_TRACKED_IPS; i += 1) assert.equal(limiter.allow(`k${i}`), true);
+  assert.equal(limiter.allow('khoa-moi'), false);
+  assert.equal(limiter.allow('k0'), true);
+
+  t += 61_000;
+  assert.equal(limiter.allow('khoa-moi'), true);
+  assert.ok(limiter.hits.size <= MAX_TRACKED_IPS);
+});
+
+test('rateKey: IPv4 giữ nguyên, IPv6 gom theo /64, IPv4-mapped quy về IPv4', () => {
+  assert.equal(rateKey('203.0.113.7'), '203.0.113.7');
+  assert.equal(rateKey('2001:db8:1:2:aaaa:bbbb:cccc:dddd'), rateKey('2001:db8:1:2::1'));
+  assert.equal(rateKey('2001:DB8:1:2::1'), rateKey('2001:db8:1:2:0:0:0:9'));
+  assert.notEqual(rateKey('2001:db8:1:2::1'), rateKey('2001:db8:1:3::1'));
+  assert.equal(rateKey('::ffff:203.0.113.7'), '203.0.113.7');
+  assert.equal(rateKey('::1'), '0000:0000:0000:0000::/64');
+  assert.equal(rateKey('khong-phai-ip'), 'khong-phai-ip');
+});
+
+test('đổi địa chỉ IPv6 trong cùng /64 không né được giới hạn /start', async () => {
+  const ctx = await setup({ trustedProxyHops: 1 });
+  try {
+    for (let i = 0; i < 20; i += 1) {
+      const res = await ctx.post(
+        '/auth/linkedin/start',
+        { state: stateN(i), code_challenge: CHALLENGE },
+        { 'X-Forwarded-For': `2001:db8:abcd:12::${(i + 1).toString(16)}` },
+      );
+      assert.equal(res.status, 200);
+    }
+    const sameBlock = await ctx.post(
+      '/auth/linkedin/start',
+      { state: stateN(70), code_challenge: CHALLENGE },
+      { 'X-Forwarded-For': '2001:db8:abcd:12:ffff:ffff:ffff:ffff' },
+    );
+    assert.equal(sameBlock.status, 429);
+    const otherBlock = await ctx.post(
+      '/auth/linkedin/start',
+      { state: stateN(71), code_challenge: CHALLENGE },
+      { 'X-Forwarded-For': '2001:db8:abcd:13::1' },
+    );
+    assert.equal(otherBlock.status, 200);
+  } finally {
+    await ctx.close();
+  }
+});
+
+test('parseTrustedProxyHops: rỗng/khoảng trắng/âm/không phải số nguyên dùng mặc định theo Render', () => {
+  for (const raw of [undefined, null, '', ' ', '   ', '-1', '1.5', 'abc', '1e2']) {
+    assert.equal(parseTrustedProxyHops(raw, true), 1, `render, "${raw}"`);
+    assert.equal(parseTrustedProxyHops(raw, false), 0, `local, "${raw}"`);
+  }
+  assert.equal(parseTrustedProxyHops('0', true), 0);
+  assert.equal(parseTrustedProxyHops('2', false), 2);
+  assert.equal(parseTrustedProxyHops(' 3 ', false), 3);
 });

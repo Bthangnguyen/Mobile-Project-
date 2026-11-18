@@ -2,6 +2,7 @@
 
 const http = require('node:http');
 const { createApp } = require('./app');
+const { parseTrustedProxyHops } = require('./config');
 
 const config = {
   clientId: process.env.LINKEDIN_MEMBER_CLIENT_ID,
@@ -9,9 +10,7 @@ const config = {
   publicUrl: process.env.BFF_PUBLIC_URL,
   appRedirectUri: process.env.APP_REDIRECT_URI || 'com.lttbdd.socialagent://oauth/linkedin/callback',
   // Số proxy tin cậy đứng trước BFF. Render đặt biến RENDER=true và có proxy phía trước nên mặc định 1; 0 = không tin X-Forwarded-For.
-  trustedProxyHops: Number.isInteger(Number(process.env.TRUSTED_PROXY_HOPS)) && process.env.TRUSTED_PROXY_HOPS !== undefined
-    ? Number(process.env.TRUSTED_PROXY_HOPS)
-    : process.env.RENDER ? 1 : 0,
+  trustedProxyHops: parseTrustedProxyHops(process.env.TRUSTED_PROXY_HOPS, Boolean(process.env.RENDER)),
 };
 
 let handler;

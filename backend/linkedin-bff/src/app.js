@@ -16,12 +16,14 @@
  */
 
 const crypto = require('node:crypto');
+const net = require('node:net');
 
 const AUTHORIZATION_TTL_MS = 10 * 60 * 1000;
 const EXCHANGE_TTL_MS = 60 * 1000;
 const MAX_PENDING = 1000;
-// Giới hạn theo IP để một người không làm đầy kho phiên của mọi người (xem review PR #22).
+// Giới hạn theo IP để một người không làm đầy kho phiên của mọi người (theo review của PR BFF; lưu ý #22 là issue, không phải PR).
 const MAX_PENDING_PER_IP = 20;
+const UPSTREAM_TIMEOUT_MS = 10 * 1000;
 const START_LIMIT_PER_MINUTE = 20;
 const TOKEN_LIMIT_PER_MINUTE = 60;
 const RATE_WINDOW_MS = 60 * 1000;
@@ -36,6 +38,45 @@ const EXCHANGE_CODE_PATTERN = /^[A-Za-z0-9_-]{32,128}$/;
 
 function sha256Base64Url(value) {
   return crypto.createHash('sha256').update(value, 'ascii').digest('base64url');
+}
+
+/** Mở rộng địa chỉ IPv6 thành 8 nhóm 16 bit; trả null nếu không hợp lệ. */
+function expandIpv6(address) {
+  let text = address.split('%')[0].toLowerCase();
+  const v4 = text.match(/(\d+\.\d+\.\d+\.\d+)$/);
+  if (v4) {
+    if (net.isIPv4(v4[1]) === false) return null;
+    const [a, b, c, d] = v4[1].split('.').map(Number);
+    text = text.slice(0, -v4[1].length) + `${((a << 8) | b).toString(16)}:${((c << 8) | d).toString(16)}`;
+  }
+  const halves = text.split('::');
+  if (halves.length > 2) return null;
+  const head = halves[0] ? halves[0].split(':') : [];
+  const tail = halves.length === 2 && halves[1] ? halves[1].split(':') : [];
+  const missing = 8 - head.length - tail.length;
+  if (halves.length === 1 ? missing !== 0 : missing < 1) return null;
+  const groups = [...head, ...Array(halves.length === 2 ? missing : 0).fill('0'), ...tail];
+  return groups.length === 8 && groups.every((g) => /^[0-9a-f]{1,4}$/.test(g)) ? groups.map((g) => g.padStart(4, '0')) : null;
+}
+
+/**
+ * Khóa dùng để giới hạn theo người gọi. IPv4 giữ nguyên; IPv6 gom theo /64 vì một máy thường có cả dải /64
+ * để đổi địa chỉ; IPv4-mapped (::ffff:a.b.c.d) quy về IPv4.
+ */
+function rateKey(ip) {
+  if (net.isIPv4(ip)) return ip;
+  if (net.isIPv6(ip)) {
+    const groups = expandIpv6(ip);
+    if (groups) {
+      if (groups.slice(0, 5).every((g) => g === '0000') && groups[5] === 'ffff') {
+        const hi = parseInt(groups[6], 16);
+        const lo = parseInt(groups[7], 16);
+        return `${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`;
+      }
+      return `${groups.slice(0, 4).join(':')}::/64`;
+    }
+  }
+  return ip;
 }
 
 function safeEqual(a, b) {
@@ -57,6 +98,12 @@ class ExpiringStore {
     if (this.items.size >= MAX_PENDING) return false;
     this.items.set(key, { value, expiresAt: this.now() + this.ttlMs });
     return true;
+  }
+
+  /** Khóa còn hạn trong kho không (không lấy ra). */
+  has(key) {
+    this.sweep();
+    return this.items.has(key);
   }
 
   take(key) {
@@ -113,7 +160,7 @@ class RateLimiter {
   }
 }
 
-function createApp({ config, fetchImpl = globalThis.fetch, now = Date.now, randomToken } = {}) {
+function createApp({ config, fetchImpl = globalThis.fetch, now = Date.now, randomToken, upstreamTimeoutMs = UPSTREAM_TIMEOUT_MS } = {}) {
   for (const key of ['clientId', 'clientSecret', 'publicUrl', 'appRedirectUri']) {
     if (!config || !config[key]) throw new Error(`Thiếu cấu hình: ${key}`);
   }
@@ -138,6 +185,11 @@ function createApp({ config, fetchImpl = globalThis.fetch, now = Date.now, rando
       if (parts.length >= proxyHops) return parts[parts.length - proxyHops];
     }
     return (req.socket && req.socket.remoteAddress) || 'unknown';
+  }
+
+  /** Khóa giới hạn tần suất của người gọi (IPv6 gom theo /64). */
+  function callerKey(req) {
+    return rateKey(clientIp(req));
   }
 
   function sendJson(res, status, body) {
@@ -193,7 +245,7 @@ function createApp({ config, fetchImpl = globalThis.fetch, now = Date.now, rando
   }
 
   async function handleStart(req, res) {
-    const ip = clientIp(req);
+    const ip = callerKey(req);
     if (!startLimiter.allow(ip)) {
       res.setHeader('Retry-After', '60');
       return sendJson(res, 429, { error: 'rate_limited' });
@@ -207,6 +259,8 @@ function createApp({ config, fetchImpl = globalThis.fetch, now = Date.now, rando
     if (!STATE_PATTERN.test(String(body.state)) || !CHALLENGE_PATTERN.test(String(body.code_challenge))) {
       return sendJson(res, 400, { error: 'invalid_request' });
     }
+    // State đã có phiên đang chờ thì từ chối, không ghi đè challenge của phiên cũ.
+    if (pending.has(body.state)) return sendJson(res, 409, { error: 'state_in_use' });
     // Mỗi IP chỉ được giữ một số phiên đang chờ nhất định, để một người không chiếm hết MAX_PENDING.
     if (pending.countWhere((v) => v.ip === ip) >= MAX_PENDING_PER_IP) {
       res.setHeader('Retry-After', '60');
@@ -230,6 +284,8 @@ function createApp({ config, fetchImpl = globalThis.fetch, now = Date.now, rando
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: form.toString(),
+      // LinkedIn treo thì không để callback (và trình duyệt người dùng) chờ vô hạn.
+      signal: AbortSignal.timeout(upstreamTimeoutMs),
     });
     if (!response.ok) return null;
     const data = await response.json();
@@ -275,7 +331,7 @@ function createApp({ config, fetchImpl = globalThis.fetch, now = Date.now, rando
   }
 
   async function handleToken(req, res) {
-    if (!tokenLimiter.allow(clientIp(req))) {
+    if (!tokenLimiter.allow(callerKey(req))) {
       res.setHeader('Retry-After', '60');
       return sendJson(res, 429, { error: 'rate_limited' });
     }
@@ -317,4 +373,4 @@ function createApp({ config, fetchImpl = globalThis.fetch, now = Date.now, rando
   };
 }
 
-module.exports = { createApp, RateLimiter, MAX_PENDING_PER_IP, START_LIMIT_PER_MINUTE, sha256Base64Url, EXCHANGE_TTL_MS, AUTHORIZATION_TTL_MS, LINKEDIN_TOKEN_ENDPOINT };
+module.exports = { createApp, RateLimiter, rateKey, MAX_PENDING, MAX_PENDING_PER_IP, MAX_TRACKED_IPS, START_LIMIT_PER_MINUTE, TOKEN_LIMIT_PER_MINUTE, UPSTREAM_TIMEOUT_MS, sha256Base64Url, EXCHANGE_TTL_MS, AUTHORIZATION_TTL_MS, LINKEDIN_TOKEN_ENDPOINT };

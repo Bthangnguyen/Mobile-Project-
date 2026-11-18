@@ -11,13 +11,14 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.navigation.fragment.findNavController
 import com.lttbdd.socialagent.R
 import com.lttbdd.socialagent.data.settings.AppLanguage
 import com.lttbdd.socialagent.databinding.FragmentSettingsBinding
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 
-/** Màn Cài đặt (F9). Hiện có đổi ngôn ngữ VI/EN; các mục Kênh của tôi (F1) và API key (F8) sẽ được thêm vào đây. */
+/** Màn Cài đặt (F9). Hiện có đổi ngôn ngữ VI/EN và mục API key (F8); mục Kênh của tôi (F1) sẽ được thêm vào đây. */
 @AndroidEntryPoint
 class SettingsFragment : Fragment() {
 
@@ -39,6 +40,8 @@ class SettingsFragment : Fragment() {
         // Đánh dấu tiêu đề để TalkBack cho phép nhảy giữa các mục (android:accessibilityHeading cần API 28).
         ViewCompat.setAccessibilityHeading(binding.settingsTitle, true)
         ViewCompat.setAccessibilityHeading(binding.languageTitle, true)
+        ViewCompat.setAccessibilityHeading(binding.apiKeysSectionTitle, true)
+        binding.manageApiKeys.setOnClickListener { openApiKeys() }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -58,6 +61,14 @@ class SettingsFragment : Fragment() {
         group.setOnCheckedChangeListener(null)
         group.check(radioIdFor(state.language))
         group.setOnCheckedChangeListener(languageListener)
+    }
+
+    /** Mở màn quản lý API key (F8). Bỏ qua lần bấm lặp khi đã rời Settings để tránh lỗi điều hướng. */
+    private fun openApiKeys() {
+        val navController = findNavController()
+        if (navController.currentDestination?.id == R.id.settingsFragment) {
+            navController.navigate(R.id.action_settings_to_api_keys)
+        }
     }
 
     private fun radioIdFor(language: AppLanguage) = when (language) {

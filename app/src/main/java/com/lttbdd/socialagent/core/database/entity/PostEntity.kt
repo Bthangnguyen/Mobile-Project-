@@ -9,7 +9,8 @@ import com.lttbdd.socialagent.core.model.PostStatus
 
 /**
  * Một lần đăng bản nháp lên một kênh (F5).
- * [idempotencyKey] là duy nhất trong bảng: DB tự chặn việc tạo hai bài đăng cho cùng một lần bấm đăng.
+ * [idempotencyKey] là duy nhất trong bảng: DB chặn tạo bản ghi trùng cho cùng một lần bấm đăng.
+ * Chặn đăng trùng lên mạng xã hội còn cần [attemptStartedAtMillis] + [outcomeUnknown] (hàng đợi #37/#38).
  * Xoá bản nháp không xoá bài đăng: [draftId] chuyển thành null, còn link bài và khoá chống trùng được giữ lại.
  */
 @Entity(

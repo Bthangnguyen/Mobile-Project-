@@ -191,7 +191,10 @@ class AppDatabaseTest {
 
     @Test
     fun `confirmed delete of a missing draft does nothing`() = runTest {
-        assertEquals(DraftDeletion(deleted = false, postsRemoved = 0, postsInFlight = 0), db.draftDao().deleteWithPendingPosts("missing"))
+        assertEquals(
+            DraftDeletion(deleted = false, postsRemoved = 0, postsInFlight = 0),
+            db.draftDao().deleteWithPendingPosts("missing"),
+        )
     }
 
     @Test

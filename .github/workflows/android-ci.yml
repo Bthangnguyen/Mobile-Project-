@@ -38,3 +38,20 @@ jobs:
         with:
           name: reports
           path: app/build/reports/
+
+  backend:
+    # Test BFF đăng nhập LinkedIn (Node, node --test); LinkedIn được giả lập nên không cần mạng hay secret.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend/linkedin-bff
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Test
+        run: npm test

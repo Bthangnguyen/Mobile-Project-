@@ -21,7 +21,7 @@ BFF không chuyển tiếp `refresh_token`, không có refresh/logout, không gh
 | `BFF_PUBLIC_URL` | URL HTTPS công khai của BFF, không có `/` cuối |
 | `APP_REDIRECT_URI` | Mặc định `com.lttbdd.socialagent://oauth/linkedin/callback` (trùng Manifest) |
 | `PORT` | Mặc định 8787 |
-| `TRUSTED_PROXY_HOPS` | Số proxy tin cậy đứng trước BFF, dùng để lấy IP thật từ `X-Forwarded-For`. Mặc định `1` khi chạy trên Render (có biến `RENDER`), `0` ở nơi khác. Đặt sai (ví dụ `0` trên Render) thì mọi người chung một IP và dễ bị giới hạn nhầm. |
+| `TRUSTED_PROXY_HOPS` | Số proxy tin cậy đứng trước BFF, dùng để lấy IP thật từ `X-Forwarded-For` (BFF lấy phần tử thứ N tính từ cuối). **Trên Render đã đo ngày 18/11: đặt `3`** (với `1` giới hạn tần suất không có tác dụng vì mỗi request mang một IP khác nhau; với `3`, một mạng bị 429 ở lần thứ 21 còn mạng khác vẫn dùng được). Ở nơi khác tự đo lại bằng cách gửi 22 request `/start`. Đặt thấp quá thì giới hạn vô hiệu; đặt cao quá thì mọi người chung một IP và dễ bị 429 nhầm. |
 
 Redirect URL phải đăng ký ở LinkedIn Developer Portal (tab Auth của App Member): `{BFF_PUBLIC_URL}/auth/linkedin/callback`.
 

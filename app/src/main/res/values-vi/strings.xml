@@ -81,4 +81,11 @@
     <string name="cap_fb_read_comments_no_task">Tài khoản Facebook của bạn cần có Page task MODERATE trên Page này</string>
     <string name="cap_fb_reply_no_task">Tài khoản Facebook của bạn cần có Page task MODERATE và CREATE_CONTENT trên Page này</string>
     <string name="cap_fb_metrics_no_task">Tài khoản Facebook của bạn cần có Page task ANALYZE trên Page này</string>
+
+    <!-- Settings strings -->
+    <string name="settings_language_title">Ngôn ngữ</string>
+    <string name="settings_language_description">Chọn ngôn ngữ hiển thị của ứng dụng. Màn hình sẽ tải lại sau khi đổi.</string>
+    <string name="settings_language_system">Theo hệ thống</string>
+    <string name="settings_language_vietnamese">Tiếng Việt</string>
+    <string name="settings_language_english">English</string>
 </resources>

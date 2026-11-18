@@ -6,6 +6,12 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
+    alias(libs.plugins.room)
+}
+
+room {
+    // Commit schema JSON để review thay đổi DB và viết migration khi tăng version.
+    schemaDirectory("$projectDir/schemas")
 }
 
 val localProperties = Properties()
@@ -91,6 +97,11 @@ android {
         // Sinh locales_config để người dùng đổi VI/EN trong Settings hệ thống (Android 13+).
         generateLocaleConfig = true
     }
+
+    testOptions {
+        // Robolectric cần resource của app để tạo Context trong unit test.
+        unitTests.isIncludeAndroidResources = true
+    }
 }
 
 dependencies {
@@ -108,14 +119,21 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.okhttp)
+    implementation(libs.okhttp.sse)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.facebook.login)
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
+
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 }

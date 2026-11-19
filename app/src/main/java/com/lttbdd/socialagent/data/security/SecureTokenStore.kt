@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.data.model.OAuthToken
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.Dispatchers
@@ -32,7 +33,7 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
  */
 @Singleton
 class SecureTokenStore @Inject constructor(
-    private val context: Context,
+    @ApplicationContext private val context: Context,
     private val keystoreCipher: AndroidKeystoreCipher,
 ) : TokenStore {
 

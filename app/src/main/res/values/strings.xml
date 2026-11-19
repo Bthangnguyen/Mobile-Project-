@@ -90,4 +90,9 @@
     <!-- Tên ngôn ngữ viết bằng chính ngôn ngữ đó để người dùng luôn nhận ra. -->
     <string name="settings_language_vietnamese">Tiếng Việt</string>
     <string name="settings_language_english">English</string>
+    <string name="channel_type_facebook">Facebook</string>
+    <string name="channel_type_linkedin">LinkedIn</string>
+    <string name="channel_linkedin_session_expired">The LinkedIn sign-in session has expired. Please tap Connect LinkedIn again.</string>
+    <string name="channel_error_load_failed">Could not load connected channels. Please try again.</string>
+    <string name="channel_not_configured_notice">%1$s is not configured in local.properties, so real sign-in is unavailable in this build.</string>
 </resources>

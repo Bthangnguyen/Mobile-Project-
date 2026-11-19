@@ -11,7 +11,8 @@ import java.nio.charset.StandardCharsets
  * - Chỉ coi URL là redirect khi nó **bắt đầu đúng** bằng redirect URI của app (đúng ranh giới),
  *   không nhận `exchange_code` từ bất kỳ URL nào khác.
  * - Chỉ nhận `exchange_code` khi `state` khớp với giá trị app đã gửi đi (RFC 6749 Section 10.12, chống CSRF).
- * - Lỗi/hủy từ BFF được chấp nhận không cần `state`, nhưng không bao giờ tạo ra mã.
+ * - `state` phải khớp ở mọi nhánh, kể cả lỗi và hủy: redirect có `state` thiếu hoặc sai bị coi là không hợp lệ
+ *   (không tạo ra mã và không được dùng để kết thúc phiên đang chờ).
  * - `exchange_code` một mình vô dụng: muốn đổi token còn cần `code_verifier` chỉ nằm trong RAM của app.
  */
 object LinkedInAuthRedirect {

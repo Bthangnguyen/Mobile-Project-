@@ -21,26 +21,6 @@ interface ChannelRepository {
     fun getConnectedChannels(): Flow<List<ChannelAccount>>
 
     /**
-     * Chỉ cho chế độ demo (chưa cấu hình FACEBOOK_APP_ID): tạo kênh Facebook giả.
-     * Đăng nhập thật dùng Meta SDK rồi [connectFacebookProfile] / [connectFacebookSelectedPage].
-     */
-    suspend fun connectFacebookPage(
-        authCode: String,
-        codeVerifier: String,
-        redirectUri: String,
-    ): Result<ChannelAccount>
-
-    /**
-     * Chỉ cho chế độ demo (chưa cấu hình LINKEDIN_MEMBER_CLIENT_ID hoặc LINKEDIN_BFF_URL): tạo kênh LinkedIn giả.
-     * Đăng nhập thật dùng [startLinkedInSession] rồi [connectLinkedInViaBff].
-     */
-    suspend fun connectLinkedIn(
-        authCode: String,
-        codeVerifier: String,
-        redirectUri: String,
-    ): Result<ChannelAccount>
-
-    /**
      * Đăng ký phiên đăng nhập LinkedIn với BFF (`state` + `code_challenge` S256) trước khi mở trình duyệt.
      */
     suspend fun startLinkedInSession(state: String, codeChallenge: String): Result<Unit> = Result.success(Unit)

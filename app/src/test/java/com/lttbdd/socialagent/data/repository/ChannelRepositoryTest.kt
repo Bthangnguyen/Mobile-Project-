@@ -1,6 +1,5 @@
 package com.lttbdd.socialagent.data.repository
 
-import com.lttbdd.socialagent.core.model.ChannelCapability
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.ConnectionStatus
 import com.lttbdd.socialagent.data.model.FacebookPage
@@ -155,49 +154,11 @@ class ChannelRepositoryTest {
     }
 
     @Test
-    fun `connectFacebookPage connects channel and stores token with computed expiresAt`() = runTest {
-        val result = repository.connectFacebookPage(
-            authCode = "code_fb_123",
-            codeVerifier = "verifier_fb_456",
-            redirectUri = "com.lttbdd.socialagent://oauth/callback",
-        )
-
-        assertTrue(result.isSuccess)
-        val channel = result.getOrThrow()
-        assertEquals(ChannelType.FACEBOOK, channel.type)
-        assertEquals("fb_page_101", channel.accountId)
-        assertEquals(ConnectionStatus.CONNECTED, channel.status)
-        assertTrue(channel.capabilities.contains(ChannelCapability.PUBLISH))
-
-        val connectedList = repository.getConnectedChannels().first()
-        assertEquals(1, connectedList.size)
-        assertEquals("fb_page_101", connectedList[0].accountId)
-    }
-
-    @Test
-    fun `connectLinkedIn connects channel and stores token`() = runTest {
-        val result = repository.connectLinkedIn(
-            authCode = "code_li_123",
-            codeVerifier = "verifier_li_456",
-            redirectUri = "com.lttbdd.socialagent://oauth/callback",
-        )
-
-        assertTrue(result.isSuccess)
-        val channel = result.getOrThrow()
-        assertEquals(ChannelType.LINKEDIN, channel.type)
-        assertEquals("li_org_202", channel.accountId)
-        assertEquals(ConnectionStatus.CONNECTED, channel.status)
-
-        val connectedList = repository.getConnectedChannels().first()
-        assertEquals(1, connectedList.size)
-    }
-
-    @Test
     fun `disconnectChannel removes channel from list`() = runTest {
-        repository.connectFacebookPage("code_fb", "verifier_fb", "uri")
+        repository.connectFacebookSelectedPage(FacebookUserToken("u", 5L, "x"), FacebookPage("p1", "Page Mot", "t"))
         assertEquals(1, repository.getConnectedChannels().first().size)
 
-        val disconnectResult = repository.disconnectChannel(ChannelType.FACEBOOK, "fb_page_101")
+        val disconnectResult = repository.disconnectChannel(ChannelType.FACEBOOK, "p1")
         assertTrue(disconnectResult.isSuccess)
         assertEquals(0, repository.getConnectedChannels().first().size)
     }
@@ -226,16 +187,23 @@ class ChannelRepositoryTest {
 
     @Test
     fun `getGrantedScope tra ve scope da luu cua token`() = runTest {
-        repository.connectFacebookPage(
-            authCode = "code_fb_123",
-            codeVerifier = "v",
-            redirectUri = "com.lttbdd.socialagent://oauth/callback",
+        repository.connectFacebookSelectedPage(
+            FacebookUserToken("u", 5L, "pages_manage_posts,pages_read_engagement"),
+            FacebookPage("p1", "Page Mot", "t"),
         )
 
         assertEquals(
             "pages_manage_posts,pages_read_engagement",
-            repository.getGrantedScope(ChannelType.FACEBOOK, "fb_page_101"),
+            repository.getGrantedScope(ChannelType.FACEBOOK, "p1"),
         )
         assertNull(repository.getGrantedScope(ChannelType.FACEBOOK, "khong_ton_tai"))
+    }
+
+    @Test
+    fun `repository khong con duong ket noi gia nao ghi vao kho that`() = runTest {
+        // Chế độ demo nằm ở ViewModel (RAM, bản debug); repository chỉ ghi token thật từ nhà cung cấp.
+        assertTrue(fakeTokenStore.storage.isEmpty())
+        assertTrue(fakeAccountStore.saved.isEmpty())
+        assertTrue(repository.getConnectedChannels().first().isEmpty())
     }
 }

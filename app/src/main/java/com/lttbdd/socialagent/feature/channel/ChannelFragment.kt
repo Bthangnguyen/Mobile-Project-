@@ -236,14 +236,13 @@ class ChannelFragment : Fragment() {
         ChannelNotice.LINKEDIN_LOGIN_CANCELLED -> R.string.channel_linkedin_cancelled
         ChannelNotice.LINKEDIN_LOGIN_FAILED -> R.string.channel_linkedin_login_failed
         ChannelNotice.LINKEDIN_LOGIN_TIMEOUT -> R.string.channel_linkedin_login_timeout
+        ChannelNotice.LINKEDIN_SESSION_EXPIRED -> R.string.channel_linkedin_session_expired
     }
 
+    /** Bản debug: báo đang ở chế độ demo (kênh giả chỉ trong RAM). Bản khác: chỉ báo chưa cấu hình, không kết nối gì. */
     private fun showDemoModeNotice(configKey: String) {
-        Toast.makeText(
-            requireContext(),
-            getString(R.string.channel_demo_mode_notice, configKey),
-            Toast.LENGTH_LONG,
-        ).show()
+        val message = if (viewModel.isDemoEnabled()) R.string.channel_demo_mode_notice else R.string.channel_not_configured_notice
+        Toast.makeText(requireContext(), getString(message, configKey), Toast.LENGTH_LONG).show()
     }
 
     override fun onDestroyView() {

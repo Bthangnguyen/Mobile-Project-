@@ -1,14 +1,15 @@
 package com.lttbdd.socialagent.feature.channel
 
 import android.content.Context
-import android.graphics.Color
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.lttbdd.socialagent.R
 import com.lttbdd.socialagent.core.model.ChannelAccount
+import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.ConnectionStatus
 import com.lttbdd.socialagent.databinding.ItemCapabilityRowBinding
 import com.lttbdd.socialagent.databinding.ItemChannelAccountBinding
@@ -39,7 +40,12 @@ class ChannelAdapter(
 
         fun bind(account: ChannelAccount) {
             val context = binding.root.context
-            binding.tvChannelType.text = account.type.name
+            binding.tvChannelType.text = context.getString(
+                when (account.type) {
+                    ChannelType.FACEBOOK -> R.string.channel_type_facebook
+                    ChannelType.LINKEDIN -> R.string.channel_type_linkedin
+                },
+            )
             binding.tvDisplayName.text = account.displayName
 
             val statusText = when (account.status) {
@@ -49,11 +55,14 @@ class ChannelAdapter(
             }
             binding.tvStatus.text = statusText
             binding.tvStatus.setTextColor(
-                when (account.status) {
-                    ConnectionStatus.CONNECTED -> Color.parseColor("#2E7D32")
-                    ConnectionStatus.TOKEN_EXPIRED -> Color.parseColor("#E65100")
-                    ConnectionStatus.DISCONNECTED -> Color.GRAY
-                },
+                ContextCompat.getColor(
+                    context,
+                    when (account.status) {
+                        ConnectionStatus.CONNECTED -> R.color.channel_status_connected
+                        ConnectionStatus.TOKEN_EXPIRED -> R.color.channel_status_expired
+                        ConnectionStatus.DISCONNECTED -> R.color.channel_status_disconnected
+                    },
+                ),
             )
 
             // Render 5 capabilities matrix
@@ -68,15 +77,15 @@ class ChannelAdapter(
                 rowBinding.tvCapStatus.text = context.getString(item.statusTextRes)
                 rowBinding.tvCapCaption.text = context.getString(item.captionRes)
 
-                val (chipBgColor, chipTextColor) = when (item.statusType) {
-                    CapabilityStatusType.SUPPORTED -> Pair(Color.parseColor("#E8F5E9"), Color.parseColor("#1B5E20"))
-                    CapabilityStatusType.REQUIRES_PERMISSION -> Pair(Color.parseColor("#FFF3E0"), Color.parseColor("#E65100"))
-                    CapabilityStatusType.NOT_SUPPORTED -> Pair(Color.parseColor("#FFEBEE"), Color.parseColor("#B71C1C"))
-                    CapabilityStatusType.UNVERIFIED -> Pair(Color.parseColor("#F5F5F5"), Color.parseColor("#616161"))
-                    CapabilityStatusType.HANDED_OFF -> Pair(Color.parseColor("#E3F2FD"), Color.parseColor("#0D47A1"))
+                val (chipBgRes, chipTextRes) = when (item.statusType) {
+                    CapabilityStatusType.SUPPORTED -> R.color.cap_supported_bg to R.color.cap_supported_text
+                    CapabilityStatusType.REQUIRES_PERMISSION -> R.color.cap_requires_bg to R.color.cap_requires_text
+                    CapabilityStatusType.NOT_SUPPORTED -> R.color.cap_not_supported_bg to R.color.cap_not_supported_text
+                    CapabilityStatusType.UNVERIFIED -> R.color.cap_unverified_bg to R.color.cap_unverified_text
+                    CapabilityStatusType.HANDED_OFF -> R.color.cap_handed_off_bg to R.color.cap_handed_off_text
                 }
-                rowBinding.tvCapStatus.setBackgroundColor(chipBgColor)
-                rowBinding.tvCapStatus.setTextColor(chipTextColor)
+                rowBinding.tvCapStatus.setBackgroundColor(ContextCompat.getColor(context, chipBgRes))
+                rowBinding.tvCapStatus.setTextColor(ContextCompat.getColor(context, chipTextRes))
 
                 binding.containerCapabilities.addView(rowBinding.root)
             }

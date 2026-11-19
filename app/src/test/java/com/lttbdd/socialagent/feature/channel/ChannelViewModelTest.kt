@@ -16,6 +16,8 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -324,7 +326,8 @@ class ChannelViewModelTest {
         callback("exchange_code=ma_gia&state=bat_ky")
 
         assertNull(fakeRepository.lastBff)
-        assertTrue(notices.isEmpty())
+        // Không kết nối gì; chỉ báo phiên đã hết hạn để người dùng thử lại.
+        assertEquals(listOf(ChannelNotice.LINKEDIN_SESSION_EXPIRED), notices)
     }
 
     @Test
@@ -381,7 +384,8 @@ class ChannelViewModelTest {
         testDispatcher.scheduler.runCurrent()
         callback("exchange_code=ma_tre&state=$state")
 
-        assertEquals(listOf(ChannelNotice.LINKEDIN_LOGIN_TIMEOUT), notices)
+        // Timeout, rồi deep link đến muộn thì báo phiên hết hạn (không im lặng) và không đổi token.
+        assertEquals(listOf(ChannelNotice.LINKEDIN_LOGIN_TIMEOUT, ChannelNotice.LINKEDIN_SESSION_EXPIRED), notices)
         assertNull(fakeRepository.lastBff)
     }
 
@@ -430,18 +434,120 @@ class ChannelViewModelTest {
         callback("exchange_code=ma_doi&state=${stateOf(urls.single())}")
         testDispatcher.scheduler.runCurrent()
 
-        fakeRepository.bffResult = Result.failure(IllegalStateException("loi la"))
-        val (urls2, _) = startLinkedIn()
-        callback("exchange_code=ma_doi2&state=${stateOf(urls2.last())}")
-        testDispatcher.scheduler.runCurrent()
-
         assertEquals(
-            listOf(
-                com.lttbdd.socialagent.R.string.channel_error_network,
-                com.lttbdd.socialagent.R.string.channel_oauth_error_generic,
-            ),
+            listOf(com.lttbdd.socialagent.R.string.channel_error_network),
             errors,
         )
+    }
+
+    // ---- Sự kiện một lần, phiên hết hạn, demo, lỗi đọc kho ----
+
+    @Test
+    fun `su kien khong bi mat khi chua co ai lang nghe, giao dung mot lan khi Fragment quay lai`() = runTest {
+        viewModel.onFacebookLoginFailed() // Fragment đang dừng: chưa có collector nào
+
+        val first = mutableListOf<ChannelNotice>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.notices.collect { first.add(it) } }
+        assertEquals(listOf(ChannelNotice.FACEBOOK_LOGIN_FAILED), first)
+
+        val second = mutableListOf<ChannelNotice>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.notices.collect { second.add(it) } }
+        assertTrue("khong duoc giao lai su kien da nhan", second.isEmpty())
+    }
+
+    @Test
+    fun `thong bao timeout phat khi nguoi dung dang o trinh duyet van den tay khi quay lai`() = runTest {
+        val urls = mutableListOf<String>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.browserRequests.collect { urls.add(it) } }
+        viewModel.startLinkedInLogin()
+        testDispatcher.scheduler.runCurrent()
+
+        // Quá hạn trong lúc Fragment dừng (không ai nghe notices).
+        testDispatcher.scheduler.advanceTimeBy(viewModel.linkedInLoginTimeoutMillis + 1)
+        testDispatcher.scheduler.runCurrent()
+
+        val notices = mutableListOf<ChannelNotice>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.notices.collect { notices.add(it) } }
+        assertEquals(listOf(ChannelNotice.LINKEDIN_LOGIN_TIMEOUT), notices)
+    }
+
+    @Test
+    fun `deep link cua BFF khi khong con phien cho thi bao phien het han, link la thi bo qua`() = runTest {
+        val notices = mutableListOf<ChannelNotice>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.notices.collect { notices.add(it) } }
+
+        viewModel.onLinkedInCallback("https://evil.example/?exchange_code=ma_gia&state=x")
+        viewModel.onLinkedInCallback("com.lttbdd.socialagent://other/path?exchange_code=ma_gia")
+        assertTrue(notices.isEmpty())
+
+        callback("exchange_code=ma_that_nhung_tre&state=bat_ky")
+        assertEquals(listOf(ChannelNotice.LINKEDIN_SESSION_EXPIRED), notices)
+        assertNull(fakeRepository.lastBff)
+    }
+
+    @Test
+    fun `bat dau dang nhap LinkedIn xong thi man hinh thoat Loading`() = runTest {
+        startLinkedIn()
+
+        assertTrue(viewModel.uiState.value is ChannelUiState.Success)
+    }
+
+    @Test
+    fun `che do demo tat thi khong tao kenh nao`() = runTest {
+        viewModel.demoEnabled = false
+
+        viewModel.connectFacebookDemo()
+        viewModel.connectLinkedInDemo()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue((viewModel.uiState.value as ChannelUiState.Success).channels.isEmpty())
+        assertTrue(!viewModel.isDemoEnabled())
+    }
+
+    @Test
+    fun `che do demo bat thi kenh demo chi nam trong RAM, co dau demo va khong cham vao repository`() = runTest {
+        viewModel.demoEnabled = true
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.connectFacebookDemo()
+        viewModel.connectLinkedInDemo()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val channels = (viewModel.uiState.value as ChannelUiState.Success).channels
+        assertEquals(2, channels.size)
+        assertTrue(channels.all { it.displayName.startsWith("[DEMO]") })
+        assertNotNull(viewModel.getScopeForAccount(channels.first()))
+        // Repository (nơi ghi token và metadata thật) không được gọi.
+        assertTrue(fakeRepository.getConnectedChannels().first().isEmpty())
+        assertNull(fakeRepository.lastUser)
+        assertNull(fakeRepository.lastBff)
+        assertTrue(fakeRepository.sessions.isEmpty())
+    }
+
+    @Test
+    fun `kenh demo khong bi mat khi repository phat lai danh sach`() = runTest {
+        viewModel.demoEnabled = true
+        fakeRepository.pages = listOf(FacebookPage("p1", "Page Mot", "t1"))
+        viewModel.connectFacebookDemo()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        connectWithFacebookToken()
+
+        val names = (viewModel.uiState.value as ChannelUiState.Success).channels.map { it.displayName }
+        assertEquals(listOf("Page Mot", "[DEMO] Facebook Page"), names)
+    }
+
+    @Test
+    fun `doc kho loi thi bao loi mot lan va thoat Loading, khong crash`() = runTest {
+        fakeRepository.loadError = true
+        val errorVm = ChannelViewModel(fakeRepository, callbackBus)
+        val errors = mutableListOf<Int>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { errorVm.errors.collect { errors.add(it) } }
+
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(listOf(com.lttbdd.socialagent.R.string.channel_error_load_failed), errors)
+        assertTrue((errorVm.uiState.value as ChannelUiState.Success).channels.isEmpty())
     }
 
     private class FakeChannelRepository : ChannelRepository {
@@ -496,7 +602,15 @@ class ChannelViewModelTest {
 
         override suspend fun connectFacebookProfile(user: FacebookUserToken): Result<ChannelAccount> {
             lastUser = user
-            return connectFacebookPage("", "", "")
+            val account = ChannelAccount(
+                type = ChannelType.FACEBOOK,
+                accountId = "fb_101",
+                displayName = "Facebook Page Test",
+                status = ConnectionStatus.CONNECTED,
+                capabilities = setOf(ChannelCapability.PUBLISH, ChannelCapability.READ_COMMENTS),
+            )
+            channels.value = channels.value + account
+            return Result.success(account)
         }
 
         override suspend fun connectFacebookSelectedPage(
@@ -515,42 +629,14 @@ class ChannelViewModelTest {
             return Result.success(account)
         }
 
-        override fun getConnectedChannels(): Flow<List<ChannelAccount>> = channels.asStateFlow()
+        /** Bật thì [getConnectedChannels] ném lỗi đọc kho (như DataStore IOException). */
+        var loadError = false
+
+        override fun getConnectedChannels(): Flow<List<ChannelAccount>> =
+            if (loadError) flow { throw java.io.IOException("doc kho loi") } else channels.asStateFlow()
 
         override suspend fun getGrantedScope(type: ChannelType, accountId: String): String? =
             if (type == ChannelType.FACEBOOK) scope else null
-
-        override suspend fun connectFacebookPage(
-            authCode: String,
-            codeVerifier: String,
-            redirectUri: String,
-        ): Result<ChannelAccount> {
-            val account = ChannelAccount(
-                type = ChannelType.FACEBOOK,
-                accountId = "fb_101",
-                displayName = "Facebook Page Test",
-                status = ConnectionStatus.CONNECTED,
-                capabilities = setOf(ChannelCapability.PUBLISH, ChannelCapability.READ_COMMENTS),
-            )
-            channels.value = channels.value + account
-            return Result.success(account)
-        }
-
-        override suspend fun connectLinkedIn(
-            authCode: String,
-            codeVerifier: String,
-            redirectUri: String,
-        ): Result<ChannelAccount> {
-            val account = ChannelAccount(
-                type = ChannelType.LINKEDIN,
-                accountId = "li_202",
-                displayName = "LinkedIn Org Test",
-                status = ConnectionStatus.CONNECTED,
-                capabilities = setOf(ChannelCapability.PUBLISH, ChannelCapability.READ_COMMENTS),
-            )
-            channels.value = channels.value + account
-            return Result.success(account)
-        }
 
         override suspend fun disconnectChannel(type: ChannelType, accountId: String): Result<Unit> {
             channels.value = channels.value.filterNot { it.type == type && it.accountId == accountId }

@@ -53,6 +53,7 @@ class ChannelRepositoryNetworkTest {
     private lateinit var repository: ChannelRepositoryImpl
     private val requests = mutableListOf<Request>()
     private val bodies = mutableListOf<String>()
+    private val readTimeouts = mutableListOf<Int>()
 
     /** Phản hồi theo (phương thức + đường dẫn); không khớp thì ném IOException như mất mạng. */
     private var handler: (Request) -> Pair<Int, String> = { throw IOException("khong co mang") }
@@ -65,6 +66,7 @@ class ChannelRepositoryNetworkTest {
         repository.httpClient = OkHttpClient.Builder().addInterceptor(Interceptor { chain ->
             val request = chain.request()
             requests.add(request)
+            readTimeouts.add(chain.readTimeoutMillis())
             val buffer = okio.Buffer()
             request.body?.writeTo(buffer)
             bodies.add(buffer.readUtf8())
@@ -135,6 +137,34 @@ class ChannelRepositoryNetworkTest {
 
         assertEquals(listOf("ANALYZE"), repository.getPageTasks(ChannelType.FACEBOOK, "p1"))
         assertNull(repository.getPageTasks(ChannelType.FACEBOOK, "khong_ton_tai"))
+    }
+
+    @Test
+    fun `moi loi goi Graph API dung phien ban tap trung v26_0`() = runTest {
+        handler = { request ->
+            if (request.url.encodedPath.endsWith("/me/accounts")) 200 to """{"data":[]}""" else 200 to """{"id":"1","name":"A"}"""
+        }
+
+        repository.fetchFacebookPages("user_tok")
+        repository.connectFacebookProfile(FacebookUserToken("u", 1L, null))
+
+        assertEquals(2, requests.size)
+        requests.forEach { assertTrue(it.url.encodedPath, it.url.encodedPath.startsWith("/${ChannelRepositoryImpl.FACEBOOK_GRAPH_API_VERSION}/")) }
+        assertEquals("v26.0", ChannelRepositoryImpl.FACEBOOK_GRAPH_API_VERSION)
+    }
+
+    @Test
+    fun `goi BFF dung timeout doc dai cho BFF dang ngu, Graph API giu timeout mac dinh`() = runTest {
+        handler = { request ->
+            if (request.url.host == "bff.example.com") 200 to """{"ok":true}""" else 200 to """{"data":[]}"""
+        }
+
+        repository.startLinkedInSession("state_123", "challenge_456")
+        repository.fetchFacebookPages("user_tok")
+
+        assertEquals(2, readTimeouts.size)
+        assertTrue("BFF can timeout >= 60 giay, thuc te ${readTimeouts[0]} ms", readTimeouts[0] >= 60_000)
+        assertTrue("Graph API khong doi timeout, thuc te ${readTimeouts[1]} ms", readTimeouts[1] < 60_000)
     }
 
     // ---- LinkedIn qua BFF ----

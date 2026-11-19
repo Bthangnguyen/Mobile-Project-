@@ -88,27 +88,6 @@ class ChannelRepositoryImpl @Inject constructor(
         capabilities = ALL_CAPABILITIES,
     )
 
-    /**
-     * Đường kết nối GIẢ cho chế độ demo (chưa cấu hình FACEBOOK_APP_ID). Luồng thật dùng
-     * [connectFacebookProfile] / [connectFacebookSelectedPage] với token từ Meta SDK.
-     */
-    override suspend fun connectFacebookPage(
-        authCode: String,
-        codeVerifier: String,
-        redirectUri: String,
-    ): Result<ChannelAccount> = withContext(Dispatchers.IO) {
-        try {
-            val token = OAuthToken.createFromExpiresIn(
-                accessToken = "fb_access_token_$authCode",
-                expiresInSeconds = DEMO_EXPIRES_IN_SECONDS,
-                scope = "pages_manage_posts,pages_read_engagement",
-            )
-            saveAndRegister(ChannelType.FACEBOOK, "fb_page_101", "Social Agent Official Page", token)
-        } catch (e: Exception) {
-            Result.failure(ChannelException(e.toChannelError(), e))
-        }
-    }
-
     override suspend fun connectFacebookProfile(user: FacebookUserToken): Result<ChannelAccount> =
         withContext(Dispatchers.IO) {
             try {
@@ -134,7 +113,7 @@ class ChannelRepositoryImpl @Inject constructor(
     private fun fetchFacebookProfile(accessToken: String): Pair<String, String>? {
         return try {
             val request = okhttp3.Request.Builder()
-                .url("https://graph.facebook.com/v20.0/me?fields=id,name")
+                .url("$GRAPH_API_BASE_URL/me?fields=id,name")
                 .header("Authorization", "Bearer $accessToken")
                 .build()
             httpClient.newCall(request).execute().use { response ->
@@ -150,7 +129,7 @@ class ChannelRepositoryImpl @Inject constructor(
         withContext(Dispatchers.IO) {
             try {
                 val request = okhttp3.Request.Builder()
-                    .url("https://graph.facebook.com/v20.0/me/accounts?fields=id,name,access_token,tasks&limit=100")
+                    .url("$GRAPH_API_BASE_URL/me/accounts?fields=id,name,access_token,tasks&limit=100")
                     .header("Authorization", "Bearer $userAccessToken")
                     .build()
                 httpClient.newCall(request).execute().use { response ->
@@ -209,27 +188,6 @@ class ChannelRepositoryImpl @Inject constructor(
             tokenStore.getToken(type, accountId).first()?.pageTasks
         } catch (_: Exception) {
             null
-        }
-    }
-
-    /**
-     * Đường kết nối GIẢ cho chế độ demo (chưa cấu hình LINKEDIN_MEMBER_CLIENT_ID / LINKEDIN_BFF_URL).
-     * Luồng thật dùng [startLinkedInSession] rồi [connectLinkedInViaBff].
-     */
-    override suspend fun connectLinkedIn(
-        authCode: String,
-        codeVerifier: String,
-        redirectUri: String,
-    ): Result<ChannelAccount> = withContext(Dispatchers.IO) {
-        try {
-            val token = OAuthToken.createFromExpiresIn(
-                accessToken = "li_access_token_$authCode",
-                expiresInSeconds = DEMO_EXPIRES_IN_SECONDS,
-                scope = LinkedInBffAuth.SCOPE,
-            )
-            saveAndRegister(ChannelType.LINKEDIN, "li_org_202", "Social Agent LinkedIn Company Page", token)
-        } catch (e: Exception) {
-            Result.failure(ChannelException(e.toChannelError(), e))
         }
     }
 
@@ -317,6 +275,12 @@ class ChannelRepositoryImpl @Inject constructor(
         }
     }
 
+    /** Khách HTTP riêng cho BFF (timeout dài hơn); giữ nguyên interceptor của [httpClient] để test thay được. */
+    private fun bffClient(): okhttp3.OkHttpClient = httpClient.newBuilder()
+        .connectTimeout(BFF_CONNECT_TIMEOUT_SECONDS, java.util.concurrent.TimeUnit.SECONDS)
+        .readTimeout(BFF_READ_TIMEOUT_SECONDS, java.util.concurrent.TimeUnit.SECONDS)
+        .build()
+
     /** POST JSON tới BFF; [handle] chạy khi response còn mở. Token trong body không bao giờ được log. */
     private fun <T> postJson(
         url: String,
@@ -327,7 +291,7 @@ class ChannelRepositoryImpl @Inject constructor(
             .url(url)
             .post(jsonBody.toRequestBody("application/json; charset=utf-8".toMediaType()))
             .build()
-        return httpClient.newCall(request).execute().use { response -> handle(response, response.body?.string()) }
+        return bffClient().newCall(request).execute().use { response -> handle(response, response.body?.string()) }
     }
 
     override suspend fun disconnectChannel(type: ChannelType, accountId: String): Result<Unit> {
@@ -379,8 +343,16 @@ class ChannelRepositoryImpl @Inject constructor(
             ChannelCapability.METRICS,
         )
 
-        /** Chỉ dùng cho đường demo; luồng thật luôn dùng hạn do nhà cung cấp trả. */
-        private const val DEMO_EXPIRES_IN_SECONDS = 5_184_000L
+        /** Phiên bản Graph API dùng chung (docs/research-social-api.md chuẩn hóa `v26.0`); nâng cấp ở đây một chỗ. */
+        internal const val FACEBOOK_GRAPH_API_VERSION = "v26.0"
+        private const val GRAPH_API_BASE_URL = "https://graph.facebook.com/$FACEBOOK_GRAPH_API_VERSION"
+
+        /**
+         * BFF chạy trên gói free của Render nên ngủ khi không ai dùng; lần gọi đầu có thể mất khoảng một phút
+         * để khởi động. Timeout mặc định của OkHttp (10 giây) sẽ làm lần đăng nhập LinkedIn đầu tiên thất bại.
+         */
+        private const val BFF_CONNECT_TIMEOUT_SECONDS = 30L
+        private const val BFF_READ_TIMEOUT_SECONDS = 60L
 
         /** LinkedIn không trả expires_in: dùng hạn ngắn để buộc đăng nhập lại thay vì giả định 60 ngày. */
         private const val FALLBACK_EXPIRES_IN_SECONDS = 3_600L

@@ -45,14 +45,5 @@ abstract class SocialRepositoryModule {
         fun provideChannelAccountStore(
             @ApplicationContext context: Context,
         ): ChannelAccountStore = DataStoreChannelAccountStore(context)
-
-        @Provides
-        @Singleton
-        fun provideSecureTokenStore(
-            @ApplicationContext context: Context,
-            keystoreCipher: AndroidKeystoreCipher,
-        ): SecureTokenStore {
-            return SecureTokenStore(context, keystoreCipher)
-        }
     }
 }

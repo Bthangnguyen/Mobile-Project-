@@ -23,4 +23,7 @@ enum class ChannelNotice {
     LINKEDIN_LOGIN_CANCELLED,
     LINKEDIN_LOGIN_FAILED,
     LINKEDIN_LOGIN_TIMEOUT,
+
+    /** Deep link của BFF quay về nhưng không còn phiên đang chờ (quá hạn hoặc app bị đóng giữa chừng). */
+    LINKEDIN_SESSION_EXPIRED,
 }

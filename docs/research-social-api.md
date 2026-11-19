@@ -19,10 +19,11 @@ thử thực tế** hoặc **Đề xuất** không được dùng làm căn cứ
    SDK có thể được dùng cho trải nghiệm đăng nhập native nếu cấu hình sản phẩm/Dashboard phù hợp (bổ sung `facebook_client_token` và đăng ký cả debug lẫn release key hash, B3).
    Web OAuth qua BFF chỉ là phương án dự phòng và chưa thuộc phạm vi Android app hiện tại; không tự
    giả định rằng PKCE thủ công có thể đổi token mà không cần secret.
-3. **LinkedIn — Tách thành 2 app độc lập:** Theo quy định chính thức của LinkedIn ([LinkedIn API Partner Support Guide](https://learn.microsoft.com/en-us/linkedin/shared/linkedin-api-partner-support-guide), [LinkedIn Community Management Overview](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/community-management-overview)), *Community Management API* bắt buộc phải là sản phẩm duy nhất trên một developer app (nút xin sẽ bị khóa nếu app đã tích hợp sản phẩm khác). Do đó, nhóm tách thành 2 app LinkedIn riêng biệt: (1) App **Member** (`LINKEDIN_MEMBER_CLIENT_ID`) bật OIDC và *Share on LinkedIn* (scope `openid profile w_member_social`) cho F1 cá nhân và đăng bài cá nhân; (2) App **Org** (`LINKEDIN_ORG_CLIENT_ID`) chỉ bật duy nhất *Community Management API* cho F1 Org, F5/F6/F7 trên Company Page. Cả 2 app đều phải xin bật Native PKCE riêng. Đối với app Org (không có OIDC/openid), URN người dùng quản trị được lấy trực tiếp từ trường `roleAssignee` trong response của `GET /rest/organizationAcls` thay vì gọi `/v2/userinfo`. App nào chưa được cấp Native PKCE thì tính năng tương ứng bị đánh dấu là blocked.
-4. **BFF không thuộc phạm vi của repository Android này.** Các endpoint `/auth/*`, việc lưu
-   `refresh_token` phía server và chính sách logout server phải được thiết kế trong một issue/ repository
-   backend riêng trước khi đưa vào mã Android.
+3. **LinkedIn — Tách thành 2 app độc lập:** Theo quy định chính thức của LinkedIn ([LinkedIn API Partner Support Guide](https://learn.microsoft.com/en-us/linkedin/shared/linkedin-api-partner-support-guide), [LinkedIn Community Management Overview](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/community-management-overview)), *Community Management API* bắt buộc phải là sản phẩm duy nhất trên một developer app (nút xin sẽ bị khóa nếu app đã tích hợp sản phẩm khác). Do đó, nhóm tách thành 2 app LinkedIn riêng biệt: (1) App **Member** (`LINKEDIN_MEMBER_CLIENT_ID`) bật OIDC và *Share on LinkedIn* (scope `openid profile w_member_social`) cho F1 cá nhân và đăng bài cá nhân; (2) App **Org** (`LINKEDIN_ORG_CLIENT_ID`) chỉ bật duy nhất *Community Management API* cho F1 Org, F5/F6/F7 trên Company Page. Cả 2 app đều phải xin bật Native PKCE riêng. Đối với app Org (không có OIDC/openid), URN người dùng quản trị được lấy trực tiếp từ trường `roleAssignee` trong response của `GET /rest/organizationAcls` thay vì gọi `/v2/userinfo`. App nào chưa được cấp Native PKCE thì tính năng tương ứng bị đánh dấu là blocked. **Cập nhật (#88):** thử nghiệm TEST-06 cho thấy Native PKCE từ chối scope `openid` ("Open ID permission is not supported for PKCE flows"), nên App **Member** đăng nhập bằng Standard OAuth qua BFF (Luồng B, xem quyết định 4). Quyết định cho App **Org** chưa thay đổi.
+4. **BFF đăng nhập LinkedIn nằm ở repository backend riêng, không thuộc repository Android này (quyết định tại #88).** Nhóm đã duyệt ngoại lệ Quy tắc 5 của `AGENTS.md` cho LinkedIn theo các điều kiện: BFF không lưu token xuống đĩa/DB và không log token, `code`, `state`, `code_verifier`; token chỉ tồn tại ≤ 60 giây và bị xóa ngay lần đổi đầu tiên; BFF không chuyển tiếp `refresh_token`; chỉ áp dụng cho LinkedIn (Facebook vẫn dùng Meta SDK, không qua BFF). Các điểm đi kèm:
+   - **Repository và vận hành:** BFF ở repo riêng [social-agent-linkedin-bff](https://github.com/dhminh678/social-agent-linkedin-bff), có README ghi rõ các điều kiện trên. `client_secret` và tài khoản Render do Minh giữ (đã deploy), cấp thêm quyền quản trị cho Thắng để không phụ thuộc một người; secret chỉ nằm trong biến môi trường của Render, không commit.
+   - **Redirect về app:** bản demo dùng custom scheme `com.lttbdd.socialagent://oauth/linkedin/callback`. Rủi ro phishing của custom scheme (app độc hại đăng ký trùng scheme có thể tự tạo phiên qua `/auth/linkedin/start`, PKCE không chặn được) là **known issue**; chuyển sang Android App Link trước bản nộp cuối bằng ticket riêng.
+   - **Không tự làm mới token LinkedIn:** BFF không giữ `refresh_token` nên không có `/refresh` hay `/logout`; token hết hạn thì người dùng đăng nhập lại.
 5. **Không để `LinkedInClient` tự truy vấn Room DB để lấy URN bài viết gốc khi Reply (B12):** Tầng Repository chịu trách nhiệm đọc `Comment.remotePostId` từ Room và truyền xuống client; client mạng không phụ thuộc ngược vào DB. Đề xuất mở issue `contract` để bổ sung hàm overload `reply(comment: Comment, text: String)` trong `SocialChannelClient` (tuân thủ Quy tắc 1 của `AGENTS.md`).
 6. **Hàng đợi đăng bài chống trùng lặp (Idempotency Protocol):** Cả Facebook và LinkedIn đều không hỗ trợ native idempotency header. Việc chỉ lưu `idempotencyKey` đơn thuần trong Room không bảo vệ được kịch bản server đã nhận bài nhưng client bị timeout, rớt mạng hoặc process bị kill trước khi ghi `remotePostId`. Do đó, hàng đợi WorkManager bắt buộc áp dụng giao thức: ghi trạng thái `PUBLISHING` kèm `attemptStartedAt` vào Room **trước** khi gọi API; phân loại lỗi mạng để chỉ retry khi chắc chắn chưa gửi được dữ liệu; nếu gặp timeout/không rõ kết quả thì phải **đối soát trước qua feed** (Facebook `/{page-id}/feed?since=...`, LinkedIn `GET /rest/posts?author=...`) trước khi được phép đăng lại.
 7. **Đánh giá rủi ro xét duyệt Community Management API cho đồ án sinh viên (B13):** Do Community Management API yêu cầu xét duyệt đơn đăng ký về quyền sở hữu Page doanh nghiệp, đây là rủi ro lớn nhất của dự án. **Hạn quyết định (Decision Deadline): Hết Tuần 1 của Milestone 1**. Nếu LinkedIn không phê duyệt CM API cho App Org của nhóm, toàn bộ nhánh LinkedIn Organization sẽ kích hoạt phương án dự phòng: F5 chuyển sang luồng `HANDED_OFF` (thông báo + đăng thủ công qua Share Sheet), F6/F7 dùng `FakeSocialChannelClient` cho demo để không làm trễ tiến độ đồ án.
@@ -538,6 +539,8 @@ Nếu Meta hỗ trợ cấu hình custom scheme và bỏ qua secret qua `code_ve
 > LinkedIn phân tách rõ ràng giữa **giao thức Native PKCE dành riêng cho ứng dụng di động** và **luồng Standard OAuth 2.0 Web**. Nhóm cần nắm rõ điều kiện áp dụng của từng luồng để tránh lỗi phân quyền `Not enough permissions to access Native PKCE protocol` khi tích hợp.
 
 #### Luồng A: LinkedIn Native PKCE Protocol (Trực tiếp Client — Không giữ Secret)
+
+> **Kết quả TEST-06 (#88):** Native PKCE từ chối scope `openid` nên **App Member không dùng Luồng A**; App Member đăng nhập bằng Luồng B (qua BFF). Nội dung Luồng A bên dưới giữ lại để tham khảo và cho App Org.
 Đây là giao thức chính thức của LinkedIn dành cho các ứng dụng native (Android/Desktop) không có
 backend; đối chiếu [OAuth 2.0 for Native Clients](https://learn.microsoft.com/en-us/linkedin/shared/authentication/authorization-code-flow-native):
 - **Authorization Endpoint:** `https://www.linkedin.com/oauth/native-pkce/authorization` *(khác với `/oauth/v2/authorization`)*
@@ -565,11 +568,17 @@ backend; đối chiếu [OAuth 2.0 for Native Clients](https://learn.microsoft.c
   ```
   *(Lưu ý về độ dài token: Độ dài của token và authorization code không cố định; ứng dụng client cần có khả năng xử lý token có độ dài tối thiểu 1.000 ký tự [LinkedIn OAuth 2.0 Native Clients (PKCE)](https://learn.microsoft.com/en-us/linkedin/shared/authentication/authorization-code-flow-native), [LinkedIn Refresh Tokens with OAuth 2.0](https://learn.microsoft.com/en-us/linkedin/shared/authentication/programmatic-refresh-tokens)).*
 
-#### Luồng B — Tài liệu thiết kế tham khảo cho Backend/BFF (Ngoài phạm vi Milestone 1)
+#### Luồng B — Standard OAuth 2.0 qua BFF (đã duyệt cho LinkedIn App Member, #88)
 
-> Phần này chỉ mô tả Standard OAuth 2.0 để tham khảo khi nhóm có backend/BFF riêng.
-> Trong Milestone 1, nếu Native PKCE chưa được LinkedIn bật cho App ID, tính năng LinkedIn
-> được đánh dấu **blocked**; không triển khai Luồng B trong repository Android.
+> **Trạng thái:** nhóm đã duyệt ở #88. BFF nằm ở **repository backend riêng** ([social-agent-linkedin-bff](https://github.com/dhminh678/social-agent-linkedin-bff)); repository Android chỉ chứa phần client (app gọi BFF qua HTTPS và nhận `exchange_code` qua deep link), không chứa mã BFF.
+>
+> **Bản triển khai hiện tại là phần tối thiểu của thiết kế tham khảo bên dưới:**
+> - Chỉ LinkedIn. Endpoint: `POST /auth/linkedin/start`, `GET /auth/linkedin/callback`, `POST /auth/linkedin/token`, `GET /healthz`.
+> - PKCE S256 giữa app và BFF, `state` chống CSRF, `exchange_code` dùng một lần, TTL ≤ 60 giây.
+> - **Không có** `bff_session_token`, `/refresh`, `/logout` và BFF không lưu hay chuyển tiếp `refresh_token`.
+> - Redirect về app bằng custom scheme (xem quyết định 4); Android App Link là việc làm sau, chưa triển khai.
+>
+> Các phần mô tả `bff_session_token`, làm mới token, logout và App Links là lựa chọn chính ở phía dưới vẫn là **thiết kế tham khảo chưa triển khai**; không dùng làm căn cứ rằng tính năng đó đã có.
 
 ##### Standard OAuth 2.0 (`/oauth/v2/...`) qua Kiến trúc BFF (Backend Proxy)
 Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm:
@@ -707,13 +716,11 @@ Nếu LinkedIn chưa kịp duyệt cấp cờ Native PKCE cho App ID của nhóm
    >   - **Luồng lưu `refresh_token` vào DB server (nếu được duyệt Partner Tier):** Mức độ vi phạm sâu hơn — token tồn tại lâu dài (365 ngày) trên database máy chủ BFF.
    > - **Kết luận về phạm vi tuân thủ:**
    >   - ✅ **Tuân thủ hoàn toàn Quy tắc 5:** **LinkedIn Luồng A (Native PKCE)** + **Facebook Phương án 1 (Meta SDK)** — token không đi qua bất kỳ server trung gian nào của dự án.
-   >   - ⚠️ **Cần ngoại lệ Policy Exception:** **LinkedIn Luồng B** và **Facebook Phương án 2 (Web OAuth qua BFF)** — access token đi qua BFF cache ≤ 60 giây; chấp nhận được về rủi ro kỹ thuật nhưng về chữ nghĩa Quy tắc 5 thì cần nhóm thống nhất.
+   >   - ✅ **Đã duyệt ngoại lệ (#88):** **LinkedIn Luồng B qua BFF** (App Member) — access token đi qua BFF cache ≤ 60 giây theo các điều kiện ở quyết định 4 và ghi trong `AGENTS.md`.
+   >   - ⚠️ **Chưa được duyệt, cần ngoại lệ riêng:** **Facebook Phương án 2 (Web OAuth qua BFF)** — access token đi qua BFF cache ≤ 60 giây; chấp nhận được về rủi ro kỹ thuật nhưng về chữ nghĩa Quy tắc 5 thì cần nhóm thống nhất.
    >   - ❌ **Xung đột rõ ràng, cần Policy Exception qua issue `contract`:** Lưu `refresh_token` LinkedIn vào DB server — phương án này thực tế **rất khó áp dụng** với đồ án vì yêu cầu đủ điều kiện MDP Partner.
-   > - **Baseline chính thức cho Milestone 1:** Đồ án chỉ triển khai **Luồng A (Native PKCE)** cho LinkedIn
-   >   khi Developer Portal đã bật protocol, và **Phương án 1 (Meta SDK)** cho Facebook. Nếu LinkedIn
-   >   chưa được bật Native PKCE, tính năng LinkedIn bị đánh dấu **blocked**; không dùng Luồng B/Phương án 2
-   >   làm dự phòng trong repository Android.
-   > - **Điều kiện tiên quyết:** Trước khi triển khai bất kỳ luồng nào qua BFF, **toàn nhóm bắt buộc phải họp thống nhất và ghi nhận phạm vi ngoại lệ (Policy Exception) cho Quy tắc 5 trong `AGENTS.md`** thông qua ticket/issue nhãn `contract`.
+   > - **Baseline chính thức cho Milestone 1 (cập nhật theo #88):** **LinkedIn App Member** đăng nhập bằng **Luồng B qua BFF** (Native PKCE từ chối `openid`, TEST-06); **Facebook** dùng **Phương án 1 (Meta SDK)**. Facebook Phương án 2 không dùng làm dự phòng trong repository Android.
+   > - **Điều kiện tiên quyết:** Trước khi triển khai bất kỳ luồng nào qua BFF, **toàn nhóm bắt buộc phải họp thống nhất và ghi nhận phạm vi ngoại lệ (Policy Exception) cho Quy tắc 5 trong `AGENTS.md`** thông qua ticket/issue nhãn `contract`. Với LinkedIn Luồng B điều kiện này đã được đáp ứng bằng #88; mọi luồng BFF khác (ví dụ Facebook) vẫn cần issue `contract` mới.
 
    - **Thực thi hoàn toàn phía Server/BFF:**
      - **Cơ chế xác thực giữa App và BFF (BFF Session Authentication):**
@@ -1438,11 +1445,10 @@ Các mục dưới đây phải được xác nhận bằng tài liệu portal h
 - [ ] Xác nhận metric insights và field follower đang khả dụng trên version Graph API được App cấp.
 - [ ] LinkedIn xác nhận sản phẩm Community Management, quyền Organization và định dạng URN trả về từ
       endpoint đăng bài.
-- [ ] LinkedIn xác nhận Native PKCE cho App ID; nếu chưa có, mở issue backend/BFF riêng (ngoài phạm vi repository Android này) trước khi triển
-      khai Standard OAuth.
+- [ ] LinkedIn App Member: thử đăng nhập thật qua BFF đã deploy (đã duyệt ở #88); ghi lại kết quả và cấu hình `TRUSTED_PROXY_HOPS` đã đo. App Org: xác nhận Native PKCE cho App ID; nếu chưa có, mở issue riêng trước khi dùng Standard OAuth.
 - [ ] Kiểm thử retry, rate limit, token revoked/expired và luồng `HANDED_OFF` 2 pha (Worker bắn notification $\rightarrow$ Fragment foreground sao chép clipboard và mở Share Sheet) trên Android 10, 13, 14+.
 - [ ] Kiểm thử cơ chế đối soát chống trùng lặp (reconciliation) trên feed Facebook (`GET /{page-id}/feed`) và LinkedIn (`GET /rest/posts?author=...`) trong trường hợp socket timeout để đảm bảo không đăng lặp bài viết lên mạng xã hội.
-- [ ] Kiểm tra disconnect xóa token cục bộ; nếu có luồng BFF ngoài phạm vi thì phải có quy trình thu hồi server-side trước khi
+- [ ] Kiểm tra disconnect xóa token cục bộ. BFF LinkedIn không lưu token (xóa trong ≤ 60 giây) và không có `/logout`, nên không có gì để thu hồi phía BFF; token LinkedIn tự hết hạn. Nếu sau này có luồng BFF lưu token thì phải có quy trình thu hồi server-side trước khi
       coi kết nối đã ngắt hoàn toàn.
 
 ## 7. Tóm tắt nội dung dùng cho Slide Báo cáo (Research Presentation)

@@ -79,6 +79,24 @@ com.lttbdd.socialagent
     └── settings/     F9 cài đặt (A)
 ```
 
+## Đăng nhập LinkedIn qua BFF (ngoại lệ Quy tắc 5, #88)
+
+Native PKCE của LinkedIn từ chối scope `openid`, nên App Member dùng Standard OAuth qua một BFF nhỏ ở **repository backend riêng** ([social-agent-linkedin-bff](https://github.com/dhminh678/social-agent-linkedin-bff); repository này không chứa mã backend). Facebook không đi qua BFF: app dùng Meta SDK.
+
+```
+App ──POST /auth/linkedin/start (state, code_challenge)──► BFF
+App ──mở trình duyệt hệ thống──► LinkedIn ──redirect──► BFF /auth/linkedin/callback
+BFF ──đổi code lấy token (giữ client_secret)──► LinkedIn
+BFF ──302 deep link com.lttbdd.socialagent://oauth/linkedin/callback?exchange_code&state──► App
+App ──POST /auth/linkedin/token (exchange_code, code_verifier)──► BFF ──access token + expires_in──► App
+```
+
+- Token chỉ nằm trong bộ nhớ BFF tối đa 60 giây và bị xóa ngay lần đổi đầu tiên; BFF không ghi đĩa/DB, không log token, `code`, `state`, `code_verifier` và không chuyển tiếp `refresh_token`.
+- App kiểm `state` ở mọi nhánh của deep link và chỉ đổi `exchange_code` kèm `code_verifier` còn trong RAM. Token được lưu bằng `SecureTokenStore` như các kênh khác.
+- Không có `/refresh` hay `/logout`: token LinkedIn hết hạn thì người dùng đăng nhập lại.
+- Redirect dùng custom scheme (bản demo). Rủi ro phishing của custom scheme là known issue; sẽ chuyển sang Android App Link bằng ticket riêng.
+- Chi tiết quyết định và điều kiện: issue #88 và `docs/research-social-api.md` (quyết định 4, Luồng B).
+
 ## Điều hướng
 
 Một Activity (`MainActivity`) + Navigation Component, bottom navigation có 5 tab:

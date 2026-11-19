@@ -38,7 +38,7 @@ val facebookClientToken = System.getenv("FACEBOOK_CLIENT_TOKEN")
 
 // LinkedIn Standard OAuth 2.0 qua BFF (docs/research-social-api.md, Luồng B).
 // Chỉ có định danh CÔNG KHAI: Client ID của App Member và địa chỉ HTTPS của BFF.
-// KHÔNG có client_secret trong app: secret chỉ nằm ở biến môi trường của BFF (backend/linkedin-bff).
+// KHÔNG có client_secret trong app: secret chỉ nằm ở biến môi trường của BFF (repo riêng: https://github.com/dhminh678/social-agent-linkedin-bff).
 val linkedinMemberClientId = System.getenv("LINKEDIN_MEMBER_CLIENT_ID")
     ?: localProperties.getProperty("LINKEDIN_MEMBER_CLIENT_ID")
     ?: "SOCIAL_AGENT_LINKEDIN_MEMBER_CLIENT_ID"

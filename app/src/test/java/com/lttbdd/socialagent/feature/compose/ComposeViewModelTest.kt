@@ -3,6 +3,8 @@ package com.lttbdd.socialagent.feature.compose
 import com.lttbdd.socialagent.R
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.ContentLanguage
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -21,7 +23,7 @@ class ComposeViewModelTest {
     }
 
     @Test
-    fun `initial state has empty fields and invalid form`() {
+    fun `initial state has empty fields, no errors, and invalid form`() {
         val state = viewModel.uiState.value
         assertEquals("", state.formState.topic)
         assertEquals("", state.formState.goal)
@@ -29,9 +31,13 @@ class ComposeViewModelTest {
         assertEquals("", state.formState.tone)
         assertEquals(ContentLanguage.VI, state.formState.language)
         assertTrue(state.formState.selectedChannels.isEmpty())
+        assertNull(state.formState.topicError)
+        assertNull(state.formState.goalError)
+        assertNull(state.formState.audienceError)
+        assertNull(state.formState.toneError)
+        assertNull(state.formState.channelsError)
         assertFalse(state.formState.isFormValid)
         assertNull(state.submittedBrief)
-        assertNull(state.successMessage)
     }
 
     @Test
@@ -44,21 +50,79 @@ class ComposeViewModelTest {
     }
 
     @Test
-    fun `toggling channels adds and removes channels correctly`() {
+    fun `toggling channels adds and removes channels and shows error when all unchecked`() {
         viewModel.onChannelToggled(ChannelType.FACEBOOK, true)
         assertEquals(setOf(ChannelType.FACEBOOK), viewModel.uiState.value.formState.selectedChannels)
+        assertNull(viewModel.uiState.value.formState.channelsError)
 
         viewModel.onChannelToggled(ChannelType.LINKEDIN, true)
         assertEquals(
             setOf(ChannelType.FACEBOOK, ChannelType.LINKEDIN),
             viewModel.uiState.value.formState.selectedChannels,
         )
+        assertNull(viewModel.uiState.value.formState.channelsError)
 
         viewModel.onChannelToggled(ChannelType.FACEBOOK, false)
         assertEquals(setOf(ChannelType.LINKEDIN), viewModel.uiState.value.formState.selectedChannels)
+        assertNull(viewModel.uiState.value.formState.channelsError)
 
         viewModel.onChannelToggled(ChannelType.LINKEDIN, false)
         assertTrue(viewModel.uiState.value.formState.selectedChannels.isEmpty())
+        assertEquals(R.string.compose_channels_error, viewModel.uiState.value.formState.channelsError)
+    }
+
+    @Test
+    fun `typing then clearing text fields immediately shows validation errors`() {
+        viewModel.onTopicChanged("Draft topic")
+        assertNull(viewModel.uiState.value.formState.topicError)
+        viewModel.onTopicChanged("")
+        assertEquals(R.string.compose_topic_error, viewModel.uiState.value.formState.topicError)
+
+        viewModel.onGoalChanged("Draft goal")
+        assertNull(viewModel.uiState.value.formState.goalError)
+        viewModel.onGoalChanged("   ")
+        assertEquals(R.string.compose_goal_error, viewModel.uiState.value.formState.goalError)
+
+        viewModel.onAudienceChanged("Devs")
+        assertNull(viewModel.uiState.value.formState.audienceError)
+        viewModel.onAudienceChanged("")
+        assertEquals(R.string.compose_audience_error, viewModel.uiState.value.formState.audienceError)
+
+        viewModel.onToneChanged("professional")
+        assertNull(viewModel.uiState.value.formState.toneError)
+        viewModel.onToneChanged("")
+        assertEquals(R.string.compose_tone_error, viewModel.uiState.value.formState.toneError)
+    }
+
+    @Test
+    fun `focus lost on empty fields immediately shows validation errors`() {
+        viewModel.onTopicFocusLost()
+        assertEquals(R.string.compose_topic_error, viewModel.uiState.value.formState.topicError)
+
+        viewModel.onGoalFocusLost()
+        assertEquals(R.string.compose_goal_error, viewModel.uiState.value.formState.goalError)
+
+        viewModel.onAudienceFocusLost()
+        assertEquals(R.string.compose_audience_error, viewModel.uiState.value.formState.audienceError)
+
+        viewModel.onToneFocusLost()
+        assertEquals(R.string.compose_tone_error, viewModel.uiState.value.formState.toneError)
+    }
+
+    @Test
+    fun `unchanged initial value does not falsely trigger validation errors`() {
+        viewModel.onTopicChanged("")
+        viewModel.onGoalChanged("")
+        viewModel.onAudienceChanged("")
+        viewModel.onToneChanged("")
+        viewModel.onChannelToggled(ChannelType.FACEBOOK, false)
+
+        val form = viewModel.uiState.value.formState
+        assertNull(form.topicError)
+        assertNull(form.goalError)
+        assertNull(form.audienceError)
+        assertNull(form.toneError)
+        assertNull(form.channelsError)
     }
 
     @Test
@@ -96,7 +160,7 @@ class ComposeViewModelTest {
     }
 
     @Test
-    fun `submit with valid fields produces TopicBrief with correct data`() {
+    fun `submit with valid fields produces TopicBrief and emits BriefSubmitted event`() = runTest {
         viewModel.onTopicChanged("Social Agent Launch")
         viewModel.onGoalChanged("Announce product release")
         viewModel.onAudienceChanged("Tech enthusiasts")
@@ -117,27 +181,17 @@ class ComposeViewModelTest {
         assertEquals(ContentLanguage.EN, brief?.language)
         assertEquals(setOf(ChannelType.FACEBOOK, ChannelType.LINKEDIN), brief?.channels)
         assertNotNull(brief?.id)
-        assertEquals(R.string.compose_submit_success, state.successMessage)
-    }
 
-    @Test
-    fun `dismissing success message clears successMessage from state`() {
-        viewModel.onTopicChanged("Topic")
-        viewModel.onGoalChanged("Goal")
-        viewModel.onAudienceChanged("Audience")
-        viewModel.onToneChanged("friendly")
-        viewModel.onChannelToggled(ChannelType.FACEBOOK, true)
-
-        viewModel.onSubmit()
-        assertNotNull(viewModel.uiState.value.successMessage)
-
-        viewModel.onSuccessMessageDismissed()
-        assertNull(viewModel.uiState.value.successMessage)
+        val event = viewModel.events.first()
+        assertTrue(event is ComposeEvent.BriefSubmitted)
+        val submittedEvent = event as ComposeEvent.BriefSubmitted
+        assertEquals(brief, submittedEvent.brief)
+        assertEquals(R.string.compose_submit_success, submittedEvent.messageRes)
     }
 
     @Test
     fun `typing into an error field clears its error once valid`() {
-        viewModel.onSubmit()
+        viewModel.onTopicFocusLost()
         assertEquals(R.string.compose_topic_error, viewModel.uiState.value.formState.topicError)
 
         viewModel.onTopicChanged("Valid Topic")

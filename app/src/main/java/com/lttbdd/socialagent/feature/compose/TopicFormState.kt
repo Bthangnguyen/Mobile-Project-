@@ -43,5 +43,14 @@ data class ComposeUiState(
     val formState: TopicFormState = TopicFormState(),
     val submittedBrief: TopicBrief? = null,
     val isSubmitting: Boolean = false,
-    @param:StringRes val successMessage: Int? = null,
 )
+
+/**
+ * Sự kiện dùng một lần (one-shot event) phát từ [ComposeViewModel] sang [ComposeFragment].
+ */
+sealed interface ComposeEvent {
+    data class BriefSubmitted(
+        val brief: TopicBrief,
+        @param:StringRes val messageRes: Int,
+    ) : ComposeEvent
+}

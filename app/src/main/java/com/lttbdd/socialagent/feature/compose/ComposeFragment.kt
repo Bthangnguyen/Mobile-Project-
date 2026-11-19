@@ -60,13 +60,26 @@ class ComposeFragment : Fragment() {
         binding.etTopic.doAfterTextChanged {
             viewModel.onTopicChanged(it?.toString().orEmpty())
         }
+        binding.etTopic.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) viewModel.onTopicFocusLost()
+        }
 
         binding.etGoal.doAfterTextChanged {
             viewModel.onGoalChanged(it?.toString().orEmpty())
         }
+        binding.etGoal.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) viewModel.onGoalFocusLost()
+        }
 
         binding.etAudience.doAfterTextChanged {
             viewModel.onAudienceChanged(it?.toString().orEmpty())
+        }
+        binding.etAudience.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) viewModel.onAudienceFocusLost()
+        }
+
+        binding.actvTone.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) viewModel.onToneFocusLost()
         }
 
         binding.rgLanguage.setOnCheckedChangeListener { _, checkedId ->
@@ -90,8 +103,19 @@ class ComposeFragment : Fragment() {
     private fun observeUiState() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.uiState.collect { state ->
-                    renderUiState(state)
+                launch {
+                    viewModel.uiState.collect { state ->
+                        renderUiState(state)
+                    }
+                }
+                launch {
+                    viewModel.events.collect { event ->
+                        when (event) {
+                            is ComposeEvent.BriefSubmitted -> {
+                                AppSnackbar.show(binding.root, event.messageRes)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -109,6 +133,15 @@ class ComposeFragment : Fragment() {
         }
         if (binding.etAudience.text?.toString() != form.audience) {
             binding.etAudience.setText(form.audience)
+        }
+
+        // Khôi phục text hiển thị của ô giọng văn khi màn hình được tạo lại (vd: đổi ngôn ngữ ở Cài đặt)
+        val expectedToneLabel = ToneOption.ALL
+            .firstOrNull { it.key == form.tone }
+            ?.let { getString(it.labelRes) }
+            .orEmpty()
+        if (binding.actvTone.text?.toString() != expectedToneLabel) {
+            binding.actvTone.setText(expectedToneLabel, false)
         }
 
         // Cập nhật lỗi
@@ -142,12 +175,6 @@ class ComposeFragment : Fragment() {
 
         // Cập nhật nút Tiếp tục
         binding.btnContinue.isEnabled = form.isFormValid && !state.isSubmitting
-
-        // Thông báo thành công
-        state.successMessage?.let { msgRes ->
-            AppSnackbar.show(binding.root, msgRes)
-            viewModel.onSuccessMessageDismissed()
-        }
     }
 
     override fun onDestroyView() {

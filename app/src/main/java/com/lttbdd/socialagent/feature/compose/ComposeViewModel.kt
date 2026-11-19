@@ -5,9 +5,12 @@ import com.lttbdd.socialagent.R
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.ContentLanguage
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 
@@ -20,43 +23,86 @@ class ComposeViewModel @Inject constructor() : ViewModel() {
     private val _uiState = MutableStateFlow(ComposeUiState())
     val uiState: StateFlow<ComposeUiState> = _uiState.asStateFlow()
 
+    private val _events = Channel<ComposeEvent>(Channel.BUFFERED)
+    val events: Flow<ComposeEvent> = _events.receiveAsFlow()
+
     fun onTopicChanged(topic: String) {
         _uiState.update { current ->
+            if (topic == current.formState.topic) return@update current
             val updated = current.formState.copy(
                 topic = topic,
-                topicError = if (current.formState.topicError != null) TopicFormValidator.validateTopic(topic) else null,
+                topicError = TopicFormValidator.validateTopic(topic),
             )
             current.copy(formState = updateValidity(updated))
+        }
+    }
+
+    fun onTopicFocusLost() {
+        _uiState.update { current ->
+            val updated = current.formState.copy(
+                topicError = TopicFormValidator.validateTopic(current.formState.topic),
+            )
+            current.copy(formState = updated)
         }
     }
 
     fun onGoalChanged(goal: String) {
         _uiState.update { current ->
+            if (goal == current.formState.goal) return@update current
             val updated = current.formState.copy(
                 goal = goal,
-                goalError = if (current.formState.goalError != null) TopicFormValidator.validateGoal(goal) else null,
+                goalError = TopicFormValidator.validateGoal(goal),
             )
             current.copy(formState = updateValidity(updated))
+        }
+    }
+
+    fun onGoalFocusLost() {
+        _uiState.update { current ->
+            val updated = current.formState.copy(
+                goalError = TopicFormValidator.validateGoal(current.formState.goal),
+            )
+            current.copy(formState = updated)
         }
     }
 
     fun onAudienceChanged(audience: String) {
         _uiState.update { current ->
+            if (audience == current.formState.audience) return@update current
             val updated = current.formState.copy(
                 audience = audience,
-                audienceError = if (current.formState.audienceError != null) TopicFormValidator.validateAudience(audience) else null,
+                audienceError = TopicFormValidator.validateAudience(audience),
             )
             current.copy(formState = updateValidity(updated))
         }
     }
 
-    fun onToneChanged(tone: String) {
+    fun onAudienceFocusLost() {
         _uiState.update { current ->
             val updated = current.formState.copy(
+                audienceError = TopicFormValidator.validateAudience(current.formState.audience),
+            )
+            current.copy(formState = updated)
+        }
+    }
+
+    fun onToneChanged(tone: String) {
+        _uiState.update { current ->
+            if (tone == current.formState.tone) return@update current
+            val updated = current.formState.copy(
                 tone = tone,
-                toneError = if (current.formState.toneError != null) TopicFormValidator.validateTone(tone) else null,
+                toneError = TopicFormValidator.validateTone(tone),
             )
             current.copy(formState = updateValidity(updated))
+        }
+    }
+
+    fun onToneFocusLost() {
+        _uiState.update { current ->
+            val updated = current.formState.copy(
+                toneError = TopicFormValidator.validateTone(current.formState.tone),
+            )
+            current.copy(formState = updated)
         }
     }
 
@@ -74,9 +120,10 @@ class ComposeViewModel @Inject constructor() : ViewModel() {
             } else {
                 current.formState.selectedChannels - channel
             }
+            if (newChannels == current.formState.selectedChannels) return@update current
             val updated = current.formState.copy(
                 selectedChannels = newChannels,
-                channelsError = if (current.formState.channelsError != null) TopicFormValidator.validateChannels(newChannels) else null,
+                channelsError = TopicFormValidator.validateChannels(newChannels),
             )
             current.copy(formState = updateValidity(updated))
         }
@@ -116,7 +163,7 @@ class ComposeViewModel @Inject constructor() : ViewModel() {
     }
 
     /**
-     * Bấm nút Tiếp tục: kiểm tra hợp lệ, đóng gói TopicBrief và cập nhật state.
+     * Bấm nút Tiếp tục: kiểm tra hợp lệ, đóng gói TopicBrief và phát sự kiện [ComposeEvent.BriefSubmitted].
      */
     fun onSubmit() {
         if (!validate()) return
@@ -124,15 +171,9 @@ class ComposeViewModel @Inject constructor() : ViewModel() {
         val formState = _uiState.value.formState
         val brief = formState.toTopicBrief()
         _uiState.update { current ->
-            current.copy(
-                submittedBrief = brief,
-                successMessage = R.string.compose_submit_success,
-            )
+            current.copy(submittedBrief = brief)
         }
-    }
-
-    fun onSuccessMessageDismissed() {
-        _uiState.update { it.copy(successMessage = null) }
+        _events.trySend(ComposeEvent.BriefSubmitted(brief, R.string.compose_submit_success))
     }
 
     private fun updateValidity(state: TopicFormState): TopicFormState {

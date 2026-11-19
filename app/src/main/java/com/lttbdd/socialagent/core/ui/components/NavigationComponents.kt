@@ -9,17 +9,18 @@ import androidx.annotation.StringRes
 import androidx.appcompat.content.res.AppCompatResources
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.appbar.MaterialToolbar
+import com.lttbdd.socialagent.R
 
 class AppToolbar @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
-    defStyleAttr: Int = androidx.appcompat.R.attr.toolbarStyle,
+    defStyleAttr: Int = R.attr.socialAgentToolbarStyle,
 ) : MaterialToolbar(context, attrs, defStyleAttr)
 
 class AppBottomNavigation @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
-    defStyleAttr: Int = com.google.android.material.R.attr.bottomNavigationStyle,
+    defStyleAttr: Int = R.attr.socialAgentBottomNavigationStyle,
 ) : BottomNavigationView(context, attrs, defStyleAttr) {
 
     fun setItems(items: List<NavigationItem>) {

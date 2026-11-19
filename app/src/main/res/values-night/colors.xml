@@ -9,10 +9,14 @@
     <color name="brand_on_secondary_container">#D6E3FA</color>
     <color name="brand_background">#11131A</color>
     <color name="brand_surface">#11131A</color>
+    <color name="brand_surface_container_low">#191B23</color>
+    <color name="brand_surface_container">#1E2028</color>
+    <color name="brand_surface_container_high">#282A33</color>
     <color name="brand_surface_variant">#454650</color>
     <color name="brand_on_surface">#E2E2EC</color>
     <color name="brand_on_surface_variant">#C5C6D0</color>
     <color name="brand_outline">#8F909A</color>
+    <color name="brand_outline_variant">#454650</color>
     <color name="brand_error">#FFB4AB</color>
     <color name="brand_on_error">#690005</color>
     <color name="brand_error_container">#93000A</color>

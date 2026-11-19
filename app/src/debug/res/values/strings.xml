@@ -10,6 +10,7 @@
     <string name="ui_demo_ai">AI components</string>
     <string name="ui_demo_primary_button">Primary action</string>
     <string name="ui_demo_secondary_button">Secondary action</string>
+    <string name="ui_demo_secondary_button_disabled">Secondary action (disabled)</string>
     <string name="ui_demo_outlined_button">Outlined action</string>
     <string name="ui_demo_text_button">Text action</string>
     <string name="ui_demo_icon_button">Search</string>

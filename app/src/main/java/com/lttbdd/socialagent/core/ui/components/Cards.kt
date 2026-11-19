@@ -12,7 +12,7 @@ import com.lttbdd.socialagent.R
 class AppCard @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
-    defStyleAttr: Int = com.google.android.material.R.attr.materialCardViewStyle,
+    defStyleAttr: Int = R.attr.socialAgentCardViewStyle,
 ) : MaterialCardView(context, attrs, defStyleAttr)
 
 class AppSection @JvmOverloads constructor(

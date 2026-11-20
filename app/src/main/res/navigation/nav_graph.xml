@@ -56,7 +56,16 @@
     <fragment
         android:id="@+id/settingsFragment"
         android:name="com.lttbdd.socialagent.feature.settings.SettingsFragment"
-        android:label="@string/nav_settings" />
+        android:label="@string/nav_settings">
+        <action
+            android:id="@+id/action_settings_to_api_keys"
+            app:destination="@id/apiKeysFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/apiKeysFragment"
+        android:name="com.lttbdd.socialagent.feature.apikeys.ApiKeysFragment"
+        android:label="@string/api_keys_title" />
 
     <!--
       Kênh của tôi (B, F1): không phải tab. Màn Cài đặt (A, F9) mở bằng

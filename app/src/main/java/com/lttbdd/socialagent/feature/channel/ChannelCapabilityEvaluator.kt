@@ -71,7 +71,9 @@ object ChannelCapabilityEvaluator {
             else -> CapabilityItemUiState(nameRes, R.string.cap_status_supported, CapabilityStatusType.SUPPORTED, okCaption)
         }
 
-        // 1. Đăng bài: pages_manage_posts + task CREATE_CONTENT
+        // 1. Đăng bài: pages_manage_posts + task CREATE_CONTENT.
+        // Đây là giả định của ma trận #22. Feed cần thử thực tế với Page chỉ có CREATE_CONTENT
+        // vì tài liệu Meta còn liệt kê MANAGE và MODERATE (docs/research-social-api.md, mục Page Tasks).
         val publishState = item(
             R.string.cap_publish,
             scopes.contains("pages_manage_posts"),
@@ -129,7 +131,14 @@ object ChannelCapabilityEvaluator {
             R.string.cap_fb_metrics_no_task,
         )
 
-        return listOf(publishState, readCommentsState, replyState, mentionState, metricsState)
+        val items = listOf(publishState, readCommentsState, replyState, mentionState, metricsState)
+        // Hồ sơ cá nhân và Page cũ thiếu thông tin task có thể cùng lưu duy nhất public_profile.
+        // Dùng caption đúng với cả hai trường hợp vì scope này không cấp quyền thao tác trên Page.
+        return if (scopes == setOf("public_profile") && tasks == null) {
+            items.map { it.copy(captionRes = R.string.cap_fb_needs_page) }
+        } else {
+            items
+        }
     }
 
     private fun evaluateLinkedIn(scopes: Set<String>): List<CapabilityItemUiState> {

@@ -14,8 +14,8 @@ Yêu cầu đầy đủ: [docs/requirements.md](docs/requirements.md). Kiến tr
 - Hilt (DI), Coroutines + Flow, Navigation Component, Material 3
 - Room (offline), WorkManager (hàng đợi đăng bài, đồng bộ nền), OkHttp, kotlinx.serialization
 - Version thư viện chỉ khai báo trong `gradle/libs.versions.toml`
-- Backend: repository này **không chứa mã backend**. Ngoại lệ duy nhất là BFF đăng nhập LinkedIn (issue #88),
-  nằm ở repository riêng (https://github.com/dhminh678/social-agent-linkedin-bff); app Android chỉ gọi BFF qua HTTPS (xem Quy tắc 5 và `docs/architecture.md`)
+- BFF đăng nhập LinkedIn (issue #88) nằm ở repository riêng (https://github.com/dhminh678/social-agent-linkedin-bff).
+  App Android gọi BFF qua HTTPS (xem Quy tắc 5 và `docs/architecture.md`).
 
 ## Lệnh hay dùng
 ```bash

@@ -496,8 +496,8 @@ class ChannelViewModelTest {
     fun `che do demo tat thi khong tao kenh nao`() = runTest {
         viewModel.demoEnabled = false
 
-        viewModel.connectFacebookDemo()
-        viewModel.connectLinkedInDemo()
+        viewModel.connectFacebookDemo("[DEMO] Trang Facebook")
+        viewModel.connectLinkedInDemo("[DEMO] Tài khoản cá nhân LinkedIn")
         testDispatcher.scheduler.advanceUntilIdle()
 
         assertTrue((viewModel.uiState.value as ChannelUiState.Success).channels.isEmpty())
@@ -509,13 +509,18 @@ class ChannelViewModelTest {
         viewModel.demoEnabled = true
         testDispatcher.scheduler.advanceUntilIdle()
 
-        viewModel.connectFacebookDemo()
-        viewModel.connectLinkedInDemo()
+        val names = listOf("[DEMO] Trang Facebook", "[DEMO] Tài khoản cá nhân LinkedIn")
+        val connected = mutableListOf<String>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.connectedEvents.collect { connected.add(it) }
+        }
+        viewModel.connectFacebookDemo(names[0])
+        viewModel.connectLinkedInDemo(names[1])
         testDispatcher.scheduler.advanceUntilIdle()
 
         val channels = (viewModel.uiState.value as ChannelUiState.Success).channels
-        assertEquals(2, channels.size)
-        assertTrue(channels.all { it.displayName.startsWith("[DEMO]") })
+        assertEquals(names, channels.map { it.displayName })
+        assertEquals(names, connected)
         assertNotNull(viewModel.getScopeForAccount(channels.first()))
         // Repository (nơi ghi token và metadata thật) không được gọi.
         assertTrue(fakeRepository.getConnectedChannels().first().isEmpty())
@@ -528,13 +533,13 @@ class ChannelViewModelTest {
     fun `kenh demo khong bi mat khi repository phat lai danh sach`() = runTest {
         viewModel.demoEnabled = true
         fakeRepository.pages = listOf(FacebookPage("p1", "Page Mot", "t1"))
-        viewModel.connectFacebookDemo()
+        viewModel.connectFacebookDemo("[DEMO] Trang Facebook")
         testDispatcher.scheduler.advanceUntilIdle()
 
         connectWithFacebookToken()
 
         val names = (viewModel.uiState.value as ChannelUiState.Success).channels.map { it.displayName }
-        assertEquals(listOf("Page Mot", "[DEMO] Facebook Page"), names)
+        assertEquals(listOf("Page Mot", "[DEMO] Trang Facebook"), names)
     }
 
     @Test

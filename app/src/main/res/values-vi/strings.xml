@@ -34,6 +34,8 @@
     <string name="channel_linkedin_login_failed">Đăng nhập LinkedIn thất bại. Vui lòng thử lại.</string>
     <string name="channel_linkedin_login_timeout">Đăng nhập LinkedIn đã hết thời gian chờ. Vui lòng thử lại.</string>
     <string name="channel_linkedin_no_browser">Không tìm thấy trình duyệt để đăng nhập LinkedIn.</string>
+    <string name="channel_demo_facebook_name">[DEMO] Trang Facebook</string>
+    <string name="channel_demo_linkedin_name">[DEMO] Tài khoản cá nhân LinkedIn</string>
     <string name="channel_demo_mode_notice">Chưa cấu hình %1$s trong local.properties, đang kết nối ở chế độ demo (không có đăng nhập thật)</string>
 
     <!-- 5 Capabilities Rows -->
@@ -49,6 +51,7 @@
     <string name="cap_status_handed_off">Bàn giao thủ công ✋</string>
 
     <!-- Capability Captions -->
+    <string name="cap_fb_needs_page">Tính năng này cần một Trang Facebook và các quyền tương ứng.</string>
     <string name="cap_fb_publish_ok">Sẵn sàng đăng bài qua POST /{page-id}/feed (đã có pages_manage_posts)</string>
     <string name="cap_fb_publish_no_perm">Cần cấp thêm quyền: pages_manage_posts</string>
     <string name="cap_fb_read_comments_ok">Sẵn sàng đọc comment qua GET /{post-id}/comments (đã có pages_read_engagement)</string>

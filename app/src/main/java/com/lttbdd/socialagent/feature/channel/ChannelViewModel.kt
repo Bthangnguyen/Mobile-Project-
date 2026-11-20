@@ -162,11 +162,6 @@ class ChannelViewModel @Inject constructor(
     /** Page task của người dùng trên Page này; null nếu chưa biết (ma trận khi đó chỉ xét quyền của app). */
     fun getTasksForAccount(account: ChannelAccount): List<String>? = pageTasks[scopeKey(account)]
 
-    fun isFacebookDemoMode(): Boolean {
-        val id = BuildConfig.FACEBOOK_APP_ID
-        return id.isBlank() || id.contains("SOCIAL_AGENT")
-    }
-
     /** Demo khi chưa cấu hình client id công khai hoặc địa chỉ BFF (còn placeholder). */
     fun isLinkedInDemoMode(): Boolean =
         linkedInClientId.isBlank() || linkedInClientId.contains("SOCIAL_AGENT") ||
@@ -175,12 +170,12 @@ class ChannelViewModel @Inject constructor(
     /** Chỉ bản debug mới cho thử kết nối giả khi chưa cấu hình khóa; bản khác chỉ báo chưa cấu hình. */
     fun isDemoEnabled(): Boolean = demoEnabled
 
-    fun connectFacebookDemo() {
-        addDemoChannel(ChannelType.FACEBOOK, "demo_fb_page", "[DEMO] Facebook Page", DEMO_FACEBOOK_SCOPE)
+    fun connectFacebookDemo(displayName: String) {
+        addDemoChannel(ChannelType.FACEBOOK, "demo_fb_page", displayName, DEMO_FACEBOOK_SCOPE)
     }
 
-    fun connectLinkedInDemo() {
-        addDemoChannel(ChannelType.LINKEDIN, "demo_li_member", "[DEMO] LinkedIn Member", LinkedInBffAuth.SCOPE)
+    fun connectLinkedInDemo(displayName: String) {
+        addDemoChannel(ChannelType.LINKEDIN, "demo_li_member", displayName, LinkedInBffAuth.SCOPE)
     }
 
     /**

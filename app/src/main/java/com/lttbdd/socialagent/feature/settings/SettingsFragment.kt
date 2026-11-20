@@ -18,7 +18,7 @@ import com.lttbdd.socialagent.databinding.FragmentSettingsBinding
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 
-/** Màn Cài đặt (F9). Hiện có đổi ngôn ngữ VI/EN và mục API key (F8); mục Kênh của tôi (F1) sẽ được thêm vào đây. */
+/** Màn Cài đặt (F9) với tùy chọn ngôn ngữ, quản lý API key (F8) và Kênh của tôi (F1). */
 @AndroidEntryPoint
 class SettingsFragment : Fragment() {
 
@@ -41,7 +41,8 @@ class SettingsFragment : Fragment() {
         ViewCompat.setAccessibilityHeading(binding.settingsTitle, true)
         ViewCompat.setAccessibilityHeading(binding.languageTitle, true)
         ViewCompat.setAccessibilityHeading(binding.apiKeysSectionTitle, true)
-        binding.manageApiKeys.setOnClickListener { openApiKeys() }
+        binding.manageApiKeys.setOnClickListener { navigateFromSettings(R.id.action_settings_to_api_keys) }
+        binding.manageChannels.setOnClickListener { navigateFromSettings(R.id.action_settings_to_channels) }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -63,11 +64,11 @@ class SettingsFragment : Fragment() {
         group.setOnCheckedChangeListener(languageListener)
     }
 
-    /** Mở màn quản lý API key (F8). Bỏ qua lần bấm lặp khi đã rời Settings để tránh lỗi điều hướng. */
-    private fun openApiKeys() {
+    /** Bỏ qua lần bấm lặp khi đã rời màn Cài đặt. */
+    private fun navigateFromSettings(@androidx.annotation.IdRes actionId: Int) {
         val navController = findNavController()
         if (navController.currentDestination?.id == R.id.settingsFragment) {
-            navController.navigate(R.id.action_settings_to_api_keys)
+            navController.navigate(actionId)
         }
     }
 

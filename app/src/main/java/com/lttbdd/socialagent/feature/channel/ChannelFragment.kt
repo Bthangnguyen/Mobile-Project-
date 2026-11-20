@@ -14,6 +14,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.lttbdd.socialagent.BuildConfig
 import com.lttbdd.socialagent.R
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.facebook.AccessToken
@@ -46,19 +47,19 @@ class ChannelFragment : Fragment() {
     private var facebookPageDialog: androidx.appcompat.app.AlertDialog? = null
     private lateinit var adapter: ChannelAdapter
     private val facebookCallbackManager: CallbackManager = CallbackManager.Factory.create()
+    private val facebookLoginManager = BuildConfig.FACEBOOK_APP_ID
+        .takeIf { it.isNotBlank() && !it.contains("SOCIAL_AGENT") }
+        ?.let { LoginManager.getInstance() }
 
-    /**
-     * Launcher đăng nhập Facebook đăng ký ngay khi Fragment được tạo (không phải lúc bấm nút), để khi Activity
-     * bị tạo lại giữa chừng (xoay màn hình, đổi dark mode, bị hệ thống kill) kết quả vẫn trả về đúng chỗ.
-     * Kết quả được CallbackManager chuyển tới [FacebookCallback] đăng ký ở [onCreate]; lambda này không cần làm gì thêm.
-     */
-    private val facebookLoginLauncher = registerForActivityResult(
-        LoginManager.getInstance().createLogInActivityResultContract(facebookCallbackManager),
-    ) { }
+    // Cấu hình App ID cố định trong APK. Khi có cấu hình, đăng ký ở mỗi lần tạo Fragment
+    // để nhận lại kết quả đăng nhập qua CallbackManager sau khi Activity được tạo lại.
+    private val facebookLoginLauncher = facebookLoginManager?.let { manager ->
+        registerForActivityResult(manager.createLogInActivityResultContract(facebookCallbackManager)) { }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        LoginManager.getInstance().registerCallback(
+        facebookLoginManager?.registerCallback(
             facebookCallbackManager,
             object : FacebookCallback<LoginResult> {
                 override fun onSuccess(result: LoginResult) {
@@ -74,7 +75,7 @@ class ChannelFragment : Fragment() {
 
     override fun onDestroy() {
         // Gỡ callback khỏi singleton LoginManager để Fragment cũ không bị giữ lại.
-        LoginManager.getInstance().unregisterCallback(facebookCallbackManager)
+        facebookLoginManager?.unregisterCallback(facebookCallbackManager)
         super.onDestroy()
     }
 
@@ -95,11 +96,6 @@ class ChannelFragment : Fragment() {
         observeUiState()
     }
 
-    /** Đăng nhập Facebook bằng Meta SDK (LoginManager). Hạn và quyền lấy từ AccessToken thật của SDK. */
-    private fun loginWithFacebook() {
-        facebookLoginLauncher.launch(FACEBOOK_PERMISSIONS)
-    }
-
     private fun AccessToken.toUserToken() = FacebookUserToken(
         accessToken = token,
         expiresAtMillis = expires.time,
@@ -108,8 +104,8 @@ class ChannelFragment : Fragment() {
 
     private fun loginWithAnotherFacebookAccount() {
         // Đăng xuất phiên SDK để màn Facebook Login không tự dùng lại tài khoản cũ.
-        LoginManager.getInstance().logOut()
-        loginWithFacebook()
+        facebookLoginManager?.logOut()
+        facebookLoginLauncher?.launch(FACEBOOK_PERMISSIONS)
     }
 
     private fun openInBrowser(url: String) {
@@ -144,11 +140,11 @@ class ChannelFragment : Fragment() {
 
     private fun setupListeners() {
         binding.btnConnectFacebook.setOnClickListener {
-            if (viewModel.isFacebookDemoMode()) {
+            if (facebookLoginLauncher == null) {
                 showDemoModeNotice("FACEBOOK_APP_ID")
-                viewModel.connectFacebookDemo()
+                viewModel.connectFacebookDemo(getString(R.string.channel_demo_facebook_name))
             } else {
-                loginWithFacebook()
+                facebookLoginLauncher.launch(FACEBOOK_PERMISSIONS)
             }
         }
 
@@ -156,7 +152,7 @@ class ChannelFragment : Fragment() {
             if (viewModel.isLinkedInDemoMode()) {
                 // Chưa cấu hình LINKEDIN_MEMBER_CLIENT_ID / LINKEDIN_BFF_URL -> không có đăng nhập thật, báo rõ cho người dùng.
                 showDemoModeNotice("LINKEDIN_MEMBER_CLIENT_ID, LINKEDIN_BFF_URL")
-                viewModel.connectLinkedInDemo()
+                viewModel.connectLinkedInDemo(getString(R.string.channel_demo_linkedin_name))
             } else {
                 viewModel.startLinkedInLogin()
             }

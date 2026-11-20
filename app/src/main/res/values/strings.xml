@@ -35,6 +35,8 @@
     <string name="channel_linkedin_login_failed">LinkedIn login failed. Please try again.</string>
     <string name="channel_linkedin_login_timeout">LinkedIn login timed out. Please try again.</string>
     <string name="channel_linkedin_no_browser">No browser found to sign in to LinkedIn.</string>
+    <string name="channel_demo_facebook_name">[DEMO] Facebook Page</string>
+    <string name="channel_demo_linkedin_name">[DEMO] LinkedIn Member</string>
     <string name="channel_demo_mode_notice">%1$s is not configured in local.properties, connecting in demo mode (no real login)</string>
 
     <!-- 5 Capabilities Rows -->
@@ -50,6 +52,7 @@
     <string name="cap_status_handed_off">Manual hand-off ✋</string>
 
     <!-- Capability Captions -->
+    <string name="cap_fb_needs_page">This feature requires a Facebook Page and the relevant permissions.</string>
     <string name="cap_fb_publish_ok">Ready to publish via POST /{page-id}/feed (pages_manage_posts granted)</string>
     <string name="cap_fb_publish_no_perm">Missing required permission: pages_manage_posts</string>
     <string name="cap_fb_read_comments_ok">Ready to read comments via GET /{post-id}/comments (pages_read_engagement granted)</string>

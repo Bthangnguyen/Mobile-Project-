@@ -78,7 +78,7 @@ class ChannelCapabilityEvaluatorTest {
     }
 
     @Test
-    fun `facebook mention khong duoc coi la supported chi vi co public_profile`() {
+    fun `facebook chi co public_profile hien huong dan can Page`() {
         val account = ChannelAccount(
             type = ChannelType.FACEBOOK,
             accountId = "fb_101",
@@ -89,7 +89,11 @@ class ChannelCapabilityEvaluatorTest {
 
         val items = ChannelCapabilityEvaluator.evaluateCapabilities(account, "public_profile")
 
-        assertEquals(CapabilityStatusType.REQUIRES_PERMISSION, items[3].statusType)
+        assertEquals(List(5) { CapabilityStatusType.REQUIRES_PERMISSION }, items.map { it.statusType })
+        assertEquals(List(5) { R.string.cap_fb_needs_page }, items.map { it.captionRes })
+
+        val pageItems = ChannelCapabilityEvaluator.evaluateCapabilities(account, "public_profile", listOf("CREATE_CONTENT"))
+        assertEquals(R.string.cap_fb_publish_no_perm, pageItems.first().captionRes)
     }
 
     @Test

@@ -2,6 +2,8 @@ package com.lttbdd.socialagent.data.repository
 
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.ConnectionStatus
+import com.lttbdd.socialagent.data.model.ChannelError
+import com.lttbdd.socialagent.data.model.ChannelException
 import com.lttbdd.socialagent.data.model.FacebookPage
 import com.lttbdd.socialagent.data.model.FacebookUserToken
 import com.lttbdd.socialagent.data.model.OAuthToken
@@ -15,6 +17,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.io.IOException
 
 class ChannelRepositoryTest {
 
@@ -23,7 +26,12 @@ class ChannelRepositoryTest {
     private lateinit var fakeAccountStore: FakeAccountStore
 
     private class FakeAccountStore(var saved: List<StoredChannelAccount> = emptyList()) : ChannelAccountStore {
-        override suspend fun load(): List<StoredChannelAccount> = saved
+        var loadError = false
+
+        override suspend fun load(): List<StoredChannelAccount> {
+            if (loadError) throw IOException("Đọc kho lỗi")
+            return saved
+        }
         override suspend fun save(accounts: List<StoredChannelAccount>) {
             saved = accounts
         }
@@ -90,6 +98,31 @@ class ChannelRepositoryTest {
 
         assertEquals(listOf("Page Mot"), channels.map { it.displayName })
         assertEquals(ConnectionStatus.CONNECTED, channels.single().status)
+    }
+
+    @Test
+    fun `kho doc loi thi khong ghi de, tai lai xong van giu kenh cu`() = runTest {
+        val saved = StoredChannelAccount(ChannelType.FACEBOOK, "old", "Page cũ")
+        fakeAccountStore.saved = listOf(saved)
+        fakeTokenStore.saveToken(ChannelType.FACEBOOK, "old", OAuthToken("old_token", 10L))
+        fakeAccountStore.loadError = true
+
+        val loadError = runCatching { repository.getConnectedChannels().first() }.exceptionOrNull()
+        assertEquals(ChannelError.CHANNELS_LOAD_FAILED, (loadError as ChannelException).error)
+
+        val user = FacebookUserToken("user_tok", 10L, "pages_show_list")
+        val page = FacebookPage("new", "Page mới", "new_token")
+        val connect = repository.connectFacebookSelectedPage(user, page)
+        assertEquals(ChannelError.CHANNELS_LOAD_FAILED, (connect.exceptionOrNull() as ChannelException).error)
+
+        assertTrue(repository.disconnectChannel(ChannelType.FACEBOOK, "old").isFailure)
+        assertEquals(listOf(saved), fakeAccountStore.saved)
+        assertEquals(setOf("FACEBOOK_old"), fakeTokenStore.storage.keys)
+
+        fakeAccountStore.loadError = false
+        assertEquals(listOf("old"), repository.getConnectedChannels().first().map { it.accountId })
+        assertTrue(repository.connectFacebookSelectedPage(user, page).isSuccess)
+        assertEquals(listOf("old", "new"), fakeAccountStore.saved.map { it.accountId })
     }
 
     @Test

@@ -79,7 +79,8 @@ class ChannelAdapter(
 
                 val (chipBgRes, chipTextRes) = when (item.statusType) {
                     CapabilityStatusType.SUPPORTED -> R.color.cap_supported_bg to R.color.cap_supported_text
-                    CapabilityStatusType.REQUIRES_PERMISSION -> R.color.cap_requires_bg to R.color.cap_requires_text
+                    CapabilityStatusType.REQUIRES_PERMISSION,
+                    CapabilityStatusType.REQUIRES_RECONNECT -> R.color.cap_requires_bg to R.color.cap_requires_text
                     CapabilityStatusType.NOT_SUPPORTED -> R.color.cap_not_supported_bg to R.color.cap_not_supported_text
                     CapabilityStatusType.UNVERIFIED -> R.color.cap_unverified_bg to R.color.cap_unverified_text
                     CapabilityStatusType.HANDED_OFF -> R.color.cap_handed_off_bg to R.color.cap_handed_off_text

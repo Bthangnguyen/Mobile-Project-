@@ -8,6 +8,7 @@ import com.lttbdd.socialagent.data.model.FacebookPage
  */
 sealed interface ChannelUiState {
     data object Loading : ChannelUiState
+    data object LoadFailed : ChannelUiState
     data class Success(val channels: List<ChannelAccount>) : ChannelUiState
 }
 

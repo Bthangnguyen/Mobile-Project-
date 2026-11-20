@@ -49,6 +49,8 @@
     <!-- Capability Statuses -->
     <string name="cap_status_supported">Supported ✅</string>
     <string name="cap_status_requires_perm">Requires Permission ⚠️</string>
+    <string name="cap_status_requires_reconnect">Reconnect required</string>
+    <string name="cap_token_expired">The connection has expired. Sign in again to use this feature.</string>
     <string name="cap_status_handed_off">Manual hand-off ✋</string>
 
     <!-- Capability Captions -->
@@ -96,6 +98,7 @@
     <string name="channel_type_facebook">Facebook</string>
     <string name="channel_type_linkedin">LinkedIn</string>
     <string name="channel_linkedin_session_expired">The LinkedIn sign-in session has expired. Please tap Connect LinkedIn again.</string>
+    <string name="channel_retry_load">Try again</string>
     <string name="channel_error_load_failed">Could not load connected channels. Please try again.</string>
     <string name="channel_not_configured_notice">%1$s is not configured in local.properties, so real sign-in is unavailable in this build.</string>
 

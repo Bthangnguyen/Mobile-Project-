@@ -139,6 +139,7 @@ class ChannelFragment : Fragment() {
     }
 
     private fun setupListeners() {
+        binding.btnRetryLoadChannels.setOnClickListener { viewModel.retryLoadChannels() }
         binding.btnConnectFacebook.setOnClickListener {
             if (facebookLoginLauncher == null) {
                 showDemoModeNotice("FACEBOOK_APP_ID")
@@ -186,27 +187,27 @@ class ChannelFragment : Fragment() {
                         }
                     }
                 }
-                viewModel.uiState.collect { state ->
-                    when (state) {
-                        is ChannelUiState.Loading -> {
-                            binding.progressBar.visibility = View.VISIBLE
-                            binding.tvEmptyState.visibility = View.GONE
-                        }
-                        is ChannelUiState.Success -> {
-                            binding.progressBar.visibility = View.GONE
-                            // DiffUtil chỉ so sánh tài khoản; quyền/ma trận lấy từ ViewModel nên có thể đổi
-                            // khi tài khoản không đổi (cấp lại quyền) -> buộc vẽ lại sau khi danh sách được áp dụng.
-                            adapter.submitList(state.channels) {
-                                adapter.notifyItemRangeChanged(0, adapter.itemCount)
-                            }
-                            if (state.channels.isEmpty()) {
-                                binding.tvEmptyState.visibility = View.VISIBLE
-                            } else {
-                                binding.tvEmptyState.visibility = View.GONE
-                            }
-                        }
-                    }
-                }
+                viewModel.uiState.collect(::render)
+            }
+        }
+    }
+
+    private fun render(state: ChannelUiState) {
+        val loadFailed = state == ChannelUiState.LoadFailed
+        binding.progressBar.visibility = if (state == ChannelUiState.Loading) View.VISIBLE else View.GONE
+        binding.btnRetryLoadChannels.visibility = if (loadFailed) View.VISIBLE else View.GONE
+        binding.btnConnectFacebook.isEnabled = state is ChannelUiState.Success
+        binding.btnConnectLinkedIn.isEnabled = state is ChannelUiState.Success
+        binding.tvEmptyState.setText(if (loadFailed) R.string.channel_error_load_failed else R.string.channel_empty_desc)
+        binding.tvEmptyState.visibility = if (loadFailed || (state is ChannelUiState.Success && state.channels.isEmpty())) {
+            View.VISIBLE
+        } else {
+            View.GONE
+        }
+        if (state is ChannelUiState.Success) {
+            // Quyền và Page task có thể đổi khi bản ghi tài khoản vẫn giống nhau.
+            adapter.submitList(state.channels) {
+                adapter.notifyItemRangeChanged(0, adapter.itemCount)
             }
         }
     }

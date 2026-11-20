@@ -30,13 +30,8 @@ class DataStoreChannelAccountStore(
 
     override suspend fun load(): List<StoredChannelAccount> {
         val raw = context.channelAccountDataStore.data.first()[key] ?: return emptyList()
-        return try {
-            json.decodeFromString(serializer, raw).mapNotNull { entry ->
-                val type = ChannelType.entries.firstOrNull { it.name == entry.type } ?: return@mapNotNull null
-                StoredChannelAccount(type, entry.accountId, entry.displayName)
-            }
-        } catch (_: Exception) {
-            emptyList()
+        return json.decodeFromString(serializer, raw).map { entry ->
+            StoredChannelAccount(ChannelType.valueOf(entry.type), entry.accountId, entry.displayName)
         }
     }
 

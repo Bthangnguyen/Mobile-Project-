@@ -113,6 +113,20 @@ class ChannelRepositoryNetworkTest {
     }
 
     @Test
+    fun `fetchFacebookPages HTTP 200 phan biet data rong va payload sai`() = runTest {
+        handler = { 200 to """{"data":[]}""" }
+        assertEquals(emptyList<FacebookPage>(), repository.fetchFacebookPages("user_tok").getOrThrow())
+
+        for (body in listOf("not_json", """{"error":{"code":190}}""", """{"data":[{"id":"1"}]}""")) {
+            handler = { 200 to body }
+            assertEquals(
+                ChannelError.FACEBOOK_PAGES_LOAD_FAILED,
+                failureError(repository.fetchFacebookPages("user_tok")),
+            )
+        }
+    }
+
+    @Test
     fun `fetchFacebookPages mat mang thi NETWORK`() = runTest {
         val result = repository.fetchFacebookPages("user_tok")
 

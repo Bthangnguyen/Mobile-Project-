@@ -543,16 +543,19 @@ class ChannelViewModelTest {
     }
 
     @Test
-    fun `doc kho loi thi bao loi mot lan va thoat Loading, khong crash`() = runTest {
+    fun `doc kho loi thi hien loi va co the thu lai`() = runTest {
+        fakeRepository.connectFacebookSelectedPage(user(), FacebookPage("p1", "Page Mot", "t1"))
         fakeRepository.loadError = true
         val errorVm = ChannelViewModel(fakeRepository, callbackBus)
-        val errors = mutableListOf<Int>()
-        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { errorVm.errors.collect { errors.add(it) } }
 
         testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(ChannelUiState.LoadFailed, errorVm.uiState.value)
 
-        assertEquals(listOf(com.lttbdd.socialagent.R.string.channel_error_load_failed), errors)
-        assertTrue((errorVm.uiState.value as ChannelUiState.Success).channels.isEmpty())
+        fakeRepository.loadError = false
+        errorVm.retryLoadChannels()
+        assertEquals(ChannelUiState.Loading, errorVm.uiState.value)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(listOf("p1"), (errorVm.uiState.value as ChannelUiState.Success).channels.map { it.accountId })
     }
 
     private class FakeChannelRepository : ChannelRepository {

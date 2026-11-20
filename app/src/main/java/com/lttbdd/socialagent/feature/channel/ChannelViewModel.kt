@@ -120,8 +120,7 @@ class ChannelViewModel @Inject constructor(
             repository.getConnectedChannels()
                 // Đọc kho lỗi (DataStore IOException/CorruptionException...) không được làm app crash.
                 .catch {
-                    _errors.trySend(R.string.channel_error_load_failed)
-                    publishChannels()
+                    _uiState.value = ChannelUiState.LoadFailed
                 }
                 .collect { channels ->
                     // Nạp quyền thật và trạng thái hạn token trước khi phát UiState để ma trận không hiện sai.
@@ -129,6 +128,12 @@ class ChannelViewModel @Inject constructor(
                     publishChannels()
                 }
         }
+    }
+
+    fun retryLoadChannels() {
+        if (_uiState.value != ChannelUiState.LoadFailed) return
+        _uiState.value = ChannelUiState.Loading
+        loadChannels()
     }
 
     /** Phát danh sách hiện tại: kênh thật đã kết nối, cộng kênh demo (chỉ trong RAM, bản debug). */
@@ -363,6 +368,7 @@ class ChannelViewModel @Inject constructor(
 
     private fun errorMessageRes(error: ChannelError): Int = when (error) {
         ChannelError.NETWORK -> R.string.channel_error_network
+        ChannelError.CHANNELS_LOAD_FAILED -> R.string.channel_error_load_failed
         ChannelError.LINKEDIN_CONFIG_INVALID -> R.string.channel_error_linkedin_config
         ChannelError.LINKEDIN_SESSION_START_FAILED -> R.string.channel_error_linkedin_session
         ChannelError.LINKEDIN_TOKEN_EXCHANGE_FAILED -> R.string.channel_error_linkedin_exchange

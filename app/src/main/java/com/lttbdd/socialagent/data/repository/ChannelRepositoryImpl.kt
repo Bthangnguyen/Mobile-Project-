@@ -13,6 +13,7 @@ import com.lttbdd.socialagent.data.model.OAuthToken
 import com.lttbdd.socialagent.data.model.toChannelError
 import com.lttbdd.socialagent.data.network.LinkedInBffAuth
 import com.lttbdd.socialagent.data.security.TokenStore
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -48,35 +49,32 @@ class ChannelRepositoryImpl @Inject constructor(
     private val channelsFlow = MutableStateFlow<List<ChannelAccount>>(emptyList())
     /** Khách HTTP; tách ra (internal var) để unit test thay bằng bản giả trả phản hồi có sẵn, không gọi mạng thật. */
     internal var httpClient: okhttp3.OkHttpClient = okhttp3.OkHttpClient()
-    private val loadMutex = Mutex()
+    private val accountsMutex = Mutex()
     private var restored = false
 
     override fun getConnectedChannels(): Flow<List<ChannelAccount>> = flow {
-        ensureRestored()
+        accountsMutex.withLock { ensureRestored() }
         emitAll(channelsFlow)
     }
 
     /**
      * Khôi phục danh sách kênh từ metadata đã lưu, chỉ giữ tài khoản còn token đọc được
      * (token mất/hỏng, ví dụ Keystore bị đặt lại, thì tài khoản đó coi như chưa kết nối).
+     * Phải giữ [accountsMutex] khi gọi. Nếu kho lỗi, lần sau phải đọc lại trước khi ghi.
      */
     private suspend fun ensureRestored() {
-        loadMutex.withLock {
-            if (restored) return
-            val accounts = try {
-                accountStore.load()
-            } catch (_: Exception) {
-                emptyList()
-            }
-            val restoredAccounts = accounts
+        if (restored) return
+        val accounts = try {
+            accountStore.load()
                 .filter { stored -> tokenStore.getToken(stored.type, stored.accountId).first() != null }
                 .map { toChannelAccount(it.type, it.accountId, it.displayName) }
-            val connectedBeforeRestore = channelsFlow.value
-            channelsFlow.value = restoredAccounts
-                .filterNot { r -> connectedBeforeRestore.any { it.type == r.type && it.accountId == r.accountId } } +
-                connectedBeforeRestore
-            restored = true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            throw ChannelException(ChannelError.CHANNELS_LOAD_FAILED, e)
         }
+        channelsFlow.value = accounts
+        restored = true
     }
 
     private fun toChannelAccount(type: ChannelType, accountId: String, displayName: String) = ChannelAccount(
@@ -134,11 +132,9 @@ class ChannelRepositoryImpl @Inject constructor(
                     .build()
                 httpClient.newCall(request).execute().use { response ->
                     val body = response.body?.string()
-                    if (response.isSuccessful && !body.isNullOrEmpty()) {
-                        Result.success(FacebookPagesParser.parse(body))
-                    } else {
-                        Result.failure(ChannelException(ChannelError.FACEBOOK_PAGES_LOAD_FAILED))
-                    }
+                    val pages = if (response.isSuccessful) body?.let(FacebookPagesParser::parse) else null
+                    pages?.let { Result.success(it) }
+                        ?: Result.failure(ChannelException(ChannelError.FACEBOOK_PAGES_LOAD_FAILED))
                 }
             } catch (e: Exception) {
                 Result.failure(ChannelException(e.toChannelError(), e))
@@ -296,11 +292,13 @@ class ChannelRepositoryImpl @Inject constructor(
 
     override suspend fun disconnectChannel(type: ChannelType, accountId: String): Result<Unit> {
         return try {
-            ensureRestored()
-            tokenStore.removeToken(type, accountId)
-            channelsFlow.value = channelsFlow.value.filterNot { it.type == type && it.accountId == accountId }
-            persistAccounts()
-            Result.success(Unit)
+            accountsMutex.withLock {
+                ensureRestored()
+                tokenStore.removeToken(type, accountId)
+                channelsFlow.value = channelsFlow.value.filterNot { it.type == type && it.accountId == accountId }
+                persistAccounts()
+                Result.success(Unit)
+            }
         } catch (e: Exception) {
             Result.failure(ChannelException(e.toChannelError(), e))
         }
@@ -311,7 +309,7 @@ class ChannelRepositoryImpl @Inject constructor(
         accountId: String,
         displayName: String,
         token: OAuthToken,
-    ): Result<ChannelAccount> {
+    ): Result<ChannelAccount> = accountsMutex.withLock {
         ensureRestored()
         tokenStore.saveToken(type, accountId, token)
         val account = toChannelAccount(type, accountId, displayName)
@@ -320,7 +318,7 @@ class ChannelRepositoryImpl @Inject constructor(
         if (index >= 0) current[index] = account else current.add(account)
         channelsFlow.value = current
         persistAccounts()
-        return Result.success(account)
+        Result.success(account)
     }
 
     /** Lưu metadata (loại, id, tên); không có token. Lỗi lưu không làm hỏng kết nối đang có. */

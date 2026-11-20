@@ -10,6 +10,39 @@ import org.junit.Test
 class ChannelCapabilityEvaluatorTest {
 
     @Test
+    fun `token het han yeu cau ket noi lai va giu ban giao thu cong`() {
+        val scopesByType = mapOf(
+            ChannelType.FACEBOOK to "pages_manage_posts,pages_read_engagement",
+            ChannelType.LINKEDIN to "openid profile w_member_social",
+        )
+
+        scopesByType.forEach { (type, scopes) ->
+            val account = ChannelAccount(
+                type = type,
+                accountId = "test",
+                displayName = "Test",
+                status = ConnectionStatus.CONNECTED,
+                capabilities = emptySet(),
+            )
+            val tasks = listOf("CREATE_CONTENT", "MODERATE")
+            val connected = ChannelCapabilityEvaluator.evaluateCapabilities(account, scopes, tasks)
+            val expired = ChannelCapabilityEvaluator.evaluateCapabilities(
+                account.copy(status = ConnectionStatus.TOKEN_EXPIRED),
+                scopes,
+                tasks,
+            )
+
+            assertEquals(CapabilityStatusType.SUPPORTED, connected.first().statusType)
+            assertEquals(CapabilityStatusType.REQUIRES_RECONNECT, expired.first().statusType)
+            assertEquals(R.string.cap_status_requires_reconnect, expired.first().statusTextRes)
+            assertEquals(R.string.cap_token_expired, expired.first().captionRes)
+            assertEquals(connected[3], expired[3])
+            assertEquals(CapabilityStatusType.HANDED_OFF, expired[3].statusType)
+            assertEquals(emptyList<CapabilityItemUiState>(), expired.filter { it.statusType == CapabilityStatusType.SUPPORTED })
+        }
+    }
+
+    @Test
     fun `facebook capabilities with full scopes return supported for publish, read, reply, metrics`() {
         val account = ChannelAccount(
             type = ChannelType.FACEBOOK,

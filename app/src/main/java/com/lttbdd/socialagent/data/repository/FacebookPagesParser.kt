@@ -1,37 +1,39 @@
 package com.lttbdd.socialagent.data.repository
 
 import com.lttbdd.socialagent.data.model.FacebookPage
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
- * Logic thuần phân tích JSON của Graph API `/me/accounts` thành danh sách [FacebookPage].
- * Bỏ qua phần tử thiếu id, tên hoặc access_token; JSON sai định dạng trả về danh sách rỗng.
+ * Phân tích danh sách Page từ Graph API. Chỉ mảng `data` rỗng hợp lệ mới nghĩa là không có Page.
+ * Bỏ qua phần tử lỗi nếu còn Page hợp lệ. Trả null nếu phản hồi lỗi hoặc không dùng được.
  */
 object FacebookPagesParser {
 
-    private val json = Json { ignoreUnknownKeys = true }
-
-    fun parse(body: String): List<FacebookPage> {
-        return try {
-            val data = (json.parseToJsonElement(body) as? JsonObject)?.get("data") as? JsonArray
-                ?: return emptyList()
-            data.mapNotNull { element ->
-                val item = element as? JsonObject ?: return@mapNotNull null
-                val id = (item["id"] as? JsonPrimitive)?.content
-                val name = (item["name"] as? JsonPrimitive)?.content
-                val token = (item["access_token"] as? JsonPrimitive)?.content
-                if (id.isNullOrBlank() || name.isNullOrBlank() || token.isNullOrBlank()) {
-                    null
-                } else {
-                    val tasks = (item["tasks"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content }
-                    FacebookPage(id = id, name = name, accessToken = token, tasks = tasks)
-                }
-            }.distinctBy { it.id }
-        } catch (_: Exception) {
-            emptyList()
+    fun parse(body: String): List<FacebookPage>? {
+        val root = try {
+            Json.parseToJsonElement(body) as? JsonObject ?: return null
+        } catch (_: SerializationException) {
+            return null
         }
+        if ("error" in root) return null
+        val data = root["data"] as? JsonArray ?: return null
+        val pages = data.mapNotNull { element ->
+            val item = element as? JsonObject ?: return@mapNotNull null
+            val id = item.nonBlankString("id") ?: return@mapNotNull null
+            val name = item.nonBlankString("name") ?: return@mapNotNull null
+            val token = item.nonBlankString("access_token") ?: return@mapNotNull null
+            val tasks = (item["tasks"] as? JsonArray)?.mapNotNull { task ->
+                (task as? JsonPrimitive)?.takeIf { it.isString }?.content
+            }
+            FacebookPage(id = id, name = name, accessToken = token, tasks = tasks)
+        }.distinctBy { it.id }
+        return pages.takeIf { data.isEmpty() || it.isNotEmpty() }
     }
+
+    private fun JsonObject.nonBlankString(key: String): String? =
+        (this[key] as? JsonPrimitive)?.takeIf { it.isString && it.content.isNotBlank() }?.content
 }

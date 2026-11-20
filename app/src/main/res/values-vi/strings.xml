@@ -48,6 +48,8 @@
     <!-- Capability Statuses -->
     <string name="cap_status_supported">Hỗ trợ ✅</string>
     <string name="cap_status_requires_perm">Cần cấp thêm quyền ⚠️</string>
+    <string name="cap_status_requires_reconnect">Cần kết nối lại</string>
+    <string name="cap_token_expired">Phiên kết nối đã hết hạn. Hãy đăng nhập lại để dùng tính năng này.</string>
     <string name="cap_status_handed_off">Bàn giao thủ công ✋</string>
 
     <!-- Capability Captions -->
@@ -94,6 +96,7 @@
     <string name="channel_type_facebook">Facebook</string>
     <string name="channel_type_linkedin">LinkedIn</string>
     <string name="channel_linkedin_session_expired">Phiên đăng nhập LinkedIn đã hết hạn. Vui lòng bấm Kết nối LinkedIn lại.</string>
+    <string name="channel_retry_load">Thử lại</string>
     <string name="channel_error_load_failed">Không tải được danh sách kênh đã kết nối. Vui lòng thử lại.</string>
     <string name="channel_not_configured_notice">Chưa cấu hình %1$s trong local.properties nên bản này không đăng nhập thật được.</string>
 

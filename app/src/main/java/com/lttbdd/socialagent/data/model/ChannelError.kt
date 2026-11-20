@@ -8,6 +8,7 @@ import java.io.IOException
  */
 enum class ChannelError {
     NETWORK,
+    CHANNELS_LOAD_FAILED,
     LINKEDIN_CONFIG_INVALID,
     LINKEDIN_SESSION_START_FAILED,
     LINKEDIN_TOKEN_EXCHANGE_FAILED,

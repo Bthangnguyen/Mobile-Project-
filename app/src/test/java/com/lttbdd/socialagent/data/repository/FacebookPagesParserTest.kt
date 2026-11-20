@@ -3,7 +3,7 @@ package com.lttbdd.socialagent.data.repository
 import com.lttbdd.socialagent.data.model.FacebookPage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 /** Test phân tích danh sách Page từ `/me/accounts`; dùng token giả, không gọi mạng. */
@@ -36,11 +36,16 @@ class FacebookPagesParserTest {
     }
 
     @Test
-    fun `json sai hoac khong co data tra ve rong`() {
-        assertTrue(FacebookPagesParser.parse("").isEmpty())
-        assertTrue(FacebookPagesParser.parse("not_json").isEmpty())
-        assertTrue(FacebookPagesParser.parse("""{"data":[]}""").isEmpty())
-        assertTrue(FacebookPagesParser.parse("""{"error":{"code":190}}""").isEmpty())
+    fun `chi mang data rong hop le moi la khong co Page`() {
+        assertEquals(emptyList<FacebookPage>(), FacebookPagesParser.parse("""{"data":[]}"""))
+        listOf(
+            "",
+            "not_json",
+            """{"error":{"code":190},"data":[]}""",
+            """{"data":null}""",
+            """{"data":[{"id":"1","name":"A"}]}""",
+            """{"data":[{"id":"1","name":"A","access_token":null}]}""",
+        ).forEach { assertNull(FacebookPagesParser.parse(it)) }
     }
 
     @Test
@@ -56,7 +61,7 @@ class FacebookPagesParserTest {
             {"id":"3","name":"C","access_token":"t3","tasks":[]}
         ]}"""
 
-        val pages = FacebookPagesParser.parse(body)
+        val pages = requireNotNull(FacebookPagesParser.parse(body))
 
         assertEquals(listOf("ANALYZE", "MODERATE"), pages[0].tasks)
         assertEquals(null, pages[1].tasks)

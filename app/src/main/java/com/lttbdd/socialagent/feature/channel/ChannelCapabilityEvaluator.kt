@@ -3,10 +3,12 @@ package com.lttbdd.socialagent.feature.channel
 import com.lttbdd.socialagent.R
 import com.lttbdd.socialagent.core.model.ChannelAccount
 import com.lttbdd.socialagent.core.model.ChannelType
+import com.lttbdd.socialagent.core.model.ConnectionStatus
 
 enum class CapabilityStatusType {
     SUPPORTED,
     REQUIRES_PERMISSION,
+    REQUIRES_RECONNECT,
     NOT_SUPPORTED,
     UNVERIFIED,
 
@@ -43,9 +45,21 @@ object ChannelCapabilityEvaluator {
     ): List<CapabilityItemUiState> {
         val scopes = parseScopes(scopeString)
 
-        return when (account.type) {
+        val items = when (account.type) {
             ChannelType.FACEBOOK -> evaluateFacebook(scopes, pageTasks?.toSet())
             ChannelType.LINKEDIN -> evaluateLinkedIn(scopes)
+        }
+        if (account.status != ConnectionStatus.TOKEN_EXPIRED) return items
+
+        return items.map { item ->
+            when (item.statusType) {
+                CapabilityStatusType.HANDED_OFF, CapabilityStatusType.NOT_SUPPORTED -> item
+                else -> item.copy(
+                    statusTextRes = R.string.cap_status_requires_reconnect,
+                    statusType = CapabilityStatusType.REQUIRES_RECONNECT,
+                    captionRes = R.string.cap_token_expired,
+                )
+            }
         }
     }
 

@@ -48,6 +48,7 @@ class ChannelViewModel @Inject constructor(
 
     /** Page task đã lưu theo từng kênh (null/vắng = chưa biết). */
     private var pageTasks: Map<String, List<String>?> = emptyMap()
+    private val facebookProfiles = mutableMapOf<String, Boolean?>()
 
     /** Danh sách kênh mới nhất từ repository (dùng khi UiState đang ở trạng thái khác Success). */
     private var knownChannels: List<ChannelAccount> = emptyList()
@@ -148,6 +149,9 @@ class ChannelViewModel @Inject constructor(
     private suspend fun resolveAccount(account: ChannelAccount): ChannelAccount {
         grantedScopes = grantedScopes + (scopeKey(account) to repository.getGrantedScope(account.type, account.accountId))
         pageTasks = pageTasks + (scopeKey(account) to repository.getPageTasks(account.type, account.accountId))
+        if (account.type == ChannelType.FACEBOOK) {
+            facebookProfiles[account.accountId] = repository.isFacebookProfile(account.accountId)
+        }
         val expiresAt = repository.getTokenExpiresAt(account.type, account.accountId)
         return if (account.status == ConnectionStatus.CONNECTED && expiresAt != null && clock() >= expiresAt) {
             account.copy(status = ConnectionStatus.TOKEN_EXPIRED)
@@ -166,6 +170,9 @@ class ChannelViewModel @Inject constructor(
 
     /** Page task của người dùng trên Page này; null nếu chưa biết (ma trận khi đó chỉ xét quyền của app). */
     fun getTasksForAccount(account: ChannelAccount): List<String>? = pageTasks[scopeKey(account)]
+
+    fun isFacebookProfile(account: ChannelAccount): Boolean? =
+        if (account.type == ChannelType.FACEBOOK) facebookProfiles[account.accountId] else null
 
     /** Demo khi chưa cấu hình client id công khai hoặc địa chỉ BFF (còn placeholder). */
     fun isLinkedInDemoMode(): Boolean =
@@ -316,10 +323,10 @@ class ChannelViewModel @Inject constructor(
                     _pagePicker.value = FacebookPagePicker(pages)
                 }
                 pages.size == 1 -> applyConnectResult(repository.connectFacebookSelectedPage(user, pages.first()))
-                else -> {
-                    _notices.trySend(ChannelNotice.NO_FACEBOOK_PAGES)
-                    applyConnectResult(repository.connectFacebookProfile(user))
-                }
+                else -> applyConnectResult(
+                    repository.connectFacebookProfile(user),
+                    successNotice = ChannelNotice.NO_FACEBOOK_PAGES,
+                )
             }
         }
     }
@@ -351,13 +358,17 @@ class ChannelViewModel @Inject constructor(
      * Phát trạng thái sau khi kết nối. Nạp quyền của kênh mới TRƯỚC khi phát để ma trận không đọc scope null
      * (luồng [loadChannels] nạp bất đồng bộ nên có thể chậm hơn kết quả kết nối).
      */
-    private suspend fun applyConnectResult(result: Result<ChannelAccount>) {
+    private suspend fun applyConnectResult(
+        result: Result<ChannelAccount>,
+        successNotice: ChannelNotice? = null,
+    ) {
         result.onSuccess { connected ->
             val account = resolveAccount(connected)
             val updatedChannels = knownChannels
                 .filterNot { it.type == account.type && it.accountId == account.accountId } + account
             knownChannels = updatedChannels
             publishChannels()
+            successNotice?.let { _notices.trySend(it) }
             _connected.trySend(account.displayName)
         }.onFailure { error ->
             // Quay về danh sách hiện có (thoát Loading) và báo lỗi bằng chuỗi đã dịch, một lần.
@@ -369,6 +380,7 @@ class ChannelViewModel @Inject constructor(
     private fun errorMessageRes(error: ChannelError): Int = when (error) {
         ChannelError.NETWORK -> R.string.channel_error_network
         ChannelError.CHANNELS_LOAD_FAILED -> R.string.channel_error_load_failed
+        ChannelError.CHANNELS_SAVE_FAILED -> R.string.channel_error_save_failed
         ChannelError.LINKEDIN_CONFIG_INVALID -> R.string.channel_error_linkedin_config
         ChannelError.LINKEDIN_SESSION_START_FAILED -> R.string.channel_error_linkedin_session
         ChannelError.LINKEDIN_TOKEN_EXCHANGE_FAILED -> R.string.channel_error_linkedin_exchange

@@ -6,6 +6,7 @@ import com.lttbdd.socialagent.data.model.ChannelException
 import com.lttbdd.socialagent.data.model.FacebookPage
 import com.lttbdd.socialagent.data.model.FacebookUserToken
 import com.lttbdd.socialagent.data.model.OAuthToken
+import com.lttbdd.socialagent.data.security.PendingChannelWrite
 import com.lttbdd.socialagent.data.security.TokenStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
@@ -34,6 +35,7 @@ class ChannelRepositoryNetworkTest {
 
     private class Store : TokenStore {
         val storage = mutableMapOf<String, OAuthToken>()
+        private val staged = mutableMapOf<PendingChannelWrite, OAuthToken>()
         override suspend fun saveToken(channelType: ChannelType, accountId: String, token: OAuthToken) {
             storage["${channelType.name}_$accountId"] = token
         }
@@ -41,15 +43,38 @@ class ChannelRepositoryNetworkTest {
             flowOf(storage["${channelType.name}_$accountId"])
         override suspend fun removeToken(channelType: ChannelType, accountId: String) {
             storage.remove("${channelType.name}_$accountId")
+            staged.keys.removeAll { it.type == channelType && it.accountId == accountId }
+        }
+        override suspend fun stageToken(write: PendingChannelWrite, token: OAuthToken) {
+            check(staged.put(write, token) == null)
+        }
+
+        override suspend fun loadPendingWrites() = staged.keys.toList()
+
+        override suspend fun loadStagedToken(write: PendingChannelWrite) = staged[write]
+
+        override suspend fun finishPendingWrite(write: PendingChannelWrite, commit: Boolean) {
+            val token = checkNotNull(staged.remove(write))
+            if (commit) saveToken(write.type, write.accountId, token)
         }
     }
 
     private class AccountStore : ChannelAccountStore {
-        override suspend fun load(): List<StoredChannelAccount> = emptyList()
-        override suspend fun save(accounts: List<StoredChannelAccount>) = Unit
+        private var saved: List<StoredChannelAccount> = emptyList()
+
+        override suspend fun load(): List<StoredChannelAccount> = saved
+
+        override suspend fun upsert(account: StoredChannelAccount) {
+            saved = saved.filterNot { it.type == account.type && it.accountId == account.accountId } + account
+        }
+
+        override suspend fun remove(type: ChannelType, accountId: String) {
+            saved = saved.filterNot { it.type == type && it.accountId == accountId }
+        }
     }
 
     private lateinit var store: Store
+    private lateinit var accounts: AccountStore
     private lateinit var repository: ChannelRepositoryImpl
     private val requests = mutableListOf<Request>()
     private val bodies = mutableListOf<String>()
@@ -61,7 +86,8 @@ class ChannelRepositoryNetworkTest {
     @Before
     fun setUp() {
         store = Store()
-        repository = ChannelRepositoryImpl(store, AccountStore())
+        accounts = AccountStore()
+        repository = ChannelRepositoryImpl(store, accounts)
         repository.linkedInBffUrl = "https://bff.example.com"
         repository.httpClient = OkHttpClient.Builder().addInterceptor(Interceptor { chain ->
             val request = chain.request()
@@ -141,6 +167,21 @@ class ChannelRepositoryNetworkTest {
 
         assertEquals(ChannelError.FACEBOOK_PROFILE_FAILED, failureError(result))
         assertTrue(store.storage.isEmpty())
+    }
+
+    @Test
+    fun `ho so ca nhan va Page thieu quyen luu co khac nhau`() = runTest {
+        handler = { 200 to """{"id":"profile","name":"Ho so"}""" }
+        val user = FacebookUserToken("user_tok", 5L, null)
+
+        repository.connectFacebookProfile(user).getOrThrow()
+        repository.connectFacebookSelectedPage(user, FacebookPage("page", "Page", "page_tok")).getOrThrow()
+
+        val restored = ChannelRepositoryImpl(store, accounts)
+        assertEquals(true, restored.isFacebookProfile("profile"))
+        assertEquals(false, restored.isFacebookProfile("page"))
+        assertEquals("public_profile", restored.getGrantedScope(ChannelType.FACEBOOK, "page"))
+        assertNull(restored.getPageTasks(ChannelType.FACEBOOK, "page"))
     }
 
     @Test

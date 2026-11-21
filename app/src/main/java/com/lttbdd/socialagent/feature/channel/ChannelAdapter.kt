@@ -17,6 +17,7 @@ import com.lttbdd.socialagent.databinding.ItemChannelAccountBinding
 class ChannelAdapter(
     private val getScopeForAccount: (ChannelAccount) -> String?,
     private val getTasksForAccount: (ChannelAccount) -> List<String>? = { null },
+    private val isFacebookProfile: (ChannelAccount) -> Boolean? = { null },
 ) : ListAdapter<ChannelAccount, ChannelAdapter.ChannelViewHolder>(ChannelDiffCallback()) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ChannelViewHolder {
@@ -25,7 +26,7 @@ class ChannelAdapter(
             parent,
             false,
         )
-        return ChannelViewHolder(binding, getScopeForAccount, getTasksForAccount)
+        return ChannelViewHolder(binding, getScopeForAccount, getTasksForAccount, isFacebookProfile)
     }
 
     override fun onBindViewHolder(holder: ChannelViewHolder, position: Int) {
@@ -36,6 +37,7 @@ class ChannelAdapter(
         private val binding: ItemChannelAccountBinding,
         private val getScopeForAccount: (ChannelAccount) -> String?,
         private val getTasksForAccount: (ChannelAccount) -> List<String>?,
+        private val isFacebookProfile: (ChannelAccount) -> Boolean?,
     ) : RecyclerView.ViewHolder(binding.root) {
 
         fun bind(account: ChannelAccount) {
@@ -68,7 +70,9 @@ class ChannelAdapter(
             // Render 5 capabilities matrix
             binding.containerCapabilities.removeAllViews()
             val scopeString = getScopeForAccount(account)
-            val capabilityItems = ChannelCapabilityEvaluator.evaluateCapabilities(account, scopeString, getTasksForAccount(account))
+            val capabilityItems = ChannelCapabilityEvaluator.evaluateCapabilities(
+                account, scopeString, getTasksForAccount(account), isFacebookProfile(account),
+            )
 
             val inflater = LayoutInflater.from(context)
             capabilityItems.forEach { item ->

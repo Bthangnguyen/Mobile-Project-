@@ -5,9 +5,21 @@ import com.lttbdd.socialagent.core.model.ChannelAccount
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.ConnectionStatus
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChannelCapabilityEvaluatorTest {
+
+    @Test
+    fun `Mention ban giao thu cong tren hai kenh khi token het han va thieu scope`() {
+        for (type in listOf(ChannelType.FACEBOOK, ChannelType.LINKEDIN)) {
+            val account = ChannelAccount(type, "id", "Tên", ConnectionStatus.TOKEN_EXPIRED, emptySet())
+            val mention = ChannelCapabilityEvaluator.evaluateCapabilities(account, null)
+                .single { it.capabilityNameRes == R.string.cap_mention }
+            assertEquals(CapabilityStatusType.HANDED_OFF, mention.statusType)
+            assertEquals(R.string.cap_status_handed_off, mention.statusTextRes)
+        }
+    }
 
     @Test
     fun `token het han yeu cau ket noi lai va giu ban giao thu cong`() {
@@ -85,7 +97,7 @@ class ChannelCapabilityEvaluatorTest {
         assertEquals(CapabilityStatusType.REQUIRES_PERMISSION, items[0].statusType)
         assertEquals(CapabilityStatusType.REQUIRES_PERMISSION, items[1].statusType)
         assertEquals(CapabilityStatusType.REQUIRES_PERMISSION, items[2].statusType)
-        assertEquals(CapabilityStatusType.REQUIRES_PERMISSION, items[3].statusType)
+        assertEquals(CapabilityStatusType.HANDED_OFF, items[3].statusType)
         assertEquals(CapabilityStatusType.REQUIRES_PERMISSION, items[4].statusType)
     }
 
@@ -111,22 +123,45 @@ class ChannelCapabilityEvaluatorTest {
     }
 
     @Test
-    fun `facebook chi co public_profile hien huong dan can Page`() {
+    fun `chi ho so Facebook da xac nhan moi hien huong dan can Page`() {
         val account = ChannelAccount(
             type = ChannelType.FACEBOOK,
             accountId = "fb_101",
-            displayName = "Facebook Test Page",
+            displayName = "Facebook",
             status = ConnectionStatus.CONNECTED,
             capabilities = emptySet(),
         )
 
-        val items = ChannelCapabilityEvaluator.evaluateCapabilities(account, "public_profile")
+        val items = ChannelCapabilityEvaluator.evaluateCapabilities(
+            account, "public_profile", isFacebookProfile = true,
+        )
 
-        assertEquals(List(5) { CapabilityStatusType.REQUIRES_PERMISSION }, items.map { it.statusType })
-        assertEquals(List(5) { R.string.cap_fb_needs_page }, items.map { it.captionRes })
+        val profileFeatures = items.filter { it.capabilityNameRes != R.string.cap_mention }
+        assertTrue(profileFeatures.all { it.statusType == CapabilityStatusType.REQUIRES_PERMISSION })
+        assertTrue(profileFeatures.all { it.captionRes == R.string.cap_fb_needs_page })
+        assertEquals(CapabilityStatusType.HANDED_OFF, items.single { it.capabilityNameRes == R.string.cap_mention }.statusType)
 
-        val pageItems = ChannelCapabilityEvaluator.evaluateCapabilities(account, "public_profile", listOf("CREATE_CONTENT"))
+        val pageItems = ChannelCapabilityEvaluator.evaluateCapabilities(
+            account, "public_profile", isFacebookProfile = false,
+        )
         assertEquals(R.string.cap_fb_publish_no_perm, pageItems.first().captionRes)
+        assertTrue(pageItems.none { it.captionRes == R.string.cap_fb_needs_page })
+
+        val legacyItems = ChannelCapabilityEvaluator.evaluateCapabilities(account, "public_profile")
+        assertTrue(legacyItems.filter { it.capabilityNameRes != R.string.cap_mention }.all { it.captionRes == R.string.cap_fb_account_type_unknown })
+
+        val expiredLegacyItems = ChannelCapabilityEvaluator.evaluateCapabilities(
+            account.copy(status = ConnectionStatus.TOKEN_EXPIRED), "public_profile",
+        )
+        val expiredFeatures = expiredLegacyItems.filter { it.capabilityNameRes != R.string.cap_mention }
+        assertTrue(expiredFeatures.all { it.captionRes == R.string.cap_fb_account_type_unknown })
+        assertTrue(expiredFeatures.all { it.statusType == CapabilityStatusType.REQUIRES_RECONNECT })
+        assertEquals(CapabilityStatusType.HANDED_OFF, expiredLegacyItems.single { it.capabilityNameRes == R.string.cap_mention }.statusType)
+
+        val legacyWithTasks = ChannelCapabilityEvaluator.evaluateCapabilities(
+            account, "public_profile", pageTasks = listOf("CREATE_CONTENT"),
+        )
+        assertEquals(R.string.cap_fb_publish_no_perm, legacyWithTasks.first().captionRes)
     }
 
     @Test
@@ -163,7 +198,7 @@ class ChannelCapabilityEvaluatorTest {
         assertEquals(CapabilityStatusType.REQUIRES_PERMISSION, items[0].statusType)
         assertEquals(CapabilityStatusType.HANDED_OFF, items[1].statusType)
         assertEquals(CapabilityStatusType.HANDED_OFF, items[2].statusType)
-        assertEquals(CapabilityStatusType.REQUIRES_PERMISSION, items[3].statusType)
+        assertEquals(CapabilityStatusType.HANDED_OFF, items[3].statusType)
         assertEquals(CapabilityStatusType.HANDED_OFF, items[4].statusType)
     }
 

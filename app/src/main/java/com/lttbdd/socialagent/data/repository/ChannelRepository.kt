@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.Flow
 interface ChannelRepository {
 
     /**
-     * Lấy danh sách các kênh đã kết nối.
+     * Lấy danh sách các kênh đã kết nối. Flow báo lỗi nếu kho không đọc được, có thể thu thập lại để thử lại.
      */
     fun getConnectedChannels(): Flow<List<ChannelAccount>>
 
@@ -57,6 +57,9 @@ interface ChannelRepository {
      * (khi đó ma trận chỉ xét quyền của app, không giả định có hay không có task).
      */
     suspend fun getPageTasks(type: ChannelType, accountId: String): List<String>? = null
+
+    /** Hồ sơ Facebook là true, Page là false, chưa xác định được là null. */
+    suspend fun isFacebookProfile(accountId: String): Boolean? = null
 
     /**
      * Lấy danh sách Facebook Page mà người dùng quản lý (Graph API `/me/accounts`).

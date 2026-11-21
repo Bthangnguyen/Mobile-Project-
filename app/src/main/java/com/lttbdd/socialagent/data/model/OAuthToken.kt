@@ -18,6 +18,8 @@ data class OAuthToken(
     val tokenType: String = "Bearer",
     /** Page task của người dùng trên Page (chỉ Facebook Page); null nếu chưa biết (token cũ, hồ sơ cá nhân). */
     val pageTasks: List<String>? = null,
+    /** Hồ sơ Facebook là true, Page là false, token cũ hoặc kênh khác là null. */
+    val isFacebookProfile: Boolean? = null,
 ) {
     /**
      * Kiểm tra xem token đã hết hạn chưa.

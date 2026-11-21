@@ -4,11 +4,23 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlinx.serialization.json.Json
 
 /**
  * Unit test kiểm tra tính toán expiresAt theo RFC 6749 Section 5.1 & 4.2.2.
  */
 class OAuthTokenTest {
+
+    @Test
+    fun `token cu van doc duoc va token ho so giu co sau khi doc lai`() {
+        val legacy = Json.decodeFromString<OAuthToken>("""{"accessToken":"fake","expiresAt":10}""")
+        assertEquals(null, legacy.isFacebookProfile)
+
+        for (flag in listOf(true, false)) {
+            val token = legacy.copy(isFacebookProfile = flag)
+            assertEquals(token, Json.decodeFromString<OAuthToken>(Json.encodeToString(token)))
+        }
+    }
 
     @Test
     fun `expiresAt is computed correctly from expiresInSeconds`() {

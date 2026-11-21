@@ -133,6 +133,7 @@ class ChannelFragment : Fragment() {
                 viewModel.getScopeForAccount(account)
             },
             getTasksForAccount = { account -> viewModel.getTasksForAccount(account) },
+            isFacebookProfile = viewModel::isFacebookProfile,
         )
         binding.rvChannels.layoutManager = LinearLayoutManager(requireContext())
         binding.rvChannels.adapter = adapter

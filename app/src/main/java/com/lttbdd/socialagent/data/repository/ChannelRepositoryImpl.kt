@@ -12,9 +12,13 @@ import com.lttbdd.socialagent.data.model.FacebookUserToken
 import com.lttbdd.socialagent.data.model.OAuthToken
 import com.lttbdd.socialagent.data.model.toChannelError
 import com.lttbdd.socialagent.data.network.LinkedInBffAuth
+import com.lttbdd.socialagent.data.security.PendingChannelWrite
 import com.lttbdd.socialagent.data.security.TokenStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emitAll
@@ -30,6 +34,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -51,9 +56,14 @@ class ChannelRepositoryImpl @Inject constructor(
     internal var httpClient: okhttp3.OkHttpClient = okhttp3.OkHttpClient()
     private val accountsMutex = Mutex()
     private var restored = false
+    private data class PendingWrite(val write: PendingChannelWrite, val committed: Boolean)
+
+    private val pendingWrites = mutableMapOf<Pair<ChannelType, String>, PendingWrite>()
 
     override fun getConnectedChannels(): Flow<List<ChannelAccount>> = flow {
-        accountsMutex.withLock { ensureRestored() }
+        accountsMutex.withLock {
+            ensureRestored(reload = true)
+        }
         emitAll(channelsFlow)
     }
 
@@ -62,11 +72,25 @@ class ChannelRepositoryImpl @Inject constructor(
      * (token mất/hỏng, ví dụ Keystore bị đặt lại, thì tài khoản đó coi như chưa kết nối).
      * Phải giữ [accountsMutex] khi gọi. Nếu kho lỗi, lần sau phải đọc lại trước khi ghi.
      */
-    private suspend fun ensureRestored() {
-        if (restored) return
+    private suspend fun ensureRestored(reload: Boolean = false) {
+        if (restored && !reload) return
+        restored = false
         val accounts = try {
-            accountStore.load()
-                .filter { stored -> tokenStore.getToken(stored.type, stored.accountId).first() != null }
+            val storedAccounts = accountStore.load()
+            val pending = tokenStore.loadPendingWrites().associate { write ->
+                (write.type to write.accountId) to PendingWrite(
+                    write,
+                    committed = storedAccounts.any {
+                        it.type == write.type && it.accountId == write.accountId && it.tokenWriteId == write.id
+                    },
+                )
+            }
+            pendingWrites.clear()
+            pendingWrites.putAll(pending)
+            // Token chính có thể đọc được ngay sau khi hoàn tất lần ghi đang chờ.
+            pendingWrites.values.toList().forEach { tryFinishPendingWrite(it) }
+            storedAccounts
+                .filter { readToken(it.type, it.accountId, pendingWrites[it.type to it.accountId]) != null }
                 .map { toChannelAccount(it.type, it.accountId, it.displayName) }
         } catch (e: CancellationException) {
             throw e
@@ -97,6 +121,7 @@ class ChannelRepositoryImpl @Inject constructor(
                     accessToken = user.accessToken,
                     expiresAt = user.expiresAtMillis,
                     scope = "public_profile",
+                    isFacebookProfile = true,
                 )
                 saveAndRegister(ChannelType.FACEBOOK, profile.first, profile.second, token)
             } catch (e: Exception) {
@@ -156,6 +181,7 @@ class ChannelRepositoryImpl @Inject constructor(
                 expiresAt = user.expiresAtMillis,
                 scope = user.grantedScope ?: "public_profile",
                 pageTasks = page.tasks,
+                isFacebookProfile = false,
             )
             saveAndRegister(ChannelType.FACEBOOK, page.id, page.name, token)
         } catch (e: Exception) {
@@ -163,27 +189,54 @@ class ChannelRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun getGrantedScope(type: ChannelType, accountId: String): String? {
-        return try {
-            tokenStore.getToken(type, accountId).first()?.scope
-        } catch (_: Exception) {
-            null
+    override suspend fun getGrantedScope(type: ChannelType, accountId: String): String? =
+        readCommittedToken(type, accountId)?.scope
+
+    override suspend fun getTokenExpiresAt(type: ChannelType, accountId: String): Long? =
+        readCommittedToken(type, accountId)?.expiresAt
+
+    override suspend fun getPageTasks(type: ChannelType, accountId: String): List<String>? =
+        readCommittedToken(type, accountId)?.pageTasks
+
+    override suspend fun isFacebookProfile(accountId: String): Boolean? =
+        readCommittedToken(ChannelType.FACEBOOK, accountId)?.isFacebookProfile
+
+    private suspend fun readCommittedToken(type: ChannelType, accountId: String): OAuthToken? = try {
+        accountsMutex.withLock {
+            ensureRestored()
+            readToken(type, accountId, pendingWrites[type to accountId])
+        }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        null
+    }
+
+    private suspend fun readToken(type: ChannelType, accountId: String, pending: PendingWrite?): OAuthToken? {
+        val write = pending?.takeIf { it.committed }?.write
+        return if (write != null && write.type == type && write.accountId == accountId) {
+            tokenStore.loadStagedToken(write)
+        } else {
+            tokenStore.getToken(type, accountId).first()
         }
     }
 
-    override suspend fun getTokenExpiresAt(type: ChannelType, accountId: String): Long? {
-        return try {
-            tokenStore.getToken(type, accountId).first()?.expiresAt
-        } catch (_: Exception) {
-            null
+    /** Gọi trong [accountsMutex]. Chỉ xử lý lần ghi kế tiếp khi đã dọn lần ghi trước. */
+    private suspend fun finishPendingWrite(pending: PendingWrite?) {
+        if (pending == null) return
+        withContext(NonCancellable) {
+            tokenStore.finishPendingWrite(pending.write, pending.committed)
+            pendingWrites.remove(pending.write.type to pending.write.accountId)
         }
     }
 
-    override suspend fun getPageTasks(type: ChannelType, accountId: String): List<String>? {
-        return try {
-            tokenStore.getToken(type, accountId).first()?.pageTasks
+    private suspend fun tryFinishPendingWrite(pending: PendingWrite?) {
+        try {
+            finishPendingWrite(pending)
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) {
-            null
+            // Trạng thái lần ghi đã nằm trên đĩa. Lần sau sẽ thử dọn lại.
         }
     }
 
@@ -294,13 +347,21 @@ class ChannelRepositoryImpl @Inject constructor(
         return try {
             accountsMutex.withLock {
                 ensureRestored()
-                tokenStore.removeToken(type, accountId)
-                channelsFlow.value = channelsFlow.value.filterNot { it.type == type && it.accountId == accountId }
-                persistAccounts()
+                currentCoroutineContext().ensureActive()
+                withContext(NonCancellable) {
+                    tokenStore.removeToken(type, accountId)
+                    pendingWrites.remove(type to accountId)
+                    channelsFlow.value = channelsFlow.value.filterNot { it.type == type && it.accountId == accountId }
+                    accountStore.remove(type, accountId)
+                }
                 Result.success(Unit)
             }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: ChannelException) {
+            Result.failure(e)
         } catch (e: Exception) {
-            Result.failure(ChannelException(e.toChannelError(), e))
+            Result.failure(ChannelException(ChannelError.CHANNELS_SAVE_FAILED, e))
         }
     }
 
@@ -311,22 +372,27 @@ class ChannelRepositoryImpl @Inject constructor(
         token: OAuthToken,
     ): Result<ChannelAccount> = accountsMutex.withLock {
         ensureRestored()
-        tokenStore.saveToken(type, accountId, token)
         val account = toChannelAccount(type, accountId, displayName)
         val current = channelsFlow.value.toMutableList()
         val index = current.indexOfFirst { it.type == type && it.accountId == accountId }
         if (index >= 0) current[index] = account else current.add(account)
-        channelsFlow.value = current
-        persistAccounts()
-        Result.success(account)
-    }
-
-    /** Lưu metadata (loại, id, tên); không có token. Lỗi lưu không làm hỏng kết nối đang có. */
-    private suspend fun persistAccounts() {
-        try {
-            accountStore.save(channelsFlow.value.map { StoredChannelAccount(it.type, it.accountId, it.displayName) })
-        } catch (_: Exception) {
-            // Lần mở app sau sẽ phải kết nối lại kênh này; không chặn luồng kết nối hiện tại.
+        currentCoroutineContext().ensureActive()
+        withContext(NonCancellable) {
+            val write = PendingChannelWrite(UUID.randomUUID().toString(), type, accountId)
+            try {
+                finishPendingWrite(pendingWrites[type to accountId])
+                tokenStore.stageToken(write, token)
+                pendingWrites[type to accountId] = PendingWrite(write, committed = false)
+                // Metadata xác nhận lần ghi. Token đang dùng vẫn còn nguyên trước bước này.
+                accountStore.upsert(StoredChannelAccount(type, accountId, displayName, write.id))
+                pendingWrites[type to accountId] = PendingWrite(write, committed = true)
+                channelsFlow.value = current
+                Result.success(account)
+            } catch (e: Exception) {
+                throw ChannelException(ChannelError.CHANNELS_SAVE_FAILED, e)
+            } finally {
+                tryFinishPendingWrite(pendingWrites[type to accountId])
+            }
         }
     }
 

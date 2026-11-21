@@ -42,11 +42,12 @@ object ChannelCapabilityEvaluator {
         account: ChannelAccount,
         scopeString: String?,
         pageTasks: List<String>? = null,
+        isFacebookProfile: Boolean? = null,
     ): List<CapabilityItemUiState> {
         val scopes = parseScopes(scopeString)
 
         val items = when (account.type) {
-            ChannelType.FACEBOOK -> evaluateFacebook(scopes, pageTasks?.toSet())
+            ChannelType.FACEBOOK -> evaluateFacebook(scopes, pageTasks?.toSet(), isFacebookProfile)
             ChannelType.LINKEDIN -> evaluateLinkedIn(scopes)
         }
         if (account.status != ConnectionStatus.TOKEN_EXPIRED) return items
@@ -57,7 +58,11 @@ object ChannelCapabilityEvaluator {
                 else -> item.copy(
                     statusTextRes = R.string.cap_status_requires_reconnect,
                     statusType = CapabilityStatusType.REQUIRES_RECONNECT,
-                    captionRes = R.string.cap_token_expired,
+                    captionRes = if (item.captionRes == R.string.cap_fb_account_type_unknown) {
+                        item.captionRes
+                    } else {
+                        R.string.cap_token_expired
+                    },
                 )
             }
         }
@@ -69,7 +74,11 @@ object ChannelCapabilityEvaluator {
      * trả lời cần MODERATE và CREATE_CONTENT; số liệu cần ANALYZE kèm `read_insights` và `pages_read_engagement`.
      * [tasks] là null khi chưa biết (token cũ, hồ sơ cá nhân): khi đó chỉ xét quyền, không đoán task.
      */
-    private fun evaluateFacebook(scopes: Set<String>, tasks: Set<String>?): List<CapabilityItemUiState> {
+    private fun evaluateFacebook(
+        scopes: Set<String>,
+        tasks: Set<String>?,
+        isFacebookProfile: Boolean?,
+    ): List<CapabilityItemUiState> {
         fun hasTasks(vararg required: String) = tasks == null || tasks.containsAll(required.toList())
 
         fun item(
@@ -117,23 +126,13 @@ object ChannelCapabilityEvaluator {
             R.string.cap_fb_reply_no_task,
         )
 
-        // 4. Mention (Nhắc tên): tài liệu Meta chỉ mô tả mention trong bình luận khi Page bật Page Mentioning,
-        // nên chưa xác minh được thì bàn giao thủ công (HANDED_OFF); không tính public_profile.
-        val mentionState = if (scopes.contains("pages_manage_posts") || scopes.contains("pages_manage_engagement")) {
-            CapabilityItemUiState(
-                capabilityNameRes = R.string.cap_mention,
-                statusTextRes = R.string.cap_status_handed_off,
-                statusType = CapabilityStatusType.HANDED_OFF,
-                captionRes = R.string.cap_fb_mention_handed_off,
-            )
-        } else {
-            CapabilityItemUiState(
-                capabilityNameRes = R.string.cap_mention,
-                statusTextRes = R.string.cap_status_requires_perm,
-                statusType = CapabilityStatusType.REQUIRES_PERMISSION,
-                captionRes = R.string.cap_fb_mention_page_no_perm,
-            )
-        }
+        // Mention chưa được xác nhận qua API, nên luôn hướng dẫn bàn giao thủ công.
+        val mentionState = CapabilityItemUiState(
+            capabilityNameRes = R.string.cap_mention,
+            statusTextRes = R.string.cap_status_handed_off,
+            statusType = CapabilityStatusType.HANDED_OFF,
+            captionRes = R.string.cap_fb_mention_handed_off,
+        )
 
         // 5. Số liệu: read_insights + pages_read_engagement + task ANALYZE
         val metricsState = item(
@@ -146,12 +145,14 @@ object ChannelCapabilityEvaluator {
         )
 
         val items = listOf(publishState, readCommentsState, replyState, mentionState, metricsState)
-        // Hồ sơ cá nhân và Page cũ thiếu thông tin task có thể cùng lưu duy nhất public_profile.
-        // Dùng caption đúng với cả hai trường hợp vì scope này không cấp quyền thao tác trên Page.
-        return if (scopes == setOf("public_profile") && tasks == null) {
-            items.map { it.copy(captionRes = R.string.cap_fb_needs_page) }
-        } else {
-            items
+        val caption = when {
+            isFacebookProfile == true -> R.string.cap_fb_needs_page
+            isFacebookProfile == null && scopes == setOf("public_profile") && tasks == null ->
+                R.string.cap_fb_account_type_unknown
+            else -> return items
+        }
+        return items.map {
+            if (it.statusType == CapabilityStatusType.HANDED_OFF) it else it.copy(captionRes = caption)
         }
     }
 
@@ -209,23 +210,13 @@ object ChannelCapabilityEvaluator {
             )
         }
 
-        // 4. Mention (Nhắc tên): cần quyền đăng và phải biết URN của người/tổ chức được nhắc (không có API tìm URN),
-        // nên có quyền đăng vẫn bàn giao thủ công (HANDED_OFF).
-        val mentionState = if (scopes.contains("w_organization_social") || scopes.contains("w_member_social")) {
-            CapabilityItemUiState(
-                capabilityNameRes = R.string.cap_mention,
-                statusTextRes = R.string.cap_status_handed_off,
-                statusType = CapabilityStatusType.HANDED_OFF,
-                captionRes = R.string.cap_li_mention_handed_off,
-            )
-        } else {
-            CapabilityItemUiState(
-                capabilityNameRes = R.string.cap_mention,
-                statusTextRes = R.string.cap_status_requires_perm,
-                statusType = CapabilityStatusType.REQUIRES_PERMISSION,
-                captionRes = R.string.cap_li_mention_no_perm,
-            )
-        }
+        // Mention chưa được xác nhận qua API, nên luôn hướng dẫn bàn giao thủ công.
+        val mentionState = CapabilityItemUiState(
+            capabilityNameRes = R.string.cap_mention,
+            statusTextRes = R.string.cap_status_handed_off,
+            statusType = CapabilityStatusType.HANDED_OFF,
+            captionRes = R.string.cap_li_mention_handed_off,
+        )
 
         // 5. Số liệu (Metrics) - Quyền yêu cầu: rw_organization_admin
         val metricsState = if (scopes.contains("rw_organization_admin")) {

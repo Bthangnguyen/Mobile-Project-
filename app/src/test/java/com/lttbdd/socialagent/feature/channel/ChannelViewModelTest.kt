@@ -119,6 +119,23 @@ class ChannelViewModelTest {
     }
 
     @Test
+    fun `luu ho so that bai thi chi bao loi`() = runTest {
+        fakeRepository.profileFailure = ChannelException(ChannelError.CHANNELS_SAVE_FAILED)
+        val notices = mutableListOf<ChannelNotice>()
+        val connected = mutableListOf<String>()
+        val errors = mutableListOf<Int>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.notices.collect { notices.add(it) } }
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.connectedEvents.collect { connected.add(it) } }
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.errors.collect { errors.add(it) } }
+
+        connectWithFacebookToken()
+
+        assertTrue(notices.isEmpty())
+        assertTrue(connected.isEmpty())
+        assertEquals(listOf(com.lttbdd.socialagent.R.string.channel_error_save_failed), errors)
+    }
+
+    @Test
     fun `huy hop thoai chon Page thi khong ket noi va xoa token tam`() = runTest {
         fakeRepository.pages = listOf(FacebookPage("p1", "A", "t1"), FacebookPage("p2", "B", "t2"))
         connectWithFacebookToken()
@@ -178,6 +195,15 @@ class ChannelViewModelTest {
 
         val channel = (viewModel.uiState.value as ChannelUiState.Success).channels.single()
         assertEquals(ConnectionStatus.CONNECTED, channel.status)
+    }
+
+    @Test
+    fun `ViewModel chuyen co ho so Facebook da luu den UI`() = runTest {
+        fakeRepository.pages = emptyList()
+        connectWithFacebookToken()
+
+        val profile = (viewModel.uiState.value as ChannelUiState.Success).channels.single()
+        assertEquals(true, viewModel.isFacebookProfile(profile))
     }
 
     @Test
@@ -608,8 +634,13 @@ class ChannelViewModelTest {
             return Result.success(account)
         }
 
+        override suspend fun isFacebookProfile(accountId: String): Boolean = accountId == "fb_101"
+
+        var profileFailure: ChannelException? = null
+
         override suspend fun connectFacebookProfile(user: FacebookUserToken): Result<ChannelAccount> {
             lastUser = user
+            profileFailure?.let { return Result.failure(it) }
             val account = ChannelAccount(
                 type = ChannelType.FACEBOOK,
                 accountId = "fb_101",

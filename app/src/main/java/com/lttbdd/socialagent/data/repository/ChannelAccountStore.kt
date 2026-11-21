@@ -10,6 +10,8 @@ data class StoredChannelAccount(
     val type: ChannelType,
     val accountId: String,
     val displayName: String,
+    /** Được ghi cùng metadata để xác nhận lần lưu token tương ứng. */
+    val tokenWriteId: String? = null,
 )
 
 /**
@@ -18,5 +20,6 @@ data class StoredChannelAccount(
  */
 interface ChannelAccountStore {
     suspend fun load(): List<StoredChannelAccount>
-    suspend fun save(accounts: List<StoredChannelAccount>)
+    suspend fun upsert(account: StoredChannelAccount)
+    suspend fun remove(type: ChannelType, accountId: String)
 }

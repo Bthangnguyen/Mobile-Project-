@@ -60,11 +60,20 @@
         <action
             android:id="@+id/action_settings_to_api_keys"
             app:destination="@id/apiKeysFragment" />
+        <action
+            android:id="@+id/action_settings_to_channels"
+            app:destination="@id/channelFragment" />
     </fragment>
 
     <fragment
         android:id="@+id/apiKeysFragment"
         android:name="com.lttbdd.socialagent.feature.apikeys.ApiKeysFragment"
         android:label="@string/api_keys_title" />
+
+    <!-- Kênh của tôi (B, F1) mở từ Cài đặt. -->
+    <fragment
+        android:id="@+id/channelFragment"
+        android:name="com.lttbdd.socialagent.feature.channel.ChannelFragment"
+        android:label="@string/channel_title" />
 
 </navigation>

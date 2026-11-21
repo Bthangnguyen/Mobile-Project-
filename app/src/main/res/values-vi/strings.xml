@@ -9,11 +9,96 @@
 
     <string name="placeholder_coming_soon">Sắp ra mắt</string>
 
+    <!-- F1 Channel Management -->
+    <string name="channel_title">Kênh của tôi</string>
+    <string name="channel_subtitle">Các tài khoản đã kết nối và trạng thái khả năng hỗ trợ theo nền tảng</string>
+    <string name="channel_connect_facebook">Kết nối Facebook Page</string>
+    <string name="channel_connect_linkedin">Kết nối LinkedIn</string>
+    <string name="channel_status_connected">Đã kết nối</string>
+    <string name="channel_status_expired">Token đã hết hạn</string>
+    <string name="channel_status_disconnected">Đã ngắt kết nối</string>
+    <string name="channel_empty_desc">Kết nối một kênh (Facebook Page hoặc LinkedIn) để xem trạng thái chức năng theo từng nền tảng</string>
+    <string name="channel_capabilities_header">Ma trận khả năng hỗ trợ:</string>
+    <string name="channel_facebook_login_error">Lỗi đăng nhập Facebook</string>
+    <string name="channel_facebook_cancel_title">Đã hủy đăng nhập Facebook</string>
+    <string name="channel_facebook_cancel_message">Bạn có muốn đăng nhập bằng tài khoản Facebook khác không?</string>
+    <string name="channel_facebook_login_another">Dùng tài khoản khác</string>
+    <string name="channel_facebook_pick_page_title">Chọn Facebook Page</string>
+    <string name="channel_facebook_no_pages">Không tìm thấy Facebook Page nào của tài khoản này nên đã kết nối bằng hồ sơ cá nhân. Cần có Page để đăng bài.</string>
+    <string name="channel_facebook_pages_load_failed">Không tải được danh sách Facebook Page. Hãy kiểm tra kết nối mạng và thử lại.</string>
+    <string name="channel_connected_named">Đã kết nối %1$s</string>
+    <string name="channel_oauth_state_mismatch">Không xác minh được phiên đăng nhập (state không khớp). Vui lòng thử lại.</string>
+    <string name="channel_oauth_error_generic">Không kết nối được kênh. Vui lòng thử lại.</string>
+    <string name="channel_close">Đóng</string>
+    <string name="channel_linkedin_cancelled">Đã hủy đăng nhập LinkedIn</string>
+    <string name="channel_linkedin_login_failed">Đăng nhập LinkedIn thất bại. Vui lòng thử lại.</string>
+    <string name="channel_linkedin_login_timeout">Đăng nhập LinkedIn đã hết thời gian chờ. Vui lòng thử lại.</string>
+    <string name="channel_linkedin_no_browser">Không tìm thấy trình duyệt để đăng nhập LinkedIn.</string>
+    <string name="channel_demo_facebook_name">[DEMO] Trang Facebook</string>
+    <string name="channel_demo_linkedin_name">[DEMO] Tài khoản cá nhân LinkedIn</string>
+    <string name="channel_demo_mode_notice">Chưa cấu hình %1$s trong local.properties, đang kết nối ở chế độ demo (không có đăng nhập thật)</string>
+
+    <!-- 5 Capabilities Rows -->
+    <string name="cap_publish">Đăng bài</string>
+    <string name="cap_read_comments">Đọc bình luận</string>
+    <string name="cap_reply">Trả lời bình luận</string>
+    <string name="cap_mention">Nhắc tên (Mention)</string>
+    <string name="cap_metrics">Số liệu &amp; Thống kê</string>
+
+    <!-- Capability Statuses -->
+    <string name="cap_status_supported">Hỗ trợ ✅</string>
+    <string name="cap_status_requires_perm">Cần cấp thêm quyền ⚠️</string>
+    <string name="cap_status_requires_reconnect">Cần kết nối lại</string>
+    <string name="cap_token_expired">Phiên kết nối đã hết hạn. Hãy đăng nhập lại để dùng tính năng này.</string>
+    <string name="cap_status_handed_off">Bàn giao thủ công ✋</string>
+
+    <!-- Capability Captions -->
+    <string name="cap_fb_account_type_unknown">Kết nối đã lưu chưa xác định loại tài khoản Facebook. Hãy kết nối lại để kiểm tra quyền truy cập Trang.</string>
+    <string name="cap_fb_needs_page">Tính năng này cần một Trang Facebook và các quyền tương ứng.</string>
+    <string name="cap_fb_publish_ok">Sẵn sàng đăng bài qua POST /{page-id}/feed (đã có pages_manage_posts)</string>
+    <string name="cap_fb_publish_no_perm">Cần cấp thêm quyền: pages_manage_posts</string>
+    <string name="cap_fb_read_comments_ok">Sẵn sàng đọc comment qua GET /{post-id}/comments (đã có pages_read_engagement)</string>
+    <string name="cap_fb_read_comments_no_perm">Cần cấp thêm quyền: pages_read_engagement hoặc pages_read_user_content</string>
+    <string name="cap_fb_reply_ok">Sẵn sàng trả lời comment qua POST /{comment-id}/comments (đã có pages_manage_engagement)</string>
+    <string name="cap_fb_reply_no_perm">Cần cấp thêm quyền: pages_manage_engagement</string>
+    <string name="cap_fb_mention_handed_off">Tài liệu Meta chỉ mô tả mention trong bình luận khi Page bật Page Mentioning; chưa xác minh nên Social Agent bàn giao, bạn tự thêm mention</string>
+    <string name="cap_fb_metrics_ok">Sẵn sàng đọc chỉ số qua GET /{post-id}/insights (đã có read_insights)</string>
+    <string name="cap_fb_metrics_no_perm">Cần cấp thêm quyền: read_insights, pages_read_engagement</string>
+
+    <string name="cap_li_publish_ok">Sẵn sàng đăng bài qua POST /rest/posts (đã có w_organization_social / w_member_social)</string>
+    <string name="cap_li_publish_no_perm">Cần cấp thêm quyền: w_organization_social hoặc w_member_social</string>
+    <string name="cap_li_read_comments_ok">Sẵn sàng đọc comment qua GET /rest/socialActions/{urn}/comments (đã có r_organization_social_feed)</string>
+    <string name="cap_li_read_comments_handed_off">App này không đọc được qua API (cần LinkedIn duyệt Community Management API); Social Agent sẽ thông báo và bạn tự đọc bình luận trên LinkedIn</string>
+    <string name="cap_li_reply_ok">Sẵn sàng trả lời comment qua POST /rest/socialActions/{urn}/comments (đã có w_organization_social_feed)</string>
+    <string name="cap_li_reply_handed_off">App này không trả lời được qua API (cần LinkedIn duyệt Community Management API); Social Agent sẽ thông báo và bạn tự trả lời trên LinkedIn</string>
+    <string name="cap_li_mention_handed_off">Mention cần URN của người/tổ chức được nhắc và không có API tra cứu URN; Social Agent bàn giao, bạn tự thêm mention</string>
+    <string name="cap_li_metrics_ok">Sẵn sàng đọc thống kê qua GET /rest/organizationalEntityShareStatistics (đã có rw_organization_admin)</string>
+    <string name="cap_li_metrics_handed_off">App này không lấy được số liệu qua API (cần LinkedIn duyệt Community Management API); Social Agent sẽ thông báo và bạn tự xem số liệu trên LinkedIn</string>
+    <string name="channel_error_network">Lỗi mạng. Kiểm tra kết nối rồi thử lại.</string>
+    <string name="channel_error_linkedin_config">Đăng nhập LinkedIn chưa được cấu hình đúng (địa chỉ máy chủ phải là HTTPS).</string>
+    <string name="channel_error_linkedin_session">Không bắt đầu được đăng nhập LinkedIn. Vui lòng thử lại.</string>
+    <string name="channel_error_linkedin_exchange">Không hoàn tất được đăng nhập LinkedIn. Vui lòng đăng nhập lại.</string>
+    <string name="channel_error_linkedin_token_invalid">Máy chủ đăng nhập trả về phản hồi không hợp lệ. Vui lòng thử lại.</string>
+    <string name="channel_error_linkedin_profile">Không đọc được thông tin tài khoản LinkedIn. Vui lòng thử lại.</string>
+    <string name="channel_error_facebook_profile">Không đọc được hồ sơ Facebook. Vui lòng thử lại.</string>
+    <string name="cap_fb_publish_no_task">Tài khoản Facebook của bạn cần có Page task CREATE_CONTENT trên Page này</string>
+    <string name="cap_fb_read_comments_no_task">Tài khoản Facebook của bạn cần có Page task MODERATE trên Page này</string>
+    <string name="cap_fb_reply_no_task">Tài khoản Facebook của bạn cần có Page task MODERATE và CREATE_CONTENT trên Page này</string>
+    <string name="cap_fb_metrics_no_task">Tài khoản Facebook của bạn cần có Page task ANALYZE trên Page này</string>
+
+    <!-- Settings strings -->
     <string name="settings_language_title">Ngôn ngữ</string>
     <string name="settings_language_description">Chọn ngôn ngữ hiển thị của ứng dụng. Màn hình sẽ tải lại sau khi đổi.</string>
     <string name="settings_language_system">Theo hệ thống</string>
     <string name="settings_language_vietnamese">Tiếng Việt</string>
     <string name="settings_language_english">English</string>
+    <string name="channel_type_facebook">Facebook</string>
+    <string name="channel_type_linkedin">LinkedIn</string>
+    <string name="channel_linkedin_session_expired">Phiên đăng nhập LinkedIn đã hết hạn. Vui lòng bấm Kết nối LinkedIn lại.</string>
+    <string name="channel_retry_load">Thử lại</string>
+    <string name="channel_error_save_failed">Không lưu được kết nối kênh. Vui lòng thử lại.</string>
+    <string name="channel_error_load_failed">Không tải được danh sách kênh đã kết nối. Vui lòng thử lại.</string>
+    <string name="channel_not_configured_notice">Chưa cấu hình %1$s trong local.properties nên bản này không đăng nhập thật được.</string>
 
     <!-- Quản lý BYOK, Issue #53. -->
     <string name="api_keys_title">API key LLM</string>

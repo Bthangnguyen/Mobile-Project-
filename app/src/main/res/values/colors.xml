@@ -6,4 +6,18 @@
     <color name="brand_primary_dark_theme">#B9C3FF</color>
     <color name="brand_on_primary_dark_theme">#1A237E</color>
     <color name="brand_secondary_dark_theme">#80CBC4</color>
+    <!-- Màu màn hình Kênh (sáng); bản tối ở values-night/colors.xml. -->
+    <color name="channel_status_connected">#2E7D32</color>
+    <color name="channel_status_expired">#E65100</color>
+    <color name="channel_status_disconnected">#757575</color>
+    <color name="cap_supported_bg">#E8F5E9</color>
+    <color name="cap_supported_text">#1B5E20</color>
+    <color name="cap_requires_bg">#FFF3E0</color>
+    <color name="cap_requires_text">#E65100</color>
+    <color name="cap_not_supported_bg">#FFEBEE</color>
+    <color name="cap_not_supported_text">#B71C1C</color>
+    <color name="cap_unverified_bg">#F5F5F5</color>
+    <color name="cap_unverified_text">#616161</color>
+    <color name="cap_handed_off_bg">#E3F2FD</color>
+    <color name="cap_handed_off_text">#0D47A1</color>
 </resources>

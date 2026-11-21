@@ -14,6 +14,8 @@ Yêu cầu đầy đủ: [docs/requirements.md](docs/requirements.md). Kiến tr
 - Hilt (DI), Coroutines + Flow, Navigation Component, Material 3
 - Room (offline), WorkManager (hàng đợi đăng bài, đồng bộ nền), OkHttp, kotlinx.serialization
 - Version thư viện chỉ khai báo trong `gradle/libs.versions.toml`
+- BFF đăng nhập LinkedIn (issue #88) nằm ở repository riêng (https://github.com/dhminh678/social-agent-linkedin-bff).
+  App Android gọi BFF qua HTTPS (xem Quy tắc 5 và `docs/architecture.md`).
 
 ## Lệnh hay dùng
 ```bash
@@ -46,6 +48,10 @@ phải báo rõ **chưa xác minh** và lý do; không tự nhận test đã PAS
 3. Feature gọi sang mảng khác **qua interface trong `core/`**, không import trực tiếp class trong `data/` của mảng khác.
 4. **Chuỗi hiển thị** phải đặt trong `res/values/strings.xml` (EN) **và** `res/values-vi/strings.xml` (VI). Không hard-code chữ trong layout/code.
 5. **Không bao giờ** log, commit hay gửi API key/token lên bất kỳ server nào ngoài nhà cung cấp LLM/mạng xã hội. Key lưu bằng Android Keystore.
+   **Ngoại lệ duy nhất (issue #88, nhãn `contract`):** đăng nhập LinkedIn (App Member) đi qua BFF ở repository backend riêng
+   để `client_secret` không nằm trong APK. BFF chỉ giữ token trong bộ nhớ tối đa 60 giây và xóa ngay lần đổi đầu tiên;
+   không ghi đĩa/DB, không log token/code/state/verifier, không chuyển tiếp `refresh_token`. Ngoại lệ chỉ áp dụng cho LinkedIn:
+   Facebook dùng Meta SDK, không qua BFF. Mở rộng sang nhà cung cấp hoặc luồng khác phải có issue `contract` mới.
 6. Agent **không được tự đăng bài** khi người dùng chưa duyệt (yêu cầu F4).
 7. Thêm thư viện: thêm vào `gradle/libs.versions.toml`, ghi lý do trong mô tả PR.
 8. Logic mới (ViewModel, repository, hàng đợi, parser) phải có unit test trong `app/src/test/`.

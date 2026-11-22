@@ -1,21 +1,21 @@
 <resources>
     <style name="TextAppearance.SocialAgent.Display" parent="TextAppearance.Material3.DisplaySmall">
-        <item name="android:textColor">@color/brand_on_surface</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
     </style>
     <style name="TextAppearance.SocialAgent.Headline" parent="TextAppearance.Material3.HeadlineSmall">
-        <item name="android:textColor">@color/brand_on_surface</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
     </style>
     <style name="TextAppearance.SocialAgent.Title" parent="TextAppearance.Material3.TitleMedium">
-        <item name="android:textColor">@color/brand_on_surface</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
     </style>
     <style name="TextAppearance.SocialAgent.Body" parent="TextAppearance.Material3.BodyLarge">
-        <item name="android:textColor">@color/brand_on_surface</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
     </style>
     <style name="TextAppearance.SocialAgent.Label" parent="TextAppearance.Material3.LabelLarge">
-        <item name="android:textColor">@color/brand_on_surface</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
     </style>
     <style name="TextAppearance.SocialAgent.Caption" parent="TextAppearance.Material3.BodySmall">
-        <item name="android:textColor">@color/brand_on_surface_variant</item>
+        <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
     </style>
 
     <style name="Widget.SocialAgent.Button" parent="Widget.Material3.Button">
@@ -23,9 +23,9 @@
         <item name="cornerRadius">@dimen/corner_radius_medium</item>
     </style>
     <style name="Widget.SocialAgent.Button.Primary" parent="Widget.SocialAgent.Button" />
-    <style name="Widget.SocialAgent.Button.Secondary" parent="Widget.SocialAgent.Button">
-        <item name="backgroundTint">@color/brand_secondary_container</item>
-        <item name="android:textColor">@color/brand_on_secondary_container</item>
+    <style name="Widget.SocialAgent.Button.Secondary" parent="Widget.Material3.Button.TonalButton">
+        <item name="android:minHeight">@dimen/button_height</item>
+        <item name="cornerRadius">@dimen/corner_radius_medium</item>
     </style>
     <style name="Widget.SocialAgent.Button.Outlined" parent="Widget.Material3.Button.OutlinedButton">
         <item name="android:minHeight">@dimen/button_height</item>

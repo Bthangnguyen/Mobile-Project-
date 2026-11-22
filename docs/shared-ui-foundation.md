@@ -125,8 +125,9 @@ binding.channelStatus.setChannel(
 `UiShowcaseActivity` and `activity_ui_showcase.xml` are under `app/src/debug/`.
 They demonstrate button variants, all input wrappers, cards, navigation, feedback,
 all statuses and selection controls, plus AgentProgress and ChannelStatus states.
-The activity is non-exported and is not the launcher. To open it from a debug build,
-use an explicit launch from the app's package:
+The activity is not the launcher and is declared with `android:exported="true"` only
+in `app/src/debug/AndroidManifest.xml` (excluded from release builds) so it can be
+opened directly via `adb` on Android 12+:
 
 ```shell
 adb shell am start -n com.lttbdd.socialagent/.core.ui.demo.UiShowcaseActivity

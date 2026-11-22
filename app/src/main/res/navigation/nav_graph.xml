@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  5 tab chính. Hiện tất cả dùng PlaceholderFragment.
+  5 tab chính. Tab chưa làm dùng PlaceholderFragment.
   Chủ mảng thay android:name bằng Fragment thật của mình (giữ nguyên android:id).
     composeFragment   -> D (F3 nhập topic + F2 tiến độ agent của C)
     postsFragment     -> D (F4 duyệt bài) + A (F5 trạng thái đăng)
@@ -51,12 +51,16 @@
 
     <fragment
         android:id="@+id/settingsFragment"
-        android:name="com.lttbdd.socialagent.core.ui.PlaceholderFragment"
+        android:name="com.lttbdd.socialagent.feature.settings.SettingsFragment"
         android:label="@string/nav_settings">
-        <argument
-            android:name="titleRes"
-            android:defaultValue="@string/nav_settings"
-            app:argType="reference" />
+        <action
+            android:id="@+id/action_settings_to_api_keys"
+            app:destination="@id/apiKeysFragment" />
     </fragment>
+
+    <fragment
+        android:id="@+id/apiKeysFragment"
+        android:name="com.lttbdd.socialagent.feature.apikeys.ApiKeysFragment"
+        android:label="@string/api_keys_title" />
 
 </navigation>

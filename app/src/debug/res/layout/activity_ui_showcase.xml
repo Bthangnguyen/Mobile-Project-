@@ -35,6 +35,12 @@
             android:layout_height="wrap_content"
             android:text="@string/ui_demo_secondary_button" />
 
+        <com.lttbdd.socialagent.core.ui.components.SecondaryButton
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:enabled="false"
+            android:text="@string/ui_demo_secondary_button_disabled" />
+
         <com.lttbdd.socialagent.core.ui.components.OutlinedButton
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

@@ -6,23 +6,24 @@ import com.google.android.material.checkbox.MaterialCheckBox
 import com.google.android.material.radiobutton.MaterialRadioButton
 import com.google.android.material.switchmaterial.SwitchMaterial
 import com.google.android.material.textfield.MaterialAutoCompleteTextView
+import com.lttbdd.socialagent.R
 
 class StyledCheckbox @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
-    defStyleAttr: Int = androidx.appcompat.R.attr.checkboxStyle,
+    defStyleAttr: Int = R.attr.socialAgentCheckBoxStyle,
 ) : MaterialCheckBox(context, attrs, defStyleAttr)
 
 class StyledRadioButton @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
-    defStyleAttr: Int = androidx.appcompat.R.attr.radioButtonStyle,
+    defStyleAttr: Int = R.attr.socialAgentRadioButtonStyle,
 ) : MaterialRadioButton(context, attrs, defStyleAttr)
 
 class StyledSwitch @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
-    defStyleAttr: Int = com.google.android.material.R.attr.materialSwitchStyle,
+    defStyleAttr: Int = R.attr.socialAgentSwitchStyle,
 ) : SwitchMaterial(context, attrs, defStyleAttr)
 
 class AppDropdown @JvmOverloads constructor(

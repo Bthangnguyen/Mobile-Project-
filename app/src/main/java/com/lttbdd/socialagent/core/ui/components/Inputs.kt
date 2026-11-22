@@ -10,13 +10,13 @@ import com.lttbdd.socialagent.R
 open class AppTextField @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
-    defStyleAttr: Int = com.google.android.material.R.attr.textInputStyle,
+    defStyleAttr: Int = R.attr.socialAgentTextInputStyle,
 ) : TextInputLayout(context, attrs, defStyleAttr)
 
 class AppPasswordField @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
-    defStyleAttr: Int = com.google.android.material.R.attr.textInputStyle,
+    defStyleAttr: Int = R.attr.socialAgentTextInputStyle,
 ) : AppTextField(context, attrs, defStyleAttr) {
 
     override fun onFinishInflate() {
@@ -29,7 +29,7 @@ class AppPasswordField @JvmOverloads constructor(
 class AppSearchField @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
-    defStyleAttr: Int = com.google.android.material.R.attr.textInputStyle,
+    defStyleAttr: Int = R.attr.socialAgentTextInputStyle,
 ) : AppTextField(context, attrs, defStyleAttr) {
 
     init {

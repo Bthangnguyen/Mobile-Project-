@@ -1,0 +1,14 @@
+<resources>
+    <attr name="socialAgentPrimaryButtonStyle" format="reference" />
+    <attr name="socialAgentSecondaryButtonStyle" format="reference" />
+    <attr name="socialAgentOutlinedButtonStyle" format="reference" />
+    <attr name="socialAgentTextButtonStyle" format="reference" />
+    <attr name="socialAgentIconButtonStyle" format="reference" />
+    <attr name="socialAgentTextInputStyle" format="reference" />
+    <attr name="socialAgentCardViewStyle" format="reference" />
+    <attr name="socialAgentBottomNavigationStyle" format="reference" />
+    <attr name="socialAgentToolbarStyle" format="reference" />
+    <attr name="socialAgentCheckBoxStyle" format="reference" />
+    <attr name="socialAgentRadioButtonStyle" format="reference" />
+    <attr name="socialAgentSwitchStyle" format="reference" />
+</resources>

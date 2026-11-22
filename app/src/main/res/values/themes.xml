@@ -2,6 +2,46 @@
     <style name="Theme.SocialAgent" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="colorPrimary">@color/brand_primary</item>
         <item name="colorOnPrimary">@color/brand_on_primary</item>
+        <item name="colorPrimaryContainer">@color/brand_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/brand_on_primary_container</item>
         <item name="colorSecondary">@color/brand_secondary</item>
+        <item name="colorOnSecondary">@color/brand_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/brand_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/brand_on_secondary_container</item>
+        <item name="android:colorBackground">@color/brand_background</item>
+        <item name="colorOnBackground">@color/brand_on_surface</item>
+        <item name="colorSurface">@color/brand_surface</item>
+        <item name="colorSurfaceContainerLow">@color/brand_surface_container_low</item>
+        <item name="colorSurfaceContainer">@color/brand_surface_container</item>
+        <item name="colorSurfaceContainerHigh">@color/brand_surface_container_high</item>
+        <item name="colorSurfaceVariant">@color/brand_surface_variant</item>
+        <item name="colorOnSurface">@color/brand_on_surface</item>
+        <item name="colorOnSurfaceVariant">@color/brand_on_surface_variant</item>
+        <item name="colorOutline">@color/brand_outline</item>
+        <item name="colorOutlineVariant">@color/brand_outline_variant</item>
+        <item name="colorError">@color/brand_error</item>
+        <item name="colorOnError">@color/brand_on_error</item>
+        <item name="colorErrorContainer">@color/brand_error_container</item>
+
+        <item name="textAppearanceDisplaySmall">@style/TextAppearance.SocialAgent.Display</item>
+        <item name="textAppearanceHeadlineSmall">@style/TextAppearance.SocialAgent.Headline</item>
+        <item name="textAppearanceTitleMedium">@style/TextAppearance.SocialAgent.Title</item>
+        <item name="textAppearanceBodyLarge">@style/TextAppearance.SocialAgent.Body</item>
+        <item name="textAppearanceLabelLarge">@style/TextAppearance.SocialAgent.Label</item>
+        <item name="textAppearanceBodySmall">@style/TextAppearance.SocialAgent.Caption</item>
+
+        <item name="socialAgentPrimaryButtonStyle">@style/Widget.SocialAgent.Button.Primary</item>
+        <item name="socialAgentSecondaryButtonStyle">@style/Widget.SocialAgent.Button.Secondary</item>
+        <item name="socialAgentOutlinedButtonStyle">@style/Widget.SocialAgent.Button.Outlined</item>
+        <item name="socialAgentTextButtonStyle">@style/Widget.SocialAgent.Button.Text</item>
+        <item name="socialAgentIconButtonStyle">@style/Widget.SocialAgent.Button.Icon</item>
+        <item name="socialAgentTextInputStyle">@style/Widget.SocialAgent.TextInputLayout</item>
+        <item name="socialAgentCardViewStyle">@style/Widget.SocialAgent.Card</item>
+        <item name="socialAgentBottomNavigationStyle">@style/Widget.SocialAgent.BottomNavigation</item>
+        <item name="socialAgentToolbarStyle">@style/Widget.SocialAgent.Toolbar</item>
+        <item name="socialAgentCheckBoxStyle">@style/Widget.SocialAgent.CheckBox</item>
+        <item name="socialAgentRadioButtonStyle">@style/Widget.SocialAgent.RadioButton</item>
+        <item name="socialAgentSwitchStyle">@style/Widget.SocialAgent.Switch</item>
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.SocialAgent.Dialog</item>
     </style>
 </resources>

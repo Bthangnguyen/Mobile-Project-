@@ -9,6 +9,32 @@
     <string name="nav_settings">Settings</string>
 
     <string name="placeholder_coming_soon">Coming soon</string>
+    <string name="action_done">Done</string>
+    <string name="action_cancel">Cancel</string>
+
+    <string name="status_connected">Connected</string>
+    <string name="status_disconnected">Disconnected</string>
+    <string name="status_connecting">Connecting</string>
+    <string name="status_expired">Expired</string>
+    <string name="status_draft">Draft</string>
+    <string name="status_queued">Queued</string>
+    <string name="status_pending_approval">Pending approval</string>
+    <string name="status_publishing">Publishing</string>
+    <string name="status_published">Published</string>
+    <string name="status_failed">Failed</string>
+    <string name="status_handed_off">Handed off</string>
+    <string name="agent_step_creating_brief">Creating brief</string>
+    <string name="agent_step_generating_outline">Generating outline</string>
+    <string name="agent_step_writing_draft">Writing draft</string>
+    <string name="agent_step_reviewing_content">Reviewing content</string>
+    <string name="agent_step_generating_image_prompt">Generating image prompt</string>
+    <string name="agent_step_generating_image">Generating image</string>
+    <string name="agent_step_completing_result">Completing result</string>
+    <string name="agent_progress_waiting">Waiting</string>
+    <string name="agent_progress_in_progress">In progress</string>
+    <string name="agent_progress_completed">Completed</string>
+    <string name="agent_progress_failed">Failed</string>
+    <string name="channel_status_content_description">%1$s account %2$s, %3$s</string>
 
     <string name="settings_language_title">Language</string>
     <string name="settings_language_description">Choose the language of the app. The screen reloads after you change it.</string>

@@ -81,17 +81,22 @@
         <!-- Tone Dropdown Field -->
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/layoutTone"
-            style="@style/Widget.SocialAgent.TextInputLayout"
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/component_spacing_small"
             android:hint="@string/compose_tone_hint"
+            app:boxCornerRadiusBottomEnd="@dimen/corner_radius_medium"
+            app:boxCornerRadiusBottomStart="@dimen/corner_radius_medium"
+            app:boxCornerRadiusTopEnd="@dimen/corner_radius_medium"
+            app:boxCornerRadiusTopStart="@dimen/corner_radius_medium"
             app:errorEnabled="true">
 
             <com.lttbdd.socialagent.core.ui.components.AppDropdown
                 android:id="@+id/actvTone"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content" />
+                android:layout_height="wrap_content"
+                android:inputType="none" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <!-- Language Selection -->

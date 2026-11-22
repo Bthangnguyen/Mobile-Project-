@@ -174,7 +174,7 @@ class ComposeFragment : Fragment() {
         }
 
         // Cập nhật nút Tiếp tục
-        binding.btnContinue.isEnabled = form.isFormValid && !state.isSubmitting
+        binding.btnContinue.isEnabled = form.isFormValid
     }
 
     override fun onDestroyView() {

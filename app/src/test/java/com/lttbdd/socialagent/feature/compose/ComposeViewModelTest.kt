@@ -1,12 +1,16 @@
 package com.lttbdd.socialagent.feature.compose
 
+import androidx.lifecycle.SavedStateHandle
 import com.lttbdd.socialagent.R
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.ContentLanguage
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -15,11 +19,13 @@ import org.junit.Test
 
 class ComposeViewModelTest {
 
+    private lateinit var savedStateHandle: SavedStateHandle
     private lateinit var viewModel: ComposeViewModel
 
     @Before
     fun setUp() {
-        viewModel = ComposeViewModel()
+        savedStateHandle = SavedStateHandle()
+        viewModel = ComposeViewModel(savedStateHandle)
     }
 
     @Test
@@ -187,6 +193,66 @@ class ComposeViewModelTest {
         val submittedEvent = event as ComposeEvent.BriefSubmitted
         assertEquals(brief, submittedEvent.brief)
         assertEquals(R.string.compose_submit_success, submittedEvent.messageRes)
+    }
+
+    @Test
+    fun `submit trims leading and trailing whitespace in TopicBrief`() = runTest {
+        viewModel.onTopicChanged("  Topic with spaces  ")
+        viewModel.onGoalChanged("  Grow reach  ")
+        viewModel.onAudienceChanged("  Mobile devs  ")
+        viewModel.onToneChanged("  friendly  ")
+        viewModel.onChannelToggled(ChannelType.FACEBOOK, true)
+
+        viewModel.onSubmit()
+
+        val brief = viewModel.uiState.value.submittedBrief
+        assertNotNull(brief)
+        assertEquals("Topic with spaces", brief?.topic)
+        assertEquals("Grow reach", brief?.goal)
+        assertEquals("Mobile devs", brief?.audience)
+        assertEquals("friendly", brief?.tone)
+    }
+
+    @Test
+    fun `submitting twice emits two BriefSubmitted events with distinct brief ids`() = runTest {
+        viewModel.onTopicChanged("Topic A")
+        viewModel.onGoalChanged("Goal A")
+        viewModel.onAudienceChanged("Audience A")
+        viewModel.onToneChanged("professional")
+        viewModel.onChannelToggled(ChannelType.FACEBOOK, true)
+
+        viewModel.onSubmit()
+        viewModel.onSubmit()
+
+        val emittedEvents = viewModel.events.take(2).toList()
+        assertEquals(2, emittedEvents.size)
+        val firstBrief = (emittedEvents[0] as ComposeEvent.BriefSubmitted).brief
+        val secondBrief = (emittedEvents[1] as ComposeEvent.BriefSubmitted).brief
+        assertNotEquals(firstBrief.id, secondBrief.id)
+        assertEquals("Topic A", secondBrief.topic)
+        assertEquals(secondBrief, viewModel.uiState.value.submittedBrief)
+    }
+
+    @Test
+    fun `recreating ViewModel with SavedStateHandle restores tone and all form fields after process death`() {
+        viewModel.onTopicChanged("Saved Topic")
+        viewModel.onGoalChanged("Saved Goal")
+        viewModel.onAudienceChanged("Saved Audience")
+        viewModel.onToneChanged("persuasive")
+        viewModel.onLanguageChanged(ContentLanguage.EN)
+        viewModel.onChannelToggled(ChannelType.FACEBOOK, true)
+        viewModel.onChannelToggled(ChannelType.LINKEDIN, true)
+
+        val restoredViewModel = ComposeViewModel(savedStateHandle)
+        val restoredForm = restoredViewModel.uiState.value.formState
+
+        assertEquals("Saved Topic", restoredForm.topic)
+        assertEquals("Saved Goal", restoredForm.goal)
+        assertEquals("Saved Audience", restoredForm.audience)
+        assertEquals("persuasive", restoredForm.tone)
+        assertEquals(ContentLanguage.EN, restoredForm.language)
+        assertEquals(setOf(ChannelType.FACEBOOK, ChannelType.LINKEDIN), restoredForm.selectedChannels)
+        assertTrue(restoredForm.isFormValid)
     }
 
     @Test

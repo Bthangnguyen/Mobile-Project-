@@ -42,7 +42,6 @@ data class TopicFormState(
 data class ComposeUiState(
     val formState: TopicFormState = TopicFormState(),
     val submittedBrief: TopicBrief? = null,
-    val isSubmitting: Boolean = false,
 )
 
 /**

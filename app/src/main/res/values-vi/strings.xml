@@ -190,4 +190,24 @@
     <string name="tone_casual">Gần gũi</string>
     <string name="tone_inspirational">Truyền cảm hứng</string>
     <string name="tone_persuasive">Thuyết phục</string>
+
+    <!-- Feature F4: Kiểm duyệt bản nháp (Issue #33) -->
+    <string name="review_header_title">Bản nháp &amp; Duyệt bài</string>
+    <string name="review_header_subtitle">Kiểm tra và duyệt bản nháp AI tạo trước khi đăng. Agent không bao giờ tự động đăng bài.</string>
+    <string name="review_empty_title">Chưa có bản nháp nào</string>
+    <string name="review_empty_message">Hãy tạo chủ đề mới. Bản nháp AI sinh ra sẽ xuất hiện tại đây để bạn duyệt trước khi đăng.</string>
+    <string name="review_status_approved">Đã duyệt</string>
+    <string name="review_approval_required_hint">Cần người dùng duyệt trước khi có thể đăng bài này.</string>
+    <string name="review_action_approve">Duyệt bài</string>
+    <string name="review_action_revoke">Bỏ duyệt</string>
+    <string name="review_action_publish">Đăng bài</string>
+    <string name="review_approve_dialog_title">Xác nhận duyệt bản nháp?</string>
+    <string name="review_approve_dialog_message">Xác nhận bạn đã kiểm tra nội dung và cho phép đăng bài này khi bạn bấm Đăng.</string>
+    <string name="review_draft_approved_message">Đã duyệt bản nháp. Bạn có thể bấm Đăng bài.</string>
+    <string name="review_draft_revoked_message">Đã bỏ duyệt. Nút đăng bài đã được khóa lại.</string>
+    <string name="review_draft_approve_failed">Không thể duyệt bản nháp trống hoặc không tồn tại.</string>
+    <string name="review_draft_action_failed">Không thể cập nhật bản nháp. Vui lòng thử lại.</string>
+    <string name="review_publish_blocked_unapproved">Bản nháp chưa được duyệt nên không thể đăng bài.</string>
+    <string name="review_publish_blocked_empty">Bản nháp đang trống nội dung nên không thể đăng bài.</string>
+    <string name="review_publish_ready_message">Bản nháp đã qua kiểm duyệt và sẵn sàng đăng bài.</string>
 </resources>

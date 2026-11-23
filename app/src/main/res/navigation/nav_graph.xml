@@ -21,13 +21,8 @@
 
     <fragment
         android:id="@+id/postsFragment"
-        android:name="com.lttbdd.socialagent.core.ui.PlaceholderFragment"
-        android:label="@string/nav_posts">
-        <argument
-            android:name="titleRes"
-            android:defaultValue="@string/nav_posts"
-            app:argType="reference" />
-    </fragment>
+        android:name="com.lttbdd.socialagent.feature.review.ReviewDraftsFragment"
+        android:label="@string/nav_posts" />
 
     <fragment
         android:id="@+id/commentsFragment"

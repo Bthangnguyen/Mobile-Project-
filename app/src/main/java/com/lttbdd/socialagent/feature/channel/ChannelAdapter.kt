@@ -51,9 +51,9 @@ class ChannelAdapter(
             binding.tvDisplayName.text = account.displayName
 
             val statusText = when (account.status) {
-                ConnectionStatus.CONNECTED -> context.getString(R.string.channel_status_connected)
+                ConnectionStatus.CONNECTED -> context.getString(R.string.status_connected)
                 ConnectionStatus.TOKEN_EXPIRED -> context.getString(R.string.channel_status_expired)
-                ConnectionStatus.DISCONNECTED -> context.getString(R.string.channel_status_disconnected)
+                ConnectionStatus.DISCONNECTED -> context.getString(R.string.status_disconnected)
             }
             binding.tvStatus.text = statusText
             binding.tvStatus.setTextColor(

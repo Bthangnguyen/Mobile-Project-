@@ -38,12 +38,12 @@
 
     <!-- F1 Channel Management -->
     <string name="channel_title">My Channels</string>
+    <string name="channel_settings_description">Connect Facebook Pages and LinkedIn, and check what each channel supports.</string>
+    <string name="channel_settings_manage">Manage channels</string>
     <string name="channel_subtitle">Connected social media accounts and platform capability statuses</string>
     <string name="channel_connect_facebook">Connect Facebook Page</string>
     <string name="channel_connect_linkedin">Connect LinkedIn</string>
-    <string name="channel_status_connected">Connected</string>
     <string name="channel_status_expired">Token Expired</string>
-    <string name="channel_status_disconnected">Disconnected</string>
     <string name="channel_empty_desc">Connect a channel (Facebook Page or LinkedIn) to view platform capability statuses</string>
     <string name="channel_capabilities_header">Platform Capabilities Matrix:</string>
     <string name="channel_facebook_login_error">Facebook login error</string>
@@ -64,6 +64,21 @@
     <string name="channel_demo_facebook_name">[DEMO] Facebook Page</string>
     <string name="channel_demo_linkedin_name">[DEMO] LinkedIn Member</string>
     <string name="channel_demo_mode_notice">%1$s is not configured in local.properties, connecting in demo mode (no real login)</string>
+
+    <string name="channel_error_network">Network error. Check your connection and try again.</string>
+    <string name="channel_error_linkedin_config">LinkedIn sign-in is not configured correctly (the server address must be HTTPS).</string>
+    <string name="channel_error_linkedin_session">Could not start the LinkedIn sign-in. Please try again.</string>
+    <string name="channel_error_linkedin_exchange">Could not complete the LinkedIn sign-in. Please sign in again.</string>
+    <string name="channel_error_linkedin_token_invalid">The sign-in server returned an invalid response. Please try again.</string>
+    <string name="channel_error_linkedin_profile">Could not read your LinkedIn account information. Please try again.</string>
+    <string name="channel_error_facebook_profile">Could not read your Facebook profile. Please try again.</string>
+    <string name="channel_type_facebook">Facebook</string>
+    <string name="channel_type_linkedin">LinkedIn</string>
+    <string name="channel_linkedin_session_expired">The LinkedIn sign-in session has expired. Please tap Connect LinkedIn again.</string>
+    <string name="channel_retry_load">Try again</string>
+    <string name="channel_error_save_failed">Could not save the channel connection. Please try again.</string>
+    <string name="channel_error_load_failed">Could not load connected channels. Please try again.</string>
+    <string name="channel_not_configured_notice">%1$s is not configured in local.properties, so real sign-in is unavailable in this build.</string>
 
     <!-- 5 Capabilities Rows -->
     <string name="cap_publish">Publishing</string>
@@ -101,13 +116,6 @@
     <string name="cap_li_mention_handed_off">Mention needs the target person/organization URN and there is no API to look it up; Social Agent hands it off and you add the mention yourself</string>
     <string name="cap_li_metrics_ok">Ready to read statistics via GET /rest/organizationalEntityShareStatistics (rw_organization_admin granted)</string>
     <string name="cap_li_metrics_handed_off">Not available through the API for this app (needs LinkedIn Community Management API approval); Social Agent notifies you and you check statistics on LinkedIn yourself</string>
-    <string name="channel_error_network">Network error. Check your connection and try again.</string>
-    <string name="channel_error_linkedin_config">LinkedIn sign-in is not configured correctly (the server address must be HTTPS).</string>
-    <string name="channel_error_linkedin_session">Could not start the LinkedIn sign-in. Please try again.</string>
-    <string name="channel_error_linkedin_exchange">Could not complete the LinkedIn sign-in. Please sign in again.</string>
-    <string name="channel_error_linkedin_token_invalid">The sign-in server returned an invalid response. Please try again.</string>
-    <string name="channel_error_linkedin_profile">Could not read your LinkedIn account information. Please try again.</string>
-    <string name="channel_error_facebook_profile">Could not read your Facebook profile. Please try again.</string>
     <string name="cap_fb_publish_no_task">Your Facebook account needs the Page task CREATE_CONTENT on this Page</string>
     <string name="cap_fb_read_comments_no_task">Your Facebook account needs the Page task MODERATE on this Page</string>
     <string name="cap_fb_reply_no_task">Your Facebook account needs the Page tasks MODERATE and CREATE_CONTENT on this Page</string>
@@ -120,13 +128,6 @@
     <!-- Tên ngôn ngữ viết bằng chính ngôn ngữ đó để người dùng luôn nhận ra. -->
     <string name="settings_language_vietnamese">Tiếng Việt</string>
     <string name="settings_language_english">English</string>
-    <string name="channel_type_facebook">Facebook</string>
-    <string name="channel_type_linkedin">LinkedIn</string>
-    <string name="channel_linkedin_session_expired">The LinkedIn sign-in session has expired. Please tap Connect LinkedIn again.</string>
-    <string name="channel_retry_load">Try again</string>
-    <string name="channel_error_save_failed">Could not save the channel connection. Please try again.</string>
-    <string name="channel_error_load_failed">Could not load connected channels. Please try again.</string>
-    <string name="channel_not_configured_notice">%1$s is not configured in local.properties, so real sign-in is unavailable in this build.</string>
 
     <!-- Quản lý BYOK, Issue #53. -->
     <string name="api_keys_title">LLM API keys</string>

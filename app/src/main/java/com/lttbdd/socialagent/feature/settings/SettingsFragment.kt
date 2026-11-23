@@ -5,6 +5,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.RadioGroup
+import androidx.annotation.IdRes
 import androidx.core.view.ViewCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
@@ -41,6 +42,7 @@ class SettingsFragment : Fragment() {
         ViewCompat.setAccessibilityHeading(binding.settingsTitle, true)
         ViewCompat.setAccessibilityHeading(binding.languageTitle, true)
         ViewCompat.setAccessibilityHeading(binding.apiKeysSectionTitle, true)
+        ViewCompat.setAccessibilityHeading(binding.channelsSectionTitle, true)
         binding.manageApiKeys.setOnClickListener { navigateFromSettings(R.id.action_settings_to_api_keys) }
         binding.manageChannels.setOnClickListener { navigateFromSettings(R.id.action_settings_to_channels) }
 
@@ -65,7 +67,7 @@ class SettingsFragment : Fragment() {
     }
 
     /** Bỏ qua lần bấm lặp khi đã rời màn Cài đặt. */
-    private fun navigateFromSettings(@androidx.annotation.IdRes actionId: Int) {
+    private fun navigateFromSettings(@IdRes actionId: Int) {
         val navController = findNavController()
         if (navController.currentDestination?.id == R.id.settingsFragment) {
             navController.navigate(actionId)

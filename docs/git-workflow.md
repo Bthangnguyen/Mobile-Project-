@@ -61,9 +61,14 @@ nên mỗi bước dưới đây đều có hạn:
 | Xem lại và Approve (hoặc nêu rõ còn thiếu gì) | Người đã Request changes | **24 giờ** sau khi được re-request |
 | Merge | Tác giả | **24 giờ** sau khi đủ 2 approve và CI xanh |
 
-Quá hạn thì nhắc trực tiếp trong nhóm chat. Nếu reviewer vẫn không phản hồi sau **48 giờ** kể từ lúc được nhắc,
-chủ repo có thể **Dismiss review** cũ, ghi rõ lý do trong PR, và nhờ người còn lại review thay.
-PR vẫn phải đủ 2 approve như bình thường.
+Quá hạn thì nhắc trực tiếp trong nhóm chat. Nếu vẫn không có phản hồi sau **48 giờ** kể từ lúc được nhắc:
+
+- **Đã Request changes, tác giả đã sửa và re-request, nhưng người đó không xem lại:** chủ repo **Dismiss review**
+  đang chặn, ghi rõ lý do trong PR (đã sửa những điểm nào, đã nhắc lúc nào).
+- **Chưa từng review** (không có review nào để dismiss): tác giả gỡ người đó khỏi danh sách Reviewers
+  và gắn thành viên còn lại review thay.
+
+Cả hai trường hợp PR vẫn phải đủ 2 approve như bình thường.
 
 ## Reviewer xoay vòng
 

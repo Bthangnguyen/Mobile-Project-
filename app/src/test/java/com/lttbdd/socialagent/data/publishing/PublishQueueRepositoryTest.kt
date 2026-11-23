@@ -18,7 +18,9 @@ import com.lttbdd.socialagent.core.social.SocialChannelClient
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -402,6 +404,127 @@ class PublishQueueRepositoryTest {
         assertEquals(PostStatus.PUBLISHED, post(id).status)
     }
 
+    // ---------- Sửa theo review #93 ----------
+
+    @Test
+    fun `worker rerun before stale window schedules delayed check then post becomes confirmable`() = runTest {
+        saveDraft()
+        val postDao = db.postDao()
+        // Worker trước bị dừng khi đang gọi API vài giây trước; WorkManager chạy lại ngay.
+        postDao.insertIfAbsent(
+            existingPost("interrupted", PostStatus.PUBLISHING, createdAt = 1)
+                .copy(attemptStartedAtMillis = nowMillis - 5_000),
+        )
+        val repo = repository()
+
+        val rerun = repo.processQueue()
+
+        assertEquals(1, rerun.inFlight)
+        assertEquals(1, scheduler.staleCheckDelays.size)
+        assertTrue(
+            "Lượt kiểm tra phải chạy sau khi bài đã quá hạn",
+            scheduler.staleCheckDelays.single() > PublishQueueRepository.STALE_PUBLISHING_MILLIS,
+        )
+        assertFalse(repo.confirmPublishedManually("interrupted"))
+
+        nowMillis += scheduler.staleCheckDelays.single()
+        val check = repo.processQueue()
+
+        assertEquals(0, check.inFlight)
+        assertTrue(post("interrupted").outcomeUnknown)
+        assertTrue(repo.confirmPublishedManually("interrupted"))
+        assertEquals(0, facebook.calls)
+    }
+
+    @Test
+    fun `no stale check is scheduled when nothing is in flight`() = runTest {
+        saveDraft()
+        val repo = repository()
+        queuedId(repo)
+
+        repo.processQueue()
+
+        assertTrue(scheduler.staleCheckDelays.isEmpty())
+    }
+
+    @Test
+    fun `confirm and requeue pressed at the same time only one wins`() = runTest {
+        saveDraft()
+        val repo = repository()
+        val id = queuedId(repo)
+        facebook.next(SocketTimeoutException())
+        repo.processQueue()
+
+        val confirm = async { repo.confirmPublishedManually(id) }
+        val requeue = async { repo.requeueAfterUserCheck(id) }
+        val confirmed = confirm.await()
+        val requeued = requeue.await()
+
+        assertTrue("Đúng một thao tác được áp dụng", confirmed xor requeued)
+        val expected = if (confirmed) PostStatus.PUBLISHED else PostStatus.QUEUED
+        assertEquals(expected, post(id).status)
+        assertFalse(post(id).outcomeUnknown)
+    }
+
+    @Test
+    fun `confirmed post cannot be requeued afterwards`() = runTest {
+        saveDraft()
+        val repo = repository()
+        val id = queuedId(repo)
+        facebook.next(SocketTimeoutException())
+        repo.processQueue()
+
+        assertTrue(repo.confirmPublishedManually(id))
+        assertFalse(repo.requeueAfterUserCheck(id))
+        repo.processQueue()
+
+        assertEquals(PostStatus.PUBLISHED, post(id).status)
+        assertEquals(1, facebook.calls)
+    }
+
+    @Test
+    fun `retryable error stops after max attempts`() = runTest {
+        saveDraft()
+        val repo = repository()
+        val id = queuedId(repo)
+        repeat(PublishQueueRepository.MAX_RETRYABLE_ATTEMPTS) {
+            facebook.next(PublishResult.RetryableError("server_error"))
+        }
+
+        repeat(PublishQueueRepository.MAX_RETRYABLE_ATTEMPTS - 1) {
+            assertTrue(repo.processQueue().shouldRetry)
+        }
+        val last = repo.processQueue()
+
+        assertEquals(1, last.failed)
+        assertFalse(last.shouldRetry)
+        assertEquals(PostStatus.FAILED, post(id).status)
+        assertEquals("retry_limit_reached (server_error)", post(id).errorMessage)
+        assertEquals(PublishQueueRepository.MAX_RETRYABLE_ATTEMPTS, facebook.calls)
+    }
+
+    @Test
+    fun `timeout cancellation inside client is treated as unknown outcome`() = runTest {
+        saveDraft()
+        val repo = repository()
+        val id = queuedId(repo)
+        val timeout = runCatching { withTimeout(1) { awaitCancellation() } }.exceptionOrNull()!!
+        facebook.next(timeout)
+
+        val result = repo.processQueue()
+
+        assertEquals(1, result.needsConfirmation)
+        assertTrue(post(id).outcomeUnknown)
+        assertEquals(PostStatus.PUBLISHING, post(id).status)
+    }
+
+    @Test
+    fun `resume on app start schedules worker`() = runTest {
+        repository().resumePendingWork()
+
+        assertEquals(1, scheduler.calls)
+    }
+
     // ---------- Test doubles ----------
 
     private fun existingPost(
@@ -425,8 +548,13 @@ class PublishQueueRepositoryTest {
 
     private class CountingScheduler : PublishScheduler {
         var calls = 0
+        val staleCheckDelays = mutableListOf<Long>()
         override fun schedule() {
             calls++
+        }
+
+        override fun scheduleStaleCheck(delayMillis: Long) {
+            staleCheckDelays += delayMillis
         }
     }
 
@@ -446,7 +574,7 @@ class PublishQueueRepositoryTest {
             gate?.await()
             return when (val outcome = script.removeFirstOrNull()) {
                 null -> PublishResult.Success("auto-${keys.size}", "https://example.com/${keys.size}")
-                is Exception -> throw outcome
+                is Throwable -> throw outcome
                 else -> outcome as PublishResult
             }
         }

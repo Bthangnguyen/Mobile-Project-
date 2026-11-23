@@ -10,6 +10,7 @@ import com.lttbdd.socialagent.core.model.PostStatus
 import com.lttbdd.socialagent.core.model.PublishResult
 import com.lttbdd.socialagent.core.social.SocialChannelClient
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.Flow
 import java.net.ConnectException
 import java.net.UnknownHostException
@@ -45,6 +46,8 @@ data class QueueRunResult(
     val retryLater: Int = 0,
     val failed: Int = 0,
     val needsConfirmation: Int = 0,
+    /** Bài còn đang PUBLISHING chưa quá hạn sau lượt này — đã hẹn lượt kiểm tra trễ. */
+    val inFlight: Int = 0,
 ) {
     val shouldRetry: Boolean get() = retryLater > 0
 }
@@ -130,38 +133,28 @@ class PublishQueueRepository @Inject constructor(
                 Outcome.SKIPPED -> result
             }
         }
-        return result
+        // Bài kẹt PUBLISHING chưa quá hạn (worker trước bị dừng giữa chừng) sẽ không còn ai xử lý nếu không hẹn
+        // lượt sau: hẹn kiểm tra lại khi đã quá STALE_PUBLISHING_MILLIS để chuyển nó sang "chờ xác nhận".
+        val inFlight = postDao.countInFlight()
+        if (inFlight > 0) scheduler.scheduleStaleCheck(STALE_PUBLISHING_MILLIS + STALE_CHECK_MARGIN_MILLIS)
+        return result.copy(inFlight = inFlight)
+    }
+
+    /** Gọi khi app khởi động: hẹn worker để xử lý bài QUEUED/PUBLISHING còn sót (app bị tắt trước khi kịp hẹn). */
+    fun resumePendingWork() {
+        scheduler.schedule()
     }
 
     /** Người dùng xác nhận bài không rõ kết quả thật ra ĐÃ lên mạng xã hội. */
-    suspend fun confirmPublishedManually(postId: String, url: String? = null): Boolean {
-        val post = postDao.getById(postId)?.takeIf { it.needsConfirmation() } ?: return false
-        postDao.update(
-            post.copy(
-                status = PostStatus.PUBLISHED,
-                url = url ?: post.url,
-                outcomeUnknown = false,
-                errorMessage = null,
-                updatedAtMillis = clock.nowMillis(),
-            ),
-        )
-        return true
-    }
+    suspend fun confirmPublishedManually(postId: String, url: String? = null): Boolean =
+        postDao.resolveUnknownAsPublished(postId, url, clock.nowMillis()) == 1
 
     /**
      * Người dùng đã kiểm tra trên mạng xã hội và bài CHƯA được đăng: đưa lại vào hàng đợi với cùng
      * idempotencyKey (client vẫn phải chặn trùng theo hợp đồng).
      */
     suspend fun requeueAfterUserCheck(postId: String): Boolean {
-        val post = postDao.getById(postId)?.takeIf { it.needsConfirmation() } ?: return false
-        postDao.update(
-            post.copy(
-                status = PostStatus.QUEUED,
-                outcomeUnknown = false,
-                errorMessage = null,
-                updatedAtMillis = clock.nowMillis(),
-            ),
-        )
+        if (postDao.requeueUnknown(postId, clock.nowMillis()) == 0) return false
         scheduler.schedule()
         return true
     }
@@ -178,6 +171,9 @@ class PublishQueueRepository @Inject constructor(
 
         val result = try {
             client.publish(draft.toModel(), post.idempotencyKey)
+        } catch (e: TimeoutCancellationException) {
+            // withTimeout hết giờ khi đang chờ response: request có thể đã tới server.
+            return post.markOutcomeUnknown(e)
         } catch (e: CancellationException) {
             // Bài vẫn ở PUBLISHING; lượt sau sẽ coi là không rõ kết quả sau STALE_PUBLISHING_MILLIS.
             throw e
@@ -204,7 +200,12 @@ class PublishQueueRepository @Inject constructor(
                 )
                 Outcome.PUBLISHED
             }
-            is PublishResult.RetryableError -> post.requeue(result.reason)
+            is PublishResult.RetryableError ->
+                if (post.attemptCount >= MAX_RETRYABLE_ATTEMPTS) {
+                    post.fail("$REASON_RETRY_LIMIT (${result.reason})")
+                } else {
+                    post.requeue(result.reason)
+                }
             is PublishResult.PermanentError -> post.fail(result.reason)
         }
     }
@@ -231,14 +232,18 @@ class PublishQueueRepository @Inject constructor(
         return Outcome.NEEDS_CONFIRMATION
     }
 
-    private fun PostEntity.needsConfirmation() =
-        status == PostStatus.PUBLISHING && outcomeUnknown && remotePostId == null
-
     private enum class Outcome { PUBLISHED, RETRY_LATER, FAILED, NEEDS_CONFIRMATION, SKIPPED }
 
     companion object {
         /** Worker của WorkManager bị dừng sau tối đa 10 phút; quá mốc này mà còn PUBLISHING thì lượt đó đã chết. */
         const val STALE_PUBLISHING_MILLIS = 15 * 60 * 1000L
+        private const val STALE_CHECK_MARGIN_MILLIS = 60 * 1000L
+
+        /**
+         * Số lần gọi API tối đa khi kênh trả lỗi tạm thời (5xx, rate limit). Lỗi chưa gửi được request
+         * (mất mạng) không bị giới hạn vì worker chỉ chạy khi có mạng. Đọc `retryAfterMillis`: #39.
+         */
+        const val MAX_RETRYABLE_ATTEMPTS = 8
 
         /** Trạng thái chặn tạo bài mới cho cùng bản nháp. */
         private val ACTIVE_STATUSES = setOf(PostStatus.QUEUED, PostStatus.PUBLISHING, PostStatus.HANDED_OFF)
@@ -249,5 +254,6 @@ class PublishQueueRepository @Inject constructor(
         const val REASON_DRAFT_MISSING = "draft_missing"
         const val REASON_NOT_APPROVED = "draft_not_approved"
         const val REASON_NO_CLIENT = "channel_not_supported"
+        const val REASON_RETRY_LIMIT = "retry_limit_reached"
     }
 }

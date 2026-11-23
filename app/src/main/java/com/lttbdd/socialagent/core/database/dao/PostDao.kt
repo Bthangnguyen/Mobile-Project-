@@ -81,4 +81,43 @@ interface PostDao {
         nowMillis: Long,
         publishing: PostStatus = PostStatus.PUBLISHING,
     ): Int
+
+    /** Số bài đang [PostStatus.PUBLISHING] mà chưa bị coi là không rõ kết quả (có thể worker khác đang đăng). */
+    @Query("SELECT COUNT(*) FROM posts WHERE status = :publishing AND outcomeUnknown = 0 AND remotePostId IS NULL")
+    suspend fun countInFlight(publishing: PostStatus = PostStatus.PUBLISHING): Int
+
+    /**
+     * Người dùng xác nhận bài không rõ kết quả ĐÃ lên mạng xã hội. Một câu lệnh có điều kiện nên hai thao tác
+     * xác nhận/đưa lại hàng đợi bấm cùng lúc không ghi đè nhau. Trả về 1 nếu thành công, 0 nếu bài không còn chờ xác nhận.
+     */
+    @Query(
+        """
+        UPDATE posts
+        SET status = :published, url = COALESCE(:url, url), outcomeUnknown = 0, errorMessage = NULL,
+            updatedAtMillis = :nowMillis
+        WHERE id = :id AND status = :publishing AND outcomeUnknown = 1 AND remotePostId IS NULL
+        """,
+    )
+    suspend fun resolveUnknownAsPublished(
+        id: String,
+        url: String?,
+        nowMillis: Long,
+        publishing: PostStatus = PostStatus.PUBLISHING,
+        published: PostStatus = PostStatus.PUBLISHED,
+    ): Int
+
+    /** Người dùng xác nhận bài CHƯA được đăng: đưa lại hàng đợi. Cùng điều kiện với [resolveUnknownAsPublished]. */
+    @Query(
+        """
+        UPDATE posts
+        SET status = :queued, outcomeUnknown = 0, errorMessage = NULL, updatedAtMillis = :nowMillis
+        WHERE id = :id AND status = :publishing AND outcomeUnknown = 1 AND remotePostId IS NULL
+        """,
+    )
+    suspend fun requeueUnknown(
+        id: String,
+        nowMillis: Long,
+        publishing: PostStatus = PostStatus.PUBLISHING,
+        queued: PostStatus = PostStatus.QUEUED,
+    ): Int
 }

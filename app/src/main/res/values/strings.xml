@@ -36,6 +36,92 @@
     <string name="agent_progress_failed">Failed</string>
     <string name="channel_status_content_description">%1$s account %2$s, %3$s</string>
 
+    <!-- F1 Channel Management -->
+    <string name="channel_title">My Channels</string>
+    <string name="channel_settings_description">Connect Facebook Pages and LinkedIn, and check what each channel supports.</string>
+    <string name="channel_settings_manage">Manage channels</string>
+    <string name="channel_subtitle">Connected social media accounts and platform capability statuses</string>
+    <string name="channel_connect_facebook">Connect Facebook Page</string>
+    <string name="channel_connect_linkedin">Connect LinkedIn</string>
+    <string name="channel_status_expired">Token Expired</string>
+    <string name="channel_empty_desc">Connect a channel (Facebook Page or LinkedIn) to view platform capability statuses</string>
+    <string name="channel_capabilities_header">Platform Capabilities Matrix:</string>
+    <string name="channel_facebook_login_error">Facebook login error</string>
+    <string name="channel_facebook_cancel_title">Facebook login cancelled</string>
+    <string name="channel_facebook_cancel_message">Do you want to log in with a different Facebook account?</string>
+    <string name="channel_facebook_login_another">Use another account</string>
+    <string name="channel_facebook_pick_page_title">Choose a Facebook Page</string>
+    <string name="channel_facebook_no_pages">No Facebook Page was found for this account, so it was connected with the personal profile. A Page is required to publish.</string>
+    <string name="channel_facebook_pages_load_failed">Could not load your Facebook Pages. Check your connection and try again.</string>
+    <string name="channel_connected_named">Connected %1$s</string>
+    <string name="channel_oauth_state_mismatch">Login could not be verified (state mismatch). Please try again.</string>
+    <string name="channel_oauth_error_generic">Could not connect the channel. Please try again.</string>
+    <string name="channel_close">Close</string>
+    <string name="channel_linkedin_cancelled">LinkedIn login was cancelled</string>
+    <string name="channel_linkedin_login_failed">LinkedIn login failed. Please try again.</string>
+    <string name="channel_linkedin_login_timeout">LinkedIn login timed out. Please try again.</string>
+    <string name="channel_linkedin_no_browser">No browser found to sign in to LinkedIn.</string>
+    <string name="channel_demo_facebook_name">[DEMO] Facebook Page</string>
+    <string name="channel_demo_linkedin_name">[DEMO] LinkedIn Member</string>
+    <string name="channel_demo_mode_notice">%1$s is not configured in local.properties, connecting in demo mode (no real login)</string>
+
+    <string name="channel_error_network">Network error. Check your connection and try again.</string>
+    <string name="channel_error_linkedin_config">LinkedIn sign-in is not configured correctly (the server address must be HTTPS).</string>
+    <string name="channel_error_linkedin_session">Could not start the LinkedIn sign-in. Please try again.</string>
+    <string name="channel_error_linkedin_exchange">Could not complete the LinkedIn sign-in. Please sign in again.</string>
+    <string name="channel_error_linkedin_token_invalid">The sign-in server returned an invalid response. Please try again.</string>
+    <string name="channel_error_linkedin_profile">Could not read your LinkedIn account information. Please try again.</string>
+    <string name="channel_error_facebook_profile">Could not read your Facebook profile. Please try again.</string>
+    <string name="channel_type_facebook">Facebook</string>
+    <string name="channel_type_linkedin">LinkedIn</string>
+    <string name="channel_linkedin_session_expired">The LinkedIn sign-in session has expired. Please tap Connect LinkedIn again.</string>
+    <string name="channel_retry_load">Try again</string>
+    <string name="channel_error_save_failed">Could not save the channel connection. Please try again.</string>
+    <string name="channel_error_load_failed">Could not load connected channels. Please try again.</string>
+    <string name="channel_not_configured_notice">%1$s is not configured in local.properties, so real sign-in is unavailable in this build.</string>
+
+    <!-- 5 Capabilities Rows -->
+    <string name="cap_publish">Publishing</string>
+    <string name="cap_read_comments">Read Comments</string>
+    <string name="cap_reply">Reply Comments</string>
+    <string name="cap_mention">Mention</string>
+    <string name="cap_metrics">Metrics &amp; Analytics</string>
+
+    <!-- Capability Statuses -->
+    <string name="cap_status_supported">Supported ✅</string>
+    <string name="cap_status_requires_perm">Requires Permission ⚠️</string>
+    <string name="cap_status_requires_reconnect">Reconnect required</string>
+    <string name="cap_token_expired">The connection has expired. Sign in again to use this feature.</string>
+    <string name="cap_status_handed_off">Manual hand-off ✋</string>
+
+    <!-- Capability Captions -->
+    <string name="cap_fb_account_type_unknown">The saved connection does not identify the Facebook account type. Reconnect to check Page access.</string>
+    <string name="cap_fb_needs_page">This feature requires a Facebook Page and the relevant permissions.</string>
+    <string name="cap_fb_publish_ok">Ready to publish via POST /{page-id}/feed (pages_manage_posts granted)</string>
+    <string name="cap_fb_publish_no_perm">Missing required permission: pages_manage_posts</string>
+    <string name="cap_fb_read_comments_ok">Ready to read comments via GET /{post-id}/comments (pages_read_engagement granted)</string>
+    <string name="cap_fb_read_comments_no_perm">Missing required permission: pages_read_engagement or pages_read_user_content</string>
+    <string name="cap_fb_reply_ok">Ready to reply via POST /{comment-id}/comments (pages_manage_engagement granted)</string>
+    <string name="cap_fb_reply_no_perm">Missing required permission: pages_manage_engagement</string>
+    <string name="cap_fb_mention_handed_off">Mention is only documented in comments/replies when the Page has Page Mentioning enabled; not verified, so Social Agent hands it off and you add the mention yourself</string>
+    <string name="cap_fb_metrics_ok">Ready to read insights via GET /{post-id}/insights (read_insights granted)</string>
+    <string name="cap_fb_metrics_no_perm">Missing required permission: read_insights, pages_read_engagement</string>
+
+    <string name="cap_li_publish_ok">Ready to publish via POST /rest/posts (w_organization_social / w_member_social granted)</string>
+    <string name="cap_li_publish_no_perm">Missing required permission: w_organization_social or w_member_social</string>
+    <string name="cap_li_read_comments_ok">Ready to read comments via GET /rest/socialActions/{urn}/comments (r_organization_social_feed granted)</string>
+    <string name="cap_li_read_comments_handed_off">Not available through the API for this app (needs LinkedIn Community Management API approval); Social Agent notifies you and you read comments on LinkedIn yourself</string>
+    <string name="cap_li_reply_ok">Ready to reply via POST /rest/socialActions/{urn}/comments (w_organization_social_feed granted)</string>
+    <string name="cap_li_reply_handed_off">Not available through the API for this app (needs LinkedIn Community Management API approval); Social Agent notifies you and you reply on LinkedIn yourself</string>
+    <string name="cap_li_mention_handed_off">Mention needs the target person/organization URN and there is no API to look it up; Social Agent hands it off and you add the mention yourself</string>
+    <string name="cap_li_metrics_ok">Ready to read statistics via GET /rest/organizationalEntityShareStatistics (rw_organization_admin granted)</string>
+    <string name="cap_li_metrics_handed_off">Not available through the API for this app (needs LinkedIn Community Management API approval); Social Agent notifies you and you check statistics on LinkedIn yourself</string>
+    <string name="cap_fb_publish_no_task">Your Facebook account needs the Page task CREATE_CONTENT on this Page</string>
+    <string name="cap_fb_read_comments_no_task">Your Facebook account needs the Page task MODERATE on this Page</string>
+    <string name="cap_fb_reply_no_task">Your Facebook account needs the Page tasks MODERATE and CREATE_CONTENT on this Page</string>
+    <string name="cap_fb_metrics_no_task">Your Facebook account needs the Page task ANALYZE on this Page</string>
+
+    <!-- Settings strings -->
     <string name="settings_language_title">Language</string>
     <string name="settings_language_description">Choose the language of the app. The screen reloads after you change it.</string>
     <string name="settings_language_system">System default</string>

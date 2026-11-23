@@ -25,4 +25,19 @@
     <color name="brand_info">#A5C8FF</color>
     <color name="brand_disabled">#9A9BA5</color>
     <color name="brand_status_surface">#30323B</color>
+
+    <!-- Màu màn hình Kênh. -->
+    <color name="channel_status_connected">#81C784</color>
+    <color name="channel_status_expired">#FFB74D</color>
+    <color name="channel_status_disconnected">#BDBDBD</color>
+    <color name="cap_supported_bg">#1B3A1F</color>
+    <color name="cap_supported_text">#A5D6A7</color>
+    <color name="cap_requires_bg">#4A2E0A</color>
+    <color name="cap_requires_text">#FFB74D</color>
+    <color name="cap_not_supported_bg">#4A1C1C</color>
+    <color name="cap_not_supported_text">#EF9A9A</color>
+    <color name="cap_unverified_bg">#2C2C2C</color>
+    <color name="cap_unverified_text">#BDBDBD</color>
+    <color name="cap_handed_off_bg">#12304D</color>
+    <color name="cap_handed_off_text">#90CAF9</color>
 </resources>

@@ -36,4 +36,49 @@ interface PostDao {
 
     @Update
     suspend fun update(post: PostEntity)
+
+    @Query("SELECT * FROM posts WHERE id = :id")
+    suspend fun getById(id: String): PostEntity?
+
+    @Query("SELECT * FROM posts WHERE draftId = :draftId ORDER BY createdAtMillis DESC")
+    suspend fun getByDraft(draftId: String): List<PostEntity>
+
+    /**
+     * Giữ chỗ một bài để đăng (#38): chỉ chuyển [PostStatus.QUEUED] → [PostStatus.PUBLISHING] trong MỘT câu lệnh,
+     * ghi `attemptStartedAtMillis` **trước** khi gọi API. Trả về 1 nếu giữ chỗ thành công, 0 nếu bài đã bị
+     * worker khác lấy hoặc không còn ở hàng đợi — nhờ vậy hai worker chạy song song không gọi API hai lần.
+     */
+    @Query(
+        """
+        UPDATE posts
+        SET status = :publishing, attemptStartedAtMillis = :nowMillis, outcomeUnknown = 0,
+            attemptCount = attemptCount + 1, updatedAtMillis = :nowMillis
+        WHERE id = :id AND status = :queued
+        """,
+    )
+    suspend fun claimForPublishing(
+        id: String,
+        nowMillis: Long,
+        queued: PostStatus = PostStatus.QUEUED,
+        publishing: PostStatus = PostStatus.PUBLISHING,
+    ): Int
+
+    /**
+     * Bài kẹt ở [PostStatus.PUBLISHING] quá [startedBeforeMillis] mà chưa có `remotePostId` (process bị huỷ giữa
+     * chừng, hoặc gọi API xong nhưng ghi DB lỗi) bị đánh dấu `outcomeUnknown`: không biết đã lên mạng xã hội chưa,
+     * nên không được tự đăng lại. Trả về số bài bị đánh dấu.
+     */
+    @Query(
+        """
+        UPDATE posts
+        SET outcomeUnknown = 1, updatedAtMillis = :nowMillis
+        WHERE status = :publishing AND remotePostId IS NULL AND outcomeUnknown = 0
+          AND attemptStartedAtMillis < :startedBeforeMillis
+        """,
+    )
+    suspend fun markStalePublishingAsUnknown(
+        startedBeforeMillis: Long,
+        nowMillis: Long,
+        publishing: PostStatus = PostStatus.PUBLISHING,
+    ): Int
 }

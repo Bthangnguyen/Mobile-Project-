@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:scrollbars="vertical">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="@dimen/screen_padding">
+
+        <com.lttbdd.socialagent.core.ui.components.AppLoading
+            android:id="@+id/loadingIndicator"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:indeterminate="true" />
+
+        <LinearLayout
+            android:id="@+id/contentContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/tvPreviewHeader"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/preview_header_title"
+                android:textAppearance="@style/TextAppearance.SocialAgent.Headline" />
+
+            <com.google.android.material.textview.MaterialTextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/component_spacing_xsmall"
+                android:text="@string/preview_header_subtitle"
+                android:textAppearance="@style/TextAppearance.SocialAgent.Caption" />
+
+            <!-- Bộ chọn kênh xem trước -->
+            <RadioGroup
+                android:id="@+id/rgPreviewChannel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/component_spacing"
+                android:orientation="horizontal">
+
+                <com.lttbdd.socialagent.core.ui.components.StyledRadioButton
+                    android:id="@+id/rbPreviewFacebook"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:checked="true"
+                    android:text="@string/compose_channel_facebook" />
+
+                <com.lttbdd.socialagent.core.ui.components.StyledRadioButton
+                    android:id="@+id/rbPreviewLinkedIn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/component_spacing"
+                    android:text="@string/compose_channel_linkedin" />
+            </RadioGroup>
+
+            <!-- Thẻ xem trước mô phỏng giao diện từng kênh -->
+            <com.lttbdd.socialagent.core.ui.components.AppCard
+                android:id="@+id/cardChannelPreview"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/component_spacing_small">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:id="@+id/tvPreviewAuthorName"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textAppearance="@style/TextAppearance.SocialAgent.Title" />
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:id="@+id/tvPreviewMeta"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textAppearance="@style/TextAppearance.SocialAgent.Caption" />
+
+                    <com.lttbdd.socialagent.core.ui.components.AppDivider
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/component_spacing_small"
+                        android:layout_marginBottom="@dimen/component_spacing_small" />
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:id="@+id/tvPreviewBody"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textAppearance="@style/TextAppearance.SocialAgent.Body" />
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:id="@+id/tvPreviewSeeMore"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/component_spacing_xsmall"
+                        android:text="@string/preview_linkedin_see_more"
+                        android:textAppearance="@style/TextAppearance.SocialAgent.Caption"
+                        android:visibility="gone" />
+
+                    <com.lttbdd.socialagent.core.ui.components.AppDivider
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/component_spacing"
+                        android:layout_marginBottom="@dimen/component_spacing_small" />
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:id="@+id/tvPreviewActions"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textAppearance="@style/TextAppearance.SocialAgent.Caption" />
+                </LinearLayout>
+            </com.lttbdd.socialagent.core.ui.components.AppCard>
+
+            <!-- Khu vực sửa tay nội dung -->
+            <com.lttbdd.socialagent.core.ui.components.AppTextField
+                android:id="@+id/layoutDraftContent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/component_spacing"
+                android:hint="@string/preview_editor_hint"
+                app:errorEnabled="true">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etDraftContent"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="top|start"
+                    android:inputType="textCapSentences|textMultiLine"
+                    android:minLines="5" />
+            </com.lttbdd.socialagent.core.ui.components.AppTextField>
+
+            <!-- Bộ đếm ký tự theo giới hạn kênh -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <com.google.android.material.textview.MaterialTextView
+                    android:id="@+id/tvCharExcess"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textAppearance="@style/TextAppearance.SocialAgent.Caption"
+                    android:textColor="@color/brand_error"
+                    android:visibility="gone" />
+
+                <com.google.android.material.textview.MaterialTextView
+                    android:id="@+id/tvCharCount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textAppearance="@style/TextAppearance.SocialAgent.Caption" />
+            </LinearLayout>
+
+            <!-- Nút Khôi phục và Lưu chỉnh sửa -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/component_spacing_large"
+                android:layout_marginBottom="@dimen/component_spacing_large"
+                android:orientation="horizontal">
+
+                <com.lttbdd.socialagent.core.ui.components.OutlinedButton
+                    android:id="@+id/btnResetEdits"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:enabled="false"
+                    android:text="@string/preview_action_reset" />
+
+                <com.lttbdd.socialagent.core.ui.components.PrimaryButton
+                    android:id="@+id/btnSaveEdits"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/component_spacing_small"
+                    android:layout_weight="1"
+                    android:enabled="false"
+                    android:text="@string/preview_action_save" />
+            </LinearLayout>
+        </LinearLayout>
+    </FrameLayout>
+</androidx.core.widget.NestedScrollView>

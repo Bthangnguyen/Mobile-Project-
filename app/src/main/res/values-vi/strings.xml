@@ -190,4 +190,25 @@
     <string name="tone_casual">Gần gũi</string>
     <string name="tone_inspirational">Truyền cảm hứng</string>
     <string name="tone_persuasive">Thuyết phục</string>
+
+    <!-- Feature F4: Xem trước theo kênh, sửa tay & đếm ký tự (Issue #34) -->
+    <string name="preview_header_title">Xem trước &amp; Sửa bài</string>
+    <string name="preview_header_subtitle">Chuyển kênh để xem trước hiển thị, chỉnh sửa thủ công và theo dõi giới hạn ký tự từng nền tảng.</string>
+    <string name="preview_facebook_author">Trang Facebook</string>
+    <string name="preview_facebook_meta">Công khai · Vừa xong</string>
+    <string name="preview_facebook_actions">Thích · Bình luận · Chia sẻ</string>
+    <string name="preview_linkedin_author">Trang LinkedIn</string>
+    <string name="preview_linkedin_meta">1st · Vừa xong</string>
+    <string name="preview_linkedin_see_more">…xem thêm</string>
+    <string name="preview_linkedin_actions">Thích · Bình luận · Đăng lại · Gửi</string>
+    <string name="preview_placeholder_body">Nhập nội dung để xem trước bài đăng…</string>
+    <string name="preview_editor_hint">Chỉnh sửa nội dung bài viết</string>
+    <string name="preview_char_count_format">%1$d / %2$d ký tự</string>
+    <string name="preview_char_excess_format">Vượt quá giới hạn %1$d ký tự</string>
+    <string name="preview_error_empty">Nội dung bài viết không được để trống</string>
+    <string name="preview_error_over_limit">Nội dung vượt quá giới hạn ký tự của kênh đang chọn</string>
+    <string name="preview_action_reset">Khôi phục</string>
+    <string name="preview_action_save">Lưu chỉnh sửa</string>
+    <string name="preview_save_success">Đã lưu chỉnh sửa. Cần duyệt lại trước khi đăng bài.</string>
+    <string name="preview_save_failed">Không thể lưu bản nháp. Vui lòng kiểm tra lại nội dung.</string>
 </resources>

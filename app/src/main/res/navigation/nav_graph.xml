@@ -72,4 +72,16 @@
         android:name="com.lttbdd.socialagent.feature.channel.ChannelFragment"
         android:label="@string/channel_title" />
 
+    <!-- Xem trước & sửa tay bản nháp (D, F4 — Issue #34). -->
+    <fragment
+        android:id="@+id/draftPreviewFragment"
+        android:name="com.lttbdd.socialagent.feature.review.DraftPreviewFragment"
+        android:label="@string/preview_header_title">
+        <argument
+            android:name="draftId"
+            android:defaultValue="@null"
+            app:argType="string"
+            app:nullable="true" />
+    </fragment>
+
 </navigation>

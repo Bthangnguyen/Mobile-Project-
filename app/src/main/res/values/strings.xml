@@ -192,4 +192,25 @@
     <string name="tone_casual">Casual</string>
     <string name="tone_inspirational">Inspirational</string>
     <string name="tone_persuasive">Persuasive</string>
+
+    <!-- Feature F4: Channel Preview, Manual Edit & Character Counter (Issue #34) -->
+    <string name="preview_header_title">Preview &amp; Edit Draft</string>
+    <string name="preview_header_subtitle">Switch channels to preview formatting, edit manually, and stay within each platform character limit.</string>
+    <string name="preview_facebook_author">Facebook Page</string>
+    <string name="preview_facebook_meta">Public · Just now</string>
+    <string name="preview_facebook_actions">Like · Comment · Share</string>
+    <string name="preview_linkedin_author">LinkedIn Profile</string>
+    <string name="preview_linkedin_meta">1st · Now</string>
+    <string name="preview_linkedin_see_more">…see more</string>
+    <string name="preview_linkedin_actions">Like · Comment · Repost · Send</string>
+    <string name="preview_placeholder_body">Start typing to preview your post…</string>
+    <string name="preview_editor_hint">Edit post content</string>
+    <string name="preview_char_count_format">%1$d / %2$d characters</string>
+    <string name="preview_char_excess_format">Exceeds limit by %1$d characters</string>
+    <string name="preview_error_empty">Post content cannot be empty</string>
+    <string name="preview_error_over_limit">Content exceeds the selected channel character limit</string>
+    <string name="preview_action_reset">Reset</string>
+    <string name="preview_action_save">Save changes</string>
+    <string name="preview_save_success">Draft changes saved. Re-approval is required before publishing.</string>
+    <string name="preview_save_failed">Could not save draft changes. Check content and try again.</string>
 </resources>

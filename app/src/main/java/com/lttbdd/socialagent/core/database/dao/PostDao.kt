@@ -47,6 +47,7 @@ interface PostDao {
      * Giữ chỗ một bài để đăng (#38): chỉ chuyển [PostStatus.QUEUED] → [PostStatus.PUBLISHING] trong MỘT câu lệnh,
      * ghi `attemptStartedAtMillis` **trước** khi gọi API. Trả về 1 nếu giữ chỗ thành công, 0 nếu bài đã bị
      * worker khác lấy hoặc không còn ở hàng đợi — nhờ vậy hai worker chạy song song không gọi API hai lần.
+     * `attemptCount` được cộng trước; repository hoàn lại khi request chắc chắn chưa được gửi.
      */
     @Query(
         """

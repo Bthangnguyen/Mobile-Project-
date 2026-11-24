@@ -14,6 +14,7 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.Flow
 import java.net.ConnectException
 import java.net.UnknownHostException
+import javax.net.ssl.SSLHandshakeException
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -178,9 +179,12 @@ class PublishQueueRepository @Inject constructor(
             // Bài vẫn ở PUBLISHING; lượt sau sẽ coi là không rõ kết quả sau STALE_PUBLISHING_MILLIS.
             throw e
         } catch (e: UnknownHostException) {
-            return post.requeue(REASON_NOT_SENT)
+            return post.requeueNotSent()
         } catch (e: ConnectException) {
-            return post.requeue(REASON_NOT_SENT)
+            return post.requeueNotSent()
+        } catch (e: SSLHandshakeException) {
+            // Bắt tay TLS lỗi xảy ra trước khi ghi request: nội dung bài chưa rời máy.
+            return post.requeueNotSent()
         } catch (e: Exception) {
             // Timeout, mất kết nối khi đang đọc response…: server có thể đã nhận bài.
             return post.markOutcomeUnknown(e)
@@ -215,6 +219,13 @@ class PublishQueueRepository @Inject constructor(
         return Outcome.RETRY_LATER
     }
 
+    /**
+     * Request chắc chắn chưa tới server: hoàn lại lượt mà [PostDao.claimForPublishing] đã cộng, để mạng chập chờn
+     * không làm bài chạm [MAX_RETRYABLE_ATTEMPTS] trước khi kênh thật sự trả lỗi.
+     */
+    private suspend fun PostEntity.requeueNotSent(): Outcome =
+        copy(attemptCount = (attemptCount - 1).coerceAtLeast(0)).requeue(REASON_NOT_SENT)
+
     private suspend fun PostEntity.fail(reason: String): Outcome {
         postDao.update(copy(status = PostStatus.FAILED, errorMessage = reason, updatedAtMillis = clock.nowMillis()))
         return Outcome.FAILED
@@ -240,8 +251,8 @@ class PublishQueueRepository @Inject constructor(
         private const val STALE_CHECK_MARGIN_MILLIS = 60 * 1000L
 
         /**
-         * Số lần gọi API tối đa khi kênh trả lỗi tạm thời (5xx, rate limit). Lỗi chưa gửi được request
-         * (mất mạng) không bị giới hạn vì worker chỉ chạy khi có mạng. Đọc `retryAfterMillis`: #39.
+         * Số lần gọi API tối đa khi kênh trả lỗi tạm thời (5xx, rate limit). Lần chưa gửi được request
+         * (mất mạng, DNS, lỗi bắt tay TLS) không được tính vào `attemptCount`. Đọc `retryAfterMillis`: #39.
          */
         const val MAX_RETRYABLE_ATTEMPTS = 8
 

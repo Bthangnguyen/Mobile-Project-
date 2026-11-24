@@ -33,8 +33,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.net.ConnectException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
+import javax.net.ssl.SSLHandshakeException
 
 /**
  * Test hàng đợi đăng bài (#37) và chống đăng trùng (#38) trên Room in-memory, kênh giả điều khiển được.
@@ -148,7 +150,7 @@ class PublishQueueRepositoryTest {
         assertEquals("fb-1", published.remotePostId)
         assertEquals("https://facebook.com/fb-1", published.url)
         assertNull(published.errorMessage)
-        assertEquals(2, published.attemptCount)
+        assertEquals("Lần mất mạng không được tính là một lần thử", 1, published.attemptCount)
         assertEquals("Thử lại phải dùng lại đúng idempotencyKey", 1, facebook.keys.toSet().size)
     }
 
@@ -501,6 +503,56 @@ class PublishQueueRepositoryTest {
         assertEquals(PostStatus.FAILED, post(id).status)
         assertEquals("retry_limit_reached (server_error)", post(id).errorMessage)
         assertEquals(PublishQueueRepository.MAX_RETRYABLE_ATTEMPTS, facebook.calls)
+    }
+
+    @Test
+    fun `many not-sent failures then one server error keeps post queued`() = runTest {
+        saveDraft()
+        val repo = repository()
+        val id = queuedId(repo)
+        repeat(PublishQueueRepository.MAX_RETRYABLE_ATTEMPTS + 2) { i ->
+            facebook.next(
+                when (i % 3) {
+                    0 -> UnknownHostException("dns")
+                    1 -> ConnectException("refused")
+                    else -> SSLHandshakeException("captive portal")
+                },
+            )
+        }
+        facebook.next(PublishResult.RetryableError("server_error"))
+
+        repeat(PublishQueueRepository.MAX_RETRYABLE_ATTEMPTS + 2) {
+            assertEquals(1, repo.processQueue().retryLater)
+            assertEquals(0, post(id).attemptCount)
+        }
+        val serverError = repo.processQueue()
+
+        assertTrue(serverError.shouldRetry)
+        assertEquals(PostStatus.QUEUED, post(id).status)
+        assertEquals("server_error", post(id).errorMessage)
+        assertEquals(1, post(id).attemptCount)
+    }
+
+    @Test
+    fun `not-sent failures between server errors do not shorten retry limit`() = runTest {
+        saveDraft()
+        val repo = repository()
+        val id = queuedId(repo)
+        repeat(PublishQueueRepository.MAX_RETRYABLE_ATTEMPTS - 1) {
+            facebook.next(PublishResult.RetryableError("rate_limited"))
+            facebook.next(UnknownHostException("offline"))
+        }
+        facebook.next(PublishResult.Success("fb-9", "https://facebook.com/fb-9"))
+
+        repeat(2 * (PublishQueueRepository.MAX_RETRYABLE_ATTEMPTS - 1)) {
+            assertTrue(repo.processQueue().shouldRetry)
+        }
+        val last = repo.processQueue()
+
+        assertEquals(1, last.published)
+        assertEquals(PostStatus.PUBLISHED, post(id).status)
+        assertEquals(PublishQueueRepository.MAX_RETRYABLE_ATTEMPTS, post(id).attemptCount)
+        assertEquals(1, facebook.keys.toSet().size)
     }
 
     @Test

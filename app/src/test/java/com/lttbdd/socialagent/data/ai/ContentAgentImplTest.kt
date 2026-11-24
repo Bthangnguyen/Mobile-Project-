@@ -6,11 +6,16 @@ import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.ContentLanguage
 import com.lttbdd.socialagent.core.model.Draft
 import com.lttbdd.socialagent.core.model.TopicBrief
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -177,6 +182,63 @@ class ContentAgentImplTest {
         assertTrue(job.isCancelled)
         assertTrue(failures(events).isEmpty())
         assertTrue(done(events).isEmpty())
+    }
+
+    @Test
+    fun `timeout ben trong sub-agent thanh ChannelFailed TIMEOUT va kenh khac van xong`() = runTest {
+        val agent = ContentAgentImpl(
+            mapOf(
+                fb to ChannelSubAgent { _, emit ->
+                    emit(AgentEvent.StepStarted(fb, AgentStep.DRAFT))
+                    withTimeout(1_000) { awaitCancellation() }
+                },
+                li to okAgent(li),
+            ),
+        )
+
+        val events = agent.generate(brief()).toList()
+
+        assertEquals(listOf(li), done(events))
+        val failed = failures(events).single()
+        assertEquals(fb, failed.channel)
+        assertEquals(AgentStep.DRAFT, failed.step)
+        assertEquals(ChannelFailureReason.TIMEOUT, failed.reason)
+    }
+
+    @Test
+    fun `huy noi bo cua sub-agent khi scope con song van co su kien ket thuc`() = runTest {
+        val agent = ContentAgentImpl(
+            mapOf(fb to ChannelSubAgent { _, _ -> throw CancellationException("noi bo") }),
+        )
+
+        val failed = failures(agent.generate(brief(setOf(fb))).toList()).single()
+
+        assertEquals(ChannelFailureReason.UNKNOWN, failed.reason)
+    }
+
+    @Test
+    fun `phat ket thuc dong thoi tu nhieu coroutine con chi gui mot su kien`() = runTest {
+        val agent = ContentAgentImpl(
+            mapOf(
+                fb to ChannelSubAgent { _, emit ->
+                    withContext(Dispatchers.Default) {
+                        coroutineScope {
+                            repeat(16) { i ->
+                                launch {
+                                    if (i % 2 == 0) emit(AgentEvent.ChannelDone(draft(fb))) else {
+                                        emit(AgentEvent.ChannelFailed(fb, AgentStep.DRAFT, "X"))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+            ),
+        )
+
+        val events = agent.generate(brief(setOf(fb))).toList()
+
+        assertEquals(1, done(events).size + failures(events).size)
     }
 
     @Test

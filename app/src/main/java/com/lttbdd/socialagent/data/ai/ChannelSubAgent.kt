@@ -41,6 +41,7 @@ object ChannelFailureReason {
     const val UNSUPPORTED_CHANNEL = "UNSUPPORTED_CHANNEL"
     const val CHANNEL_NOT_IN_BRIEF = "CHANNEL_NOT_IN_BRIEF"
     const val NO_RESULT = "NO_RESULT"
+    const val TIMEOUT = "TIMEOUT"
 
     fun fromLlm(failure: LlmFailure): String = "LLM_${failure.name}"
 }

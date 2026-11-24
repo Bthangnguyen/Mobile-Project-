@@ -8,12 +8,17 @@ import com.lttbdd.socialagent.core.model.Draft
 import com.lttbdd.socialagent.core.model.RewriteInstruction
 import com.lttbdd.socialagent.core.model.TopicBrief
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.channels.ProducerScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 
 /**
@@ -22,7 +27,9 @@ import kotlinx.coroutines.sync.withPermit
  * Bảo đảm:
  * - Mỗi kênh phát đúng một sự kiện kết thúc ([AgentEvent.ChannelDone] hoặc [AgentEvent.ChannelFailed]).
  * - Lỗi của một kênh không làm dừng kênh khác; lý do lỗi chỉ là mã an toàn, không chứa key/prompt.
- * - Huỷ việc collect Flow huỷ toàn bộ sub-agent; [CancellationException] không bị đổi thành lỗi nghiệp vụ.
+ * - Huỷ việc collect Flow huỷ toàn bộ sub-agent; huỷ thật không bị đổi thành lỗi nghiệp vụ.
+ *   Riêng [TimeoutCancellationException] phát sinh bên trong sub-agent (scope vẫn còn sống) là lỗi của kênh đó
+ *   và được báo bằng [AgentEvent.ChannelFailed] với mã [ChannelFailureReason.TIMEOUT].
  * - Không tự đăng bài: chỉ sinh bản nháp, việc duyệt/đăng thuộc F4/F5.
  *
  * Mỗi lần gọi [generate]/[regenerate] là một Flow lạnh độc lập nên luồng cũ không ghi đè kết quả lần chạy mới.
@@ -67,11 +74,15 @@ class ContentAgentImpl(
     override suspend fun regenerateImage(draft: Draft): String =
         throw UnsupportedOperationException("Sinh lại ảnh thuộc Issue #28")
 
-    /** Trạng thái riêng của một lần chạy kênh; @Volatile vì sub-agent có thể phát từ nhiều coroutine con. */
-    private class ChannelRun {
-        @Volatile var step = AgentStep.OUTLINE
-
-        @Volatile var finished = false
+    /**
+     * Trạng thái riêng của một lần chạy kênh. Sub-agent có thể phát từ nhiều coroutine con nên mọi thao tác
+     * "kiểm tra đã kết thúc → cập nhật → gửi" chạy trong [mutex]; nhờ đó chỉ một sự kiện kết thúc được gửi
+     * và không có sự kiện nào đi sau nó.
+     */
+    private class ChannelRunState {
+        val mutex = Mutex()
+        var step = AgentStep.OUTLINE
+        var finished = false
     }
 
     private suspend fun ProducerScope<AgentEvent>.runChannel(
@@ -84,30 +95,48 @@ class ContentAgentImpl(
             send(AgentEvent.ChannelFailed(channel, AgentStep.OUTLINE, ChannelFailureReason.UNSUPPORTED_CHANNEL))
             return
         }
-        val run = ChannelRun()
+        val state = ChannelRunState()
         try {
             subAgent.run(ChannelRunContext(brief, channel, summary)) { event ->
                 // Orchestrator sở hữu BriefReady; sự kiện của kênh khác hoặc sau khi đã kết thúc bị bỏ để cách ly kênh.
-                if (run.finished || !event.belongsTo(channel)) return@run
-                when (event) {
-                    is AgentEvent.StepStarted -> run.step = event.step
-                    is AgentEvent.ChannelDone, is AgentEvent.ChannelFailed -> run.finished = true
-                    else -> Unit
+                if (!event.belongsTo(channel)) return@run
+                state.mutex.withLock {
+                    if (state.finished) return@withLock
+                    when (event) {
+                        is AgentEvent.StepStarted -> state.step = event.step
+                        is AgentEvent.ChannelDone, is AgentEvent.ChannelFailed -> state.finished = true
+                        else -> Unit
+                    }
+                    send(event)
                 }
-                send(event)
             }
-            if (!run.finished) {
-                run.finished = true
-                send(AgentEvent.ChannelFailed(channel, run.step, ChannelFailureReason.NO_RESULT))
-            }
+            failIfUnfinished(state, channel, ChannelFailureReason.NO_RESULT)
         } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (error: Exception) {
-            if (!run.finished) {
-                run.finished = true
-                val step = (error as? ChannelSubAgentException)?.step ?: run.step
-                send(AgentEvent.ChannelFailed(channel, step, error.toSafeReason()))
+            // Huỷ thật (scope đã bị huỷ) thì ensureActive ném lại và dừng cả cây coroutine.
+            // Nếu scope vẫn sống thì đây là timeout/huỷ nội bộ của chính sub-agent: kênh này phải có kết thúc.
+            currentCoroutineContext().ensureActive()
+            val reason = if (cancelled is TimeoutCancellationException) {
+                ChannelFailureReason.TIMEOUT
+            } else {
+                ChannelFailureReason.UNKNOWN
             }
+            failIfUnfinished(state, channel, reason)
+        } catch (error: Exception) {
+            failIfUnfinished(state, channel, error.toSafeReason(), (error as? ChannelSubAgentException)?.step)
+        }
+    }
+
+    /** Phát [AgentEvent.ChannelFailed] đúng một lần nếu kênh chưa có sự kiện kết thúc. */
+    private suspend fun ProducerScope<AgentEvent>.failIfUnfinished(
+        state: ChannelRunState,
+        channel: ChannelType,
+        reason: String,
+        step: AgentStep? = null,
+    ) {
+        state.mutex.withLock {
+            if (state.finished) return
+            state.finished = true
+            send(AgentEvent.ChannelFailed(channel, step ?: state.step, reason))
         }
     }
 

@@ -1,5 +1,9 @@
 package com.lttbdd.socialagent.feature.channel
 
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.repeatOnLifecycle
 import com.lttbdd.socialagent.core.model.ChannelAccount
 import com.lttbdd.socialagent.core.model.ChannelCapability
 import com.lttbdd.socialagent.core.model.ChannelType
@@ -8,11 +12,21 @@ import com.lttbdd.socialagent.data.model.ChannelError
 import com.lttbdd.socialagent.data.model.ChannelException
 import com.lttbdd.socialagent.data.model.FacebookPage
 import com.lttbdd.socialagent.data.model.FacebookUserToken
+import com.lttbdd.socialagent.data.model.FacebookRefreshCheck
+import com.lttbdd.socialagent.data.model.FacebookRefreshException
+import com.lttbdd.socialagent.data.model.FacebookRefreshOutcome
+import com.lttbdd.socialagent.data.model.FacebookRefreshIssue
+import com.lttbdd.socialagent.data.model.FacebookRefreshSkip
 import com.lttbdd.socialagent.data.network.LinkedInBffAuth
 import com.lttbdd.socialagent.data.network.PkceUtil
 import com.lttbdd.socialagent.data.repository.ChannelRepository
+import com.lttbdd.socialagent.data.repository.FacebookRefreshCoordinator
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -44,12 +58,13 @@ class ChannelViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        fakeRepository = FakeChannelRepository()
+        fakeRepository = FakeChannelRepository { testDispatcher.scheduler.currentTime }
         callbackBus = LinkedInCallbackBus()
         viewModel = ChannelViewModel(fakeRepository, callbackBus)
         viewModel.linkedInClientId = "client_that"
         viewModel.linkedInBffUrl = "https://bff.example.com"
         viewModel.linkedInLoginTimeoutMillis = 1_000L
+        viewModel.elapsedRealtime = { testDispatcher.scheduler.currentTime }
     }
 
     @After
@@ -104,6 +119,26 @@ class ChannelViewModelTest {
         assertNull(viewModel.pagePicker.value)
         val channels = (viewModel.uiState.value as ChannelUiState.Success).channels
         assertEquals(listOf("Page Duy Nhat"), channels.map { it.displayName })
+    }
+
+    @Test
+    fun facebookReconnectSelectsOnlyRequestedPage() = runTest {
+        fakeRepository.pages = listOf(FacebookPage("a", "Page A", "token-a"), FacebookPage("b", "Page B", "token-b"))
+        viewModel.onFacebookLoggedIn(user(), expectedAccountId = "b")
+        testScheduler.runCurrent()
+
+        assertNull(viewModel.pagePicker.value)
+        assertEquals(listOf("b"), (viewModel.uiState.value as ChannelUiState.Success).channels.map { it.accountId })
+    }
+
+    @Test
+    fun facebookReconnectDoesNotConnectAnotherPage() = runTest {
+        fakeRepository.pages = listOf(FacebookPage("a", "Page A", "token-a"))
+        viewModel.onFacebookLoggedIn(user(), expectedAccountId = "missing")
+        testScheduler.runCurrent()
+
+        assertEquals(com.lttbdd.socialagent.R.string.channel_error_reconnect_account_mismatch, viewModel.errors.first())
+        assertTrue((viewModel.uiState.value as ChannelUiState.Success).channels.isEmpty())
     }
 
     @Test
@@ -183,6 +218,479 @@ class ChannelViewModelTest {
 
         val channel = (viewModel.uiState.value as ChannelUiState.Success).channels.single()
         assertEquals(ConnectionStatus.CONNECTED, channel.status)
+    }
+
+    @Test
+    fun `token het han trong luc man hinh dang mo thi can ket noi lai`() = runTest {
+        fakeRepository.pages = listOf(FacebookPage("p1", "Page", "page-token"))
+        fakeRepository.expiresAt = 1_000L
+        viewModel.clock = { testScheduler.currentTime }
+        connectWithFacebookToken()
+        backgroundScope.launch { viewModel.monitorTokenExpiry() }
+        testScheduler.runCurrent()
+        assertEquals(ConnectionStatus.CONNECTED, (viewModel.uiState.value as ChannelUiState.Success).channels.single().status)
+
+        testScheduler.advanceTimeBy(1_000L)
+        testScheduler.runCurrent()
+        assertEquals(ConnectionStatus.TOKEN_EXPIRED, (viewModel.uiState.value as ChannelUiState.Success).channels.single().status)
+    }
+
+    @Test
+    fun resumingChannelScreenRechecksTokenExpiryBeforeTimerRuns() = runTest {
+        var now = 0L
+        fakeRepository.pages = listOf(FacebookPage("p1", "Page", "page-token"))
+        fakeRepository.expiresAt = 1_000L
+        viewModel.clock = { now }
+        connectWithFacebookToken()
+        backgroundScope.launch { viewModel.monitorTokenExpiry() }
+        testScheduler.runCurrent()
+        assertEquals(ConnectionStatus.CONNECTED, (viewModel.uiState.value as ChannelUiState.Success).channels.single().status)
+
+        now = 1_000L
+        viewModel.onChannelScreenResumed()
+
+        assertEquals(ConnectionStatus.TOKEN_EXPIRED, (viewModel.uiState.value as ChannelUiState.Success).channels.single().status)
+    }
+
+    @Test
+    fun correctingDeviceTimeRestoresChannelAndReschedulesExpiry() = runTest {
+        var clockOffset = 2_000L
+        viewModel.clock = { testScheduler.currentTime + clockOffset }
+        fakeRepository.pages = listOf(FacebookPage("p1", "Page", "page-token"))
+        fakeRepository.expiresAt = 1_000L
+        connectWithFacebookToken()
+        backgroundScope.launch { viewModel.monitorTokenExpiry() }
+        testScheduler.runCurrent()
+
+        fun channelStatus() = (viewModel.uiState.value as ChannelUiState.Success).channels.single().status
+        assertEquals(ConnectionStatus.TOKEN_EXPIRED, channelStatus())
+
+        clockOffset = 500L
+        viewModel.onChannelScreenResumed()
+        testScheduler.runCurrent()
+        assertEquals(ConnectionStatus.CONNECTED, channelStatus())
+
+        testScheduler.advanceTimeBy(500L)
+        testScheduler.runCurrent()
+        assertEquals(ConnectionStatus.TOKEN_EXPIRED, channelStatus())
+
+        clockOffset = 0L
+        viewModel.onChannelScreenResumed()
+        assertEquals(ConnectionStatus.CONNECTED, channelStatus())
+    }
+
+    @Test
+    fun resumingAfterClockMovesForwardReschedulesStillValidToken() = runTest {
+        var clockOffset = 0L
+        viewModel.clock = { testScheduler.currentTime + clockOffset }
+        fakeRepository.pages = listOf(FacebookPage("p1", "Page", "page-token"))
+        fakeRepository.expiresAt = 1_000L
+        connectWithFacebookToken()
+        backgroundScope.launch { viewModel.monitorTokenExpiry() }
+        testScheduler.runCurrent()
+
+        clockOffset = 750L
+        viewModel.onChannelScreenResumed()
+        testScheduler.runCurrent()
+        testScheduler.advanceTimeBy(249L)
+        testScheduler.runCurrent()
+        assertEquals(ConnectionStatus.CONNECTED, (viewModel.uiState.value as ChannelUiState.Success).channels.single().status)
+
+        testScheduler.advanceTimeBy(1L)
+        testScheduler.runCurrent()
+        assertEquals(ConnectionStatus.TOKEN_EXPIRED, (viewModel.uiState.value as ChannelUiState.Success).channels.single().status)
+    }
+
+    @Test
+    fun deviceClockChangeUpdatesTokenStatusWhileScreenRemainsOpen() = runTest {
+        var now = 0L
+        viewModel.clock = { now }
+        fakeRepository.pages = listOf(FacebookPage("p1", "Page", "page-token"))
+        fakeRepository.expiresAt = 1_000L
+        connectWithFacebookToken()
+        backgroundScope.launch { viewModel.monitorTokenExpiry() }
+        testScheduler.runCurrent()
+
+        fun channelStatus() = (viewModel.uiState.value as ChannelUiState.Success).channels.single().status
+        assertEquals(ConnectionStatus.CONNECTED, channelStatus())
+
+        now = 1_000L
+        viewModel.recheckTokenExpiry()
+        assertEquals(ConnectionStatus.TOKEN_EXPIRED, channelStatus())
+
+        now = 500L
+        viewModel.recheckTokenExpiry()
+        assertEquals(ConnectionStatus.CONNECTED, channelStatus())
+    }
+
+    @Test
+    fun facebookReconnectReschedulesExpiryForUnchangedChannel() = runTest {
+        fakeRepository.pages = listOf(FacebookPage("p1", "Page", "page-token"))
+        fakeRepository.expiresAt = 5_000L
+        viewModel.clock = { testScheduler.currentTime }
+        connectWithFacebookToken()
+        backgroundScope.launch { viewModel.monitorTokenExpiry() }
+        testScheduler.runCurrent()
+        val original = viewModel.uiState.value as ChannelUiState.Success
+
+        testScheduler.advanceTimeBy(100L)
+        fakeRepository.expiresAt = 1_000L
+        fakeRepository.scope = "pages_show_list"
+        viewModel.onFacebookLoggedIn(user(), expectedAccountId = "p1")
+        testScheduler.runCurrent()
+        val reconnected = viewModel.uiState.value as ChannelUiState.Success
+        assertEquals(original.channels, reconnected.channels)
+        assertEquals("pages_show_list", viewModel.getScopeForAccount(reconnected.channels.single()))
+
+        testScheduler.advanceTimeBy(900L)
+        testScheduler.runCurrent()
+        val expired = viewModel.uiState.value as ChannelUiState.Success
+        assertEquals(ConnectionStatus.TOKEN_EXPIRED, expired.channels.single().status)
+        assertTrue(reconnected.tokenRevision > original.tokenRevision)
+    }
+
+    private suspend fun checkFacebookRefresh(userId: String, refresh: suspend () -> FacebookUserToken?): Long =
+        viewModel.refreshFacebookIfNeeded(userId) {
+            refresh() ?: throw FacebookRefreshException(FacebookRefreshIssue.SDK_UNAVAILABLE)
+        }.nextCheckMillis
+
+    @Test
+    fun `tu lam moi phien Facebook gan het han va gioi han tan suat thu lai`() = runTest {
+        fakeRepository.pages = listOf(FacebookPage("p1", "Page", "page-token"))
+        fakeRepository.expiresAt = 1_000L
+        viewModel.clock = { 2_000L }
+        connectWithFacebookToken()
+
+        var refreshCalls = 0
+        suspend fun refresh(): FacebookUserToken {
+            refreshCalls++
+            return user(60_000L).copy(userId = "owner")
+        }
+        launch { checkFacebookRefresh("owner", refresh = ::refresh) }
+        launch { checkFacebookRefresh("owner", refresh = ::refresh) }
+        testScheduler.runCurrent()
+        checkFacebookRefresh("owner", refresh = ::refresh)
+        testScheduler.runCurrent()
+
+        assertEquals(1, refreshCalls)
+        assertEquals(60_000L, fakeRepository.expiresAt)
+        assertEquals(ConnectionStatus.CONNECTED, (viewModel.uiState.value as ChannelUiState.Success).channels.single().status)
+    }
+
+    @Test
+    fun facebookRefreshReportsSkippedAndInvalidSessionSeparately() = runTest {
+        val noSession = viewModel.refreshFacebookIfNeeded(null) { error("Không có phiên SDK.") }
+        assertEquals(FacebookRefreshSkip.NO_SDK_SESSION, noSession.outcome.skipped)
+        val noChannels = viewModel.refreshFacebookIfNeeded("owner") { error("Không có kênh cần refresh.") }
+        assertEquals(FacebookRefreshSkip.NO_ELIGIBLE_CHANNELS, noChannels.outcome.skipped)
+
+        fakeRepository.pages = listOf(FacebookPage("p1", "Page", "page-token"))
+        fakeRepository.expiresAt = 1_000L
+        connectWithFacebookToken()
+        fakeRepository.facebookRefreshOutcome = FacebookRefreshOutcome(
+            issues = setOf(FacebookRefreshIssue.SESSION_INVALID),
+            reconnectAccountIds = setOf("p1"),
+        )
+        val failure = viewModel.refreshFacebookIfNeeded("owner") { throw FacebookRefreshException(FacebookRefreshIssue.SESSION_INVALID) }
+
+        assertEquals(setOf(FacebookRefreshIssue.SESSION_INVALID), failure.outcome.issues)
+        assertEquals(failure, viewModel.facebookRefreshState.value)
+        val state = viewModel.uiState.value as ChannelUiState.Success
+        assertEquals(setOf("p1"), state.facebookReconnectIds)
+        assertTrue(viewModel.needsFacebookReconnect(state.channels.single()))
+        val cooldown = viewModel.refreshFacebookIfNeeded("owner") { error("Đang chờ thử lại.") }
+        assertEquals(FacebookRefreshSkip.WAITING_FOR_SESSION, cooldown.outcome.skipped)
+
+        connectWithFacebookToken()
+        assertTrue((viewModel.uiState.value as ChannelUiState.Success).facebookReconnectIds.isEmpty())
+    }
+
+    @Test
+    fun facebookRefreshKeepsTemporaryIssueDuringCooldownAndClearsItOnSuccess() = runTest {
+        fakeRepository.pages = listOf(FacebookPage("p1", "Page", "page-token"))
+        fakeRepository.expiresAt = 1_000L
+        connectWithFacebookToken()
+
+        val failed = viewModel.refreshFacebookIfNeeded("owner") {
+            throw FacebookRefreshException(FacebookRefreshIssue.NETWORK)
+        }
+        assertEquals(setOf(FacebookRefreshIssue.NETWORK), viewModel.facebookRefreshIssues.value)
+        val cooldown = viewModel.refreshFacebookIfNeeded("owner") { error("Đang chờ thử lại.") }
+        assertEquals(FacebookRefreshSkip.COOLDOWN, cooldown.outcome.skipped)
+        assertEquals(setOf(FacebookRefreshIssue.NETWORK), viewModel.facebookRefreshIssues.value)
+        assertTrue((viewModel.uiState.value as ChannelUiState.Success).facebookReconnectIds.isEmpty())
+
+        testScheduler.advanceTimeBy(failed.nextCheckMillis)
+        val updated = viewModel.refreshFacebookIfNeeded("owner") {
+            user(Long.MAX_VALUE).copy(userId = "owner")
+        }
+        assertEquals(listOf("p1"), updated.outcome.updated.map { it.accountId })
+        assertTrue(viewModel.facebookRefreshIssues.value.isEmpty())
+    }
+
+    @Test
+    fun facebookShowsMissingPageWarningAndClearsItWhenPageReturnsUnchanged() = runTest {
+        fakeRepository.pages = listOf(FacebookPage("p1", "Page", "page-token"))
+        fakeRepository.expiresAt = 1_000L
+        viewModel.clock = { 0L }
+        connectWithFacebookToken()
+        fakeRepository.facebookRefreshOutcome = FacebookRefreshOutcome(
+            issues = setOf(FacebookRefreshIssue.PAGE_NOT_RETURNED),
+            issuesByAccountId = mapOf("p1" to FacebookRefreshIssue.PAGE_NOT_RETURNED),
+        )
+
+        val first = viewModel.refreshFacebookIfNeeded("owner") { user(Long.MAX_VALUE).copy(userId = "owner") }
+        val state = viewModel.uiState.value as ChannelUiState.Success
+        assertEquals(setOf("p1"), state.unlistedFacebookPageIds)
+        assertTrue(state.facebookReconnectIds.isEmpty())
+        assertEquals(ConnectionStatus.CONNECTED, state.channels.single().status)
+        assertTrue(viewModel.isFacebookPageUnlisted(state.channels.single()))
+
+        testScheduler.advanceTimeBy(first.nextCheckMillis)
+        fakeRepository.facebookRefreshOutcome = FacebookRefreshOutcome(
+            skipped = FacebookRefreshSkip.NO_CHANGES,
+            confirmedPageIds = setOf("p1"),
+        )
+        viewModel.refreshFacebookIfNeeded("owner") { user(Long.MAX_VALUE).copy(userId = "owner") }
+        assertTrue((viewModel.uiState.value as ChannelUiState.Success).unlistedFacebookPageIds.isEmpty())
+    }
+
+    @Test
+    fun leavingForegroundCancelsSdkWaitAndNextResumeChecksTheNewSession() = runTest {
+        fakeRepository.pages = listOf(FacebookPage("p1", "Page", "page-token"))
+        fakeRepository.expiresAt = 1_000L
+        connectWithFacebookToken()
+        val owner = object : LifecycleOwner {
+            override val lifecycle = LifecycleRegistry.createUnsafe(this)
+        }
+        var currentUser = "first"
+        val attempts = mutableListOf<String>()
+        val cancellations = mutableListOf<String>()
+        val monitor = backgroundScope.launch {
+            owner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                viewModel.monitorFacebookRefresh(currentUserId = { currentUser }) {
+                    val startedUser = currentUser
+                    attempts.add(startedUser)
+                    try {
+                        awaitCancellation()
+                    } finally {
+                        cancellations.add(startedUser)
+                    }
+                }
+            }
+        }
+
+        owner.lifecycle.currentState = Lifecycle.State.RESUMED
+        testScheduler.runCurrent()
+        assertEquals(listOf("first"), attempts)
+        owner.lifecycle.currentState = Lifecycle.State.CREATED
+        testScheduler.runCurrent()
+        assertEquals(listOf("first"), cancellations)
+        currentUser = "second"
+        owner.lifecycle.currentState = Lifecycle.State.RESUMED
+        testScheduler.runCurrent()
+        assertEquals(listOf("first", "second"), attempts)
+        owner.lifecycle.currentState = Lifecycle.State.DESTROYED
+        monitor.cancelAndJoin()
+    }
+
+    @Test
+    fun resumedRefreshReloadsTokenDetailsEvenDuringCooldownAfterCancellation() = runTest {
+        fakeRepository.pages = listOf(FacebookPage("p1", "Page", "page-token"))
+        fakeRepository.expiresAt = 1_000L
+        fakeRepository.scope = "pages_show_list"
+        connectWithFacebookToken()
+        val account = (viewModel.uiState.value as ChannelUiState.Success).channels.single()
+        val refresh = launch {
+            viewModel.refreshFacebookIfNeeded("owner") {
+                fakeRepository.scope = "pages_manage_posts"
+                awaitCancellation()
+            }
+        }
+        testScheduler.runCurrent()
+        refresh.cancelAndJoin()
+
+        val check = viewModel.refreshFacebookIfNeeded("owner") { error("Đang chờ thử lại.") }
+        assertEquals(FacebookRefreshSkip.COOLDOWN, check.outcome.skipped)
+        assertEquals("pages_manage_posts", viewModel.getScopeForAccount(account))
+    }
+
+    @Test
+    fun sdkResultFromPreviousSessionDoesNotUpdateAfterAccountSwitch() = runTest {
+        fakeRepository.pages = listOf(FacebookPage("p1", "Page", "page-token"))
+        fakeRepository.expiresAt = 1_000L
+        connectWithFacebookToken()
+        var currentUser = "first"
+        val release = CompletableDeferred<Unit>()
+        val attempts = mutableListOf<String>()
+        val monitor = backgroundScope.launch {
+            viewModel.monitorFacebookRefresh(currentUserId = { currentUser }) {
+                attempts.add(currentUser)
+                if (currentUser == "first") {
+                    release.await()
+                    user(40_000L).copy(userId = "first")
+                } else {
+                    awaitCancellation()
+                }
+            }
+        }
+
+        testScheduler.runCurrent()
+        assertEquals(listOf("first"), attempts)
+        currentUser = "second"
+        release.complete(Unit)
+        testScheduler.runCurrent()
+
+        assertEquals(listOf("first", "second"), attempts)
+        assertEquals(1_000L, fakeRepository.expiresAt)
+        assertEquals(FacebookRefreshSkip.SDK_SESSION_CHANGED, viewModel.facebookRefreshState.value?.outcome?.skipped)
+        monitor.cancelAndJoin()
+    }
+
+    @Test
+    fun facebookRefreshUsesRemainingRetryDelayAfterScreenResumes() = runTest {
+        fakeRepository.pages = listOf(FacebookPage("p1", "Page", "page-token"))
+        fakeRepository.expiresAt = 1_000L
+        viewModel.clock = { testScheduler.currentTime }
+        connectWithFacebookToken()
+
+        var attempts = 0
+        suspend fun refresh(): FacebookUserToken? {
+            attempts++
+            return null
+        }
+
+        assertEquals(15 * 60_000L, checkFacebookRefresh("owner", refresh = ::refresh))
+        testScheduler.runCurrent()
+        testScheduler.advanceTimeBy(10 * 60_000L)
+
+        val retryIn = checkFacebookRefresh("owner", refresh = ::refresh)
+        assertEquals(5 * 60_000L, retryIn)
+        assertEquals(1, attempts)
+
+        testScheduler.advanceTimeBy(retryIn)
+        checkFacebookRefresh("owner", refresh = ::refresh)
+        testScheduler.runCurrent()
+        assertEquals(2, attempts)
+    }
+
+    @Test
+    fun facebookRefreshCountsSdkWaitTowardsRetryInterval() = runTest {
+        fakeRepository.pages = listOf(FacebookPage("p1", "Page", "page-token"))
+        fakeRepository.expiresAt = 1_000L
+        viewModel.clock = { testScheduler.currentTime }
+        connectWithFacebookToken()
+
+        val retryIn = checkFacebookRefresh("owner") {
+            delay(30_000L)
+            null
+        }
+
+        assertEquals(15 * 60_000L - 30_000L, retryIn)
+    }
+
+    @Test
+    fun facebookRefreshChecksNewUserAfterPreviousUserFinishes() = runTest {
+        fakeRepository.pages = listOf(FacebookPage("p1", "Page", "page-token"))
+        fakeRepository.expiresAt = 1_000L
+        connectWithFacebookToken()
+
+        val finishPreviousRefresh = CompletableDeferred<Unit>()
+        val attempts = mutableListOf<String>()
+        launch {
+            checkFacebookRefresh("previous") {
+                attempts += "previous"
+                finishPreviousRefresh.await()
+                null
+            }
+        }
+        testScheduler.runCurrent()
+        launch {
+            checkFacebookRefresh("current") {
+                attempts += "current"
+                null
+            }
+        }
+        testScheduler.runCurrent()
+        assertEquals(listOf("previous"), attempts)
+
+        finishPreviousRefresh.complete(Unit)
+        testScheduler.runCurrent()
+
+        assertEquals(listOf("previous", "current"), attempts)
+    }
+
+    @Test
+    fun facebookRefreshKeepsTheRetryDelayWhenSwitchingBackToPreviousUser() = runTest {
+        fakeRepository.pages = listOf(FacebookPage("p1", "Page", "page-token"))
+        fakeRepository.expiresAt = 1_000L
+        connectWithFacebookToken()
+
+        val attempts = mutableListOf<String>()
+        suspend fun check(userId: String) = checkFacebookRefresh(userId) {
+            attempts += userId
+            null
+        }
+
+        check("first")
+        testScheduler.advanceTimeBy(5 * 60_000L)
+        check("second")
+        val retryIn = check("first")
+
+        assertEquals(listOf("first", "second"), attempts)
+        assertEquals(10 * 60_000L, retryIn)
+    }
+
+    @Test
+    fun facebookRefreshRetryDelayUsesElapsedTimeWhenDeviceClockChanges() = runTest {
+        var wallTime = 0L
+        viewModel.clock = { wallTime }
+        fakeRepository.pages = listOf(FacebookPage("p1", "Page", "page-token"))
+        fakeRepository.expiresAt = 1_000L
+        connectWithFacebookToken()
+
+        var attempts = 0
+        suspend fun refresh(): FacebookUserToken? {
+            attempts++
+            return null
+        }
+
+        checkFacebookRefresh("owner", refresh = ::refresh)
+        testScheduler.advanceTimeBy(5 * 60_000L)
+        wallTime += 60 * 60_000L
+        val retryIn = checkFacebookRefresh("owner", refresh = ::refresh)
+
+        assertEquals(1, attempts)
+        assertEquals(10 * 60_000L, retryIn)
+    }
+
+    @Test
+    fun facebookAccountChangeBeforeSdkCallDoesNotConsumeRetryInterval() = runTest {
+        fakeRepository.pages = listOf(FacebookPage("p1", "Page", "page-token"))
+        fakeRepository.expiresAt = 1_000L
+        connectWithFacebookToken()
+
+        var currentUserId = "owner"
+        var sdkAttempts = 0
+        val candidatesReady = CompletableDeferred<Unit>()
+        fakeRepository.beforeFacebookRefresh = { candidatesReady.await() }
+        fun isCurrentUser() = currentUserId == "owner"
+        suspend fun refresh() = viewModel.refreshFacebookIfNeeded("owner") {
+            if (!isCurrentUser()) return@refreshFacebookIfNeeded null
+            sdkAttempts++
+            throw FacebookRefreshException(FacebookRefreshIssue.SDK_UNAVAILABLE)
+        }
+
+        val originalCheck = launch { refresh() }
+        testScheduler.runCurrent()
+        currentUserId = "another-owner"
+        candidatesReady.complete(Unit)
+        originalCheck.join()
+        assertEquals(0, sdkAttempts)
+
+        currentUserId = "owner"
+        refresh()
+        assertEquals(1, sdkAttempts)
     }
 
     @Test
@@ -270,6 +778,81 @@ class ChannelViewModelTest {
     }
 
     private fun stateOf(url: String) = Regex("state=([^&]+)").find(url)!!.groupValues[1]
+
+    @Test
+    fun linkedinDoesNotOpenQueuedBrowserRequestAfterTimeout() = runTest {
+        viewModel.startLinkedInLogin()
+        testScheduler.runCurrent()
+        assertEquals(1, fakeRepository.sessions.size)
+        testScheduler.advanceTimeBy(viewModel.linkedInLoginTimeoutMillis + 1)
+
+        val urls = mutableListOf<String>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.browserRequests.collect { urls.add(it) } }
+        assertTrue(urls.isEmpty())
+        assertEquals(ChannelNotice.LINKEDIN_LOGIN_TIMEOUT, viewModel.notices.first())
+    }
+
+    @Test
+    fun returningFromBrowserWithoutCallbackReportsElapsedLinkedInTimeout() = runTest {
+        var elapsed = 10_000L
+        viewModel.elapsedRealtime = { elapsed }
+        val (urls, notices) = startLinkedIn()
+        assertEquals(1, urls.size)
+
+        elapsed += viewModel.linkedInLoginTimeoutMillis - 1
+        viewModel.onChannelScreenResumed()
+        assertTrue(notices.isEmpty())
+
+        elapsed++
+        viewModel.onChannelScreenResumed()
+
+        assertEquals(listOf(ChannelNotice.LINKEDIN_LOGIN_TIMEOUT), notices)
+        testScheduler.advanceTimeBy(viewModel.linkedInLoginTimeoutMillis + 1)
+        assertEquals(listOf(ChannelNotice.LINKEDIN_LOGIN_TIMEOUT), notices)
+    }
+
+    @Test
+    fun linkedinDoesNotOpenQueuedBrowserWhenElapsedTimeExpiresBeforeTimerRuns() = runTest {
+        var elapsed = 10_000L
+        viewModel.elapsedRealtime = { elapsed }
+        viewModel.startLinkedInLogin()
+        testScheduler.runCurrent()
+        assertEquals(1, fakeRepository.sessions.size)
+        elapsed += viewModel.linkedInLoginTimeoutMillis
+
+        val urls = mutableListOf<String>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.browserRequests.collect { urls.add(it) } }
+
+        assertTrue(urls.isEmpty())
+        assertEquals(ChannelNotice.LINKEDIN_LOGIN_TIMEOUT, viewModel.notices.first())
+    }
+
+    @Test
+    fun linkedinDoesNotExchangeCallbackWhenElapsedTimeExpiresBeforeTimerRuns() = runTest {
+        var elapsed = 10_000L
+        viewModel.elapsedRealtime = { elapsed }
+        val (urls, notices) = startLinkedIn()
+        val state = stateOf(urls.single())
+        elapsed += viewModel.linkedInLoginTimeoutMillis
+
+        callback("exchange_code=ma_doi&state=$state")
+
+        assertNull(fakeRepository.lastBff)
+        assertEquals(listOf(ChannelNotice.LINKEDIN_SESSION_EXPIRED), notices)
+    }
+
+    @Test
+    fun linkedinOpensOnlyLatestQueuedBrowserRequest() = runTest {
+        viewModel.startLinkedInLogin()
+        testScheduler.runCurrent()
+        viewModel.startLinkedInLogin()
+        testScheduler.runCurrent()
+        assertEquals(2, fakeRepository.sessions.size)
+
+        val urls = mutableListOf<String>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.browserRequests.collect { urls.add(it) } }
+        assertEquals(listOf(fakeRepository.sessions.last().first), urls.map(::stateOf))
+    }
 
     private fun callback(query: String) {
         viewModel.onLinkedInCallback("$redirect?$query")
@@ -584,7 +1167,7 @@ class ChannelViewModelTest {
         assertEquals(listOf("p1"), (errorVm.uiState.value as ChannelUiState.Success).channels.map { it.accountId })
     }
 
-    private class FakeChannelRepository : ChannelRepository {
+    private class FakeChannelRepository(elapsedRealtime: () -> Long = { 0L }) : ChannelRepository {
         private val channels = MutableStateFlow<List<ChannelAccount>>(emptyList())
 
         var pages: List<FacebookPage> = emptyList()
@@ -596,6 +1179,35 @@ class ChannelViewModelTest {
         var expiresAt: Long? = null
 
         override suspend fun getTokenExpiresAt(type: ChannelType, accountId: String): Long? = expiresAt
+
+        var beforeFacebookRefresh: suspend () -> Unit = {}
+
+        var facebookRefreshOutcome: FacebookRefreshOutcome? = null
+
+        private val refreshCoordinator = FacebookRefreshCoordinator(elapsedRealtime)
+
+        override suspend fun refreshFacebookChannels(
+            userId: String?,
+            expiresBefore: Long,
+            sessionVersion: () -> Long?,
+            refresh: suspend () -> FacebookUserToken?,
+        ): FacebookRefreshCheck = refreshCoordinator.check(userId, refresh, sessionVersion) { attempt ->
+            if (expiresAt?.let { it <= expiresBefore } != true) {
+                return@check FacebookRefreshOutcome(skipped = FacebookRefreshSkip.NO_ELIGIBLE_CHANNELS)
+            }
+            beforeFacebookRefresh()
+            val user = try {
+                attempt()
+            } catch (e: FacebookRefreshException) {
+                return@check facebookRefreshOutcome ?: FacebookRefreshOutcome(issues = setOf(e.issue))
+            }
+            facebookRefreshOutcome?.let { return@check it }
+            if (user == null || user.userId != userId) {
+                return@check FacebookRefreshOutcome(skipped = FacebookRefreshSkip.SDK_SESSION_CHANGED)
+            }
+            expiresAt = user.expiresAtMillis
+            FacebookRefreshOutcome(updated = channels.value.filter { it.type == ChannelType.FACEBOOK })
+        }
 
         override suspend fun fetchFacebookPages(userAccessToken: String): Result<List<FacebookPage>> =
             pagesResult ?: Result.success(pages)
@@ -620,6 +1232,7 @@ class ChannelViewModelTest {
             exchangeCode: String,
             state: String,
             codeVerifier: String,
+            expectedAccountId: String?,
         ): Result<ChannelAccount> {
             lastBff = Triple(exchangeCode, state, codeVerifier)
             bffResult?.let { return it }
@@ -664,7 +1277,9 @@ class ChannelViewModelTest {
                 status = ConnectionStatus.CONNECTED,
                 capabilities = setOf(ChannelCapability.PUBLISH),
             )
-            channels.value = channels.value + account
+            channels.value = channels.value.filterNot {
+                it.type == account.type && it.accountId == account.accountId
+            } + account
             return Result.success(account)
         }
 

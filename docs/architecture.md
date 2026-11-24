@@ -97,6 +97,18 @@ App ──POST /auth/linkedin/token (exchange_code, code_verifier)──► BFF 
 - Redirect dùng custom scheme (bản demo). Rủi ro phishing của custom scheme là known issue; sẽ chuyển sang Android App Link bằng ticket riêng.
 - Chi tiết quyết định và điều kiện: issue #88 và `docs/research-social-api.md` (quyết định 4, Luồng B).
 
+### Làm mới kết nối Facebook (issue #24)
+
+- App kiểm tra refresh khi Activity chính ở foreground, kể cả khi người dùng chuyển tab. LinkedIn vẫn đăng nhập lại khi token hết hạn theo luồng BFF ở trên.
+- Token Page lưu hạn là `null` khi chưa có hạn thực từ Meta. Hạn phiên người cấp quyền chỉ dùng để lên lịch refresh. Phản hồi `/me/accounts` luôn lưu hạn Page là `null`, kể cả khi chuỗi Page token trùng với lần trước. Nếu cần triển khai xác minh hạn Page qua [Meta Debug Token](https://developers.facebook.com/docs/graph-api/reference/debug_token/), cần cấu hình xác thực được Meta hỗ trợ. APK hiện không nhúng App Secret.
+- Page đã lưu từ bản cũ thiếu ID người cấp quyền sẽ hiện **Cần kết nối lại** để cập nhật thông tin bằng phiên đăng nhập đã xác nhận. Sự cố mạng, SDK hoặc kho dữ liệu được phân loại để thử lại. Khi Meta xác nhận phiên không hợp lệ, chỉ các kênh của phiên liên quan được yêu cầu kết nối lại. Cảnh báo về phiên User không chuyển trạng thái Page token sang hết hạn hay vô hiệu hóa ma trận quyền.
+- Repository tuần tự hóa các lượt refresh SDK tự động và dùng đồng hồ đơn điệu để tính thời gian chờ theo phiên và theo Page. App kiểm tra thế hệ phiên trước và sau callback SDK, rồi kiểm tra lại trước khi xác nhận token đã ghi tạm. Màn Kênh giữ thông báo lỗi tạm thời trong thời gian chờ. Log `FacebookTokenRefresh` ghi mã kết quả, số kênh, khoảng chờ và mã lỗi Graph/HTTP khi SDK có cung cấp. Log không chứa token, ID tài khoản, nội dung lỗi hay phản hồi API.
+- Page vắng khỏi danh sách trả về có cảnh báo và nút kết nối lại riêng. Token và quyền đã lưu của Page được giữ nguyên vì phản hồi không xác nhận nguyên nhân. Kết quả refresh ghi lỗi theo tài khoản, và một lần lưu thất bại không hoàn tác những Page đã lưu thành công.
+- Khi Activity rời foreground hoặc hết 30 giây chờ SDK, coroutine ngừng nhận kết quả. SDK 17.0.2 có thể hoàn tất request sau đó, nhưng callback muộn không tiếp tục tải Page hay ghi token. Một giao dịch token đã bắt đầu vẫn hoàn tất theo cơ chế ghi an toàn của kho.
+- Retry tự động mặc định chờ 15 phút. Lỗi tạm thời liên tiếp của SDK hoặc của cả đợt refresh tăng dần thời gian chờ đến tối đa 2 giờ. Lỗi của từng Page không làm tăng thời gian chờ tự động. Rate limit áp dụng khoảng chờ chung 30 phút cho cả refresh tự động và retry Page. Phiên không hợp lệ, hết hạn hoặc sai tài khoản sẽ chờ phiên SDK thay đổi. Lệnh refresh SDK trực tiếp có chốt chống gọi đồng thời riêng; app vẫn áp dụng backoff sau lỗi SDK.
+- Nút **Thử làm mới Trang** dùng Facebook User token của phiên SDK hiện tại và chỉ ghi token cho Page được chọn. Retry Page dừng phân trang khi tìm thấy Page, có thể tải song song với refresh tự động và dùng chung cơ chế kiểm tra bản ghi hiện tại khi lưu. Retry Page không gọi SDK làm mới User token.
+- Log chẩn đoán có từng giai đoạn, số Page cập nhật và số Page lỗi. Tham chiếu tài khoản là mã có salt ngẫu nhiên theo tiến trình, chỉ dùng để đối chiếu các lỗi trong cùng phiên app.
+
 ## Điều hướng
 
 Một Activity (`MainActivity`) + Navigation Component, bottom navigation có 5 tab:

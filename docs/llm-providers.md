@@ -79,3 +79,21 @@ không gọi API LLM thật trong CI.
 - [OpenAI Responses events](https://developers.openai.com/api/reference/resources/responses/streaming-events)
 - [Gemini GenerateContent và usage](https://ai.google.dev/api/generate-content)
 - [Gemini API và authentication](https://ai.google.dev/api)
+
+## Chọn model theo loại việc — Issue #54
+
+`LlmModule` cấp `TaskModelResolver` làm `LlmConfigurationSource` (thay `InMemoryLlmConfiguration`).
+Lựa chọn lưu bền vững trong DataStore (`social_agent_task_models`), chỉ gồm tên provider và model ID.
+
+- **Mặc định:** `WRITE_POST` = Gemini `gemini-2.5-flash`, `CLASSIFY_COMMENT` = Gemini `gemini-2.5-flash-lite`
+  (theo `docs/research-llm.md` mục 3.2). `GENERATE_IMAGE` không có mặc định: chưa chọn nghĩa là dùng template ảnh offline.
+- **Trạng thái `TaskModelResolution`:** `Ready`, `NeedsApiKey` (provider chưa có key hoặc key đã xóa),
+  `NotSelected` (chỉ sinh ảnh), `InvalidSelection` (model đã lưu không hợp lệ cho loại việc). Không có trạng thái nào
+  tự chuyển sang provider khác; router vẫn báo `MISSING_API_KEY` đúng nguyên nhân.
+- **Kiểm tra model:** `LlmModelCatalog.validate` kiểm tra định dạng ID (tối đa 128 ký tự, chỉ `A-Za-z0-9._:/-`) và khả
+  năng dùng cho loại việc. Model trong danh mục dùng khai báo sẵn; model tự nhập được xét theo quy ước tên: ID chứa
+  "image" là model ảnh. Đây là heuristic, không xác nhận tài khoản có quyền dùng model.
+- **Key:** `ProviderKeyAvailability` chỉ hỏi `ApiKeyStore.status(provider) == CONFIGURED`, không đọc nội dung key.
+  UI khóa provider chưa có key và dẫn tới màn API key.
+- **UI:** `feature/models/` (Cài đặt → Chọn model). Danh mục model gợi ý là cấu hình trong `LlmModelCatalog`,
+  cập nhật khi nhà cung cấp đổi model; ID tự nhập vẫn dùng được.

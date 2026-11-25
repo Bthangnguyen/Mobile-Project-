@@ -23,7 +23,7 @@ class ModelSelectionRepositoryTest {
 
     @Test
     fun `saves a valid selection trimmed and independently per task`() = runTest {
-        assertEquals(SaveModelResult.Saved, repository.save(LlmTask.WRITE_POST, LlmProvider.OPENAI, "  gpt-6-luna \n"))
+        assertEquals(SaveModelResult.Saved(), repository.save(LlmTask.WRITE_POST, LlmProvider.OPENAI, "  gpt-6-luna \n"))
         assertEquals(TaskModelSelection(LlmProvider.OPENAI, "gpt-6-luna"), store.values[LlmTask.WRITE_POST])
         assertTrue(LlmTask.CLASSIFY_COMMENT !in store.values)
         val snapshot = repository.snapshot()
@@ -59,6 +59,33 @@ class ModelSelectionRepositoryTest {
             repository.save(LlmTask.WRITE_POST, LlmProvider.GEMINI, "bad id"),
         )
         assertEquals(0, store.saveCalls)
+    }
+
+    @Test
+    fun `refuses gemini ids the router would reject so a saved model is always callable`() = runTest {
+        for (id in listOf("tunedModels/my-model", "gemini-2.5-flash:001", "models/", "a/b")) {
+            assertEquals(
+                id,
+                SaveModelResult.Invalid(ModelValidation.INVALID_FORMAT),
+                repository.save(LlmTask.WRITE_POST, LlmProvider.GEMINI, id),
+            )
+        }
+        assertEquals(0, store.saveCalls)
+        // OpenAI vẫn nhận ID có `:` (model tinh chỉnh) vì router OpenAI không ghép ID vào URL.
+        assertEquals(SaveModelResult.Saved(), repository.save(LlmTask.WRITE_POST, LlmProvider.OPENAI, "ft:gpt-6-luna:org::1"))
+    }
+
+    @Test
+    fun `saves unknown model whose name does not fit the task but returns a warning`() = runTest {
+        assertEquals(
+            SaveModelResult.Saved(ModelWarning.POSSIBLY_INCOMPATIBLE_WITH_TASK),
+            repository.save(LlmTask.WRITE_POST, LlmProvider.GEMINI, "gemini-x-image-preview"),
+        )
+        assertEquals("gemini-x-image-preview", store.values[LlmTask.WRITE_POST]?.modelId)
+        assertEquals(
+            SaveModelResult.Saved(ModelWarning.POSSIBLY_INCOMPATIBLE_WITH_TASK),
+            repository.save(LlmTask.GENERATE_IMAGE, LlmProvider.GEMINI, "my-custom-model"),
+        )
     }
 
     @Test

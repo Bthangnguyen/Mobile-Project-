@@ -187,6 +187,7 @@
     <string name="models_status_not_selected">No model selected. The app will use offline image templates.</string>
     <string name="models_status_invalid">The saved model is not valid for this task. Choose another model.</string>
     <string name="models_msg_saved">Selection saved.</string>
+    <string name="models_msg_saved_warning">Saved, but this model name does not look like a model for this kind of work. Check that it works with your account.</string>
     <string name="models_msg_reset">Reset to default.</string>
     <string name="models_msg_missing_key">This provider has no API key yet. Add one in API keys first.</string>
     <string name="models_msg_empty">Enter a model ID.</string>

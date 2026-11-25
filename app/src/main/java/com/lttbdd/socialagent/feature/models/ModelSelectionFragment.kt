@@ -163,6 +163,7 @@ class ModelSelectionFragment : Fragment() {
     @StringRes
     private fun messageResource(message: ModelSelectionMessage): Int = when (message) {
         ModelSelectionMessage.SAVED -> R.string.models_msg_saved
+        ModelSelectionMessage.SAVED_WITH_WARNING -> R.string.models_msg_saved_warning
         ModelSelectionMessage.RESET -> R.string.models_msg_reset
         ModelSelectionMessage.MISSING_API_KEY -> R.string.models_msg_missing_key
         ModelSelectionMessage.EMPTY -> R.string.models_msg_empty

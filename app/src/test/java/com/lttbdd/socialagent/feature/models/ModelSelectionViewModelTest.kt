@@ -176,7 +176,7 @@ class ModelSelectionViewModelTest {
     }
 
     @Test
-    fun `storage failure reports an error and does not leave the screen busy`() = runTest(dispatcher) {
+    fun `storage failure reports an error only on the task being saved and does not leave the screen busy`() = runTest(dispatcher) {
         viewModel.refresh()
         advanceUntilIdle()
         store.failure = IllegalStateException("disk")
@@ -184,6 +184,8 @@ class ModelSelectionViewModelTest {
         advanceUntilIdle()
         assertFalse(viewModel.uiState.value.busy)
         assertEquals(ModelSelectionMessage.ERROR, task(LlmTask.WRITE_POST).message)
+        assertNull(task(LlmTask.CLASSIFY_COMMENT).message)
+        assertNull(task(LlmTask.GENERATE_IMAGE).message)
         store.failure = null
         viewModel.refresh()
         advanceUntilIdle()
@@ -202,6 +204,71 @@ class ModelSelectionViewModelTest {
         advanceUntilIdle()
         assertFalse(viewModel.uiState.value.loadFailed)
         assertEquals(3, viewModel.uiState.value.tasks.size)
+    }
+
+    @Test
+    fun `reset failure is reported only on its own task`() = runTest(dispatcher) {
+        viewModel.refresh()
+        advanceUntilIdle()
+        store.failure = IllegalStateException("disk")
+        viewModel.reset(LlmTask.CLASSIFY_COMMENT)
+        advanceUntilIdle()
+        assertEquals(ModelSelectionMessage.ERROR, task(LlmTask.CLASSIFY_COMMENT).message)
+        assertNull(task(LlmTask.WRITE_POST).message)
+        assertNull(task(LlmTask.GENERATE_IMAGE).message)
+    }
+
+    @Test
+    fun `refresh requested while busy runs after the current operation and picks up key changes`() = runTest(dispatcher) {
+        viewModel.refresh()
+        advanceUntilIdle()
+        assertEquals(TaskModelStatus.READY, task(LlmTask.WRITE_POST).status)
+        viewModel.save(LlmTask.WRITE_POST)
+        assertTrue(viewModel.uiState.value.busy)
+        // Người dùng sang màn API key, xóa key rồi quay lại trong lúc lưu: onStart gọi refresh khi còn bận.
+        keys.configured -= LlmProvider.GEMINI
+        viewModel.refresh()
+        advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.busy)
+        assertEquals(false, viewModel.uiState.value.providerKeys[LlmProvider.GEMINI])
+        assertEquals(TaskModelStatus.NEEDS_API_KEY, task(LlmTask.WRITE_POST).status)
+    }
+
+    @Test
+    fun `pending refresh also runs when the busy operation fails`() = runTest(dispatcher) {
+        viewModel.refresh()
+        advanceUntilIdle()
+        store.saveFailure = IllegalStateException("disk")
+        viewModel.save(LlmTask.WRITE_POST)
+        viewModel.refresh()
+        keys.configured -= LlmProvider.GEMINI
+        advanceUntilIdle()
+        assertEquals(false, viewModel.uiState.value.providerKeys[LlmProvider.GEMINI])
+        assertEquals(TaskModelStatus.NEEDS_API_KEY, task(LlmTask.WRITE_POST).status)
+        assertFalse(viewModel.uiState.value.busy)
+    }
+
+    @Test
+    fun `saving an unknown model with a doubtful name saves it and shows the warning message`() = runTest(dispatcher) {
+        viewModel.refresh()
+        advanceUntilIdle()
+        viewModel.onModelEdited(LlmTask.GENERATE_IMAGE, "my-custom-model")
+        viewModel.save(LlmTask.GENERATE_IMAGE)
+        advanceUntilIdle()
+        assertEquals(ModelSelectionMessage.SAVED_WITH_WARNING, task(LlmTask.GENERATE_IMAGE).message)
+        assertEquals("my-custom-model", store.values[LlmTask.GENERATE_IMAGE]?.modelId)
+        assertEquals(TaskModelStatus.READY, task(LlmTask.GENERATE_IMAGE).status)
+    }
+
+    @Test
+    fun `gemini id that the router would reject is refused at save time`() = runTest(dispatcher) {
+        viewModel.refresh()
+        advanceUntilIdle()
+        viewModel.onModelEdited(LlmTask.WRITE_POST, "tunedModels/my-model")
+        viewModel.save(LlmTask.WRITE_POST)
+        advanceUntilIdle()
+        assertEquals(ModelSelectionMessage.INVALID_FORMAT, task(LlmTask.WRITE_POST).message)
+        assertEquals(0, store.saveCalls)
     }
 
     @Test

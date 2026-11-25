@@ -24,6 +24,7 @@ enum class TaskModelStatus { READY, NEEDS_API_KEY, NOT_SELECTED, INVALID_SELECTI
 
 enum class ModelSelectionMessage {
     SAVED,
+    SAVED_WITH_WARNING,
     RESET,
     MISSING_API_KEY,
     EMPTY,
@@ -61,9 +62,15 @@ class ModelSelectionViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ModelSelectionUiState())
     val uiState: StateFlow<ModelSelectionUiState> = _uiState.asStateFlow()
 
+    /** `refresh()` bị gọi khi đang bận: chạy lại ngay khi thao tác hiện tại kết thúc để không dùng trạng thái key cũ. */
+    private var refreshPending = false
+
     /** Gọi mỗi lần màn hình hiện lại (ví dụ sau khi thêm/xóa key); giữ nguyên bản nháp đang sửa. */
     fun refresh() {
-        if (_uiState.value.busy) return
+        if (_uiState.value.busy) {
+            refreshPending = true
+            return
+        }
         launchOperation { applySnapshot(repository.snapshot(), rebuildDraft = emptySet()) }
     }
 
@@ -94,11 +101,16 @@ class ModelSelectionViewModel @Inject constructor(
     fun save(task: LlmTask) {
         val draft = _uiState.value.tasks[task] ?: return
         if (_uiState.value.busy) return
-        launchOperation {
+        launchOperation(task) {
             when (val result = repository.save(task, draft.provider, draft.modelInput)) {
-                SaveModelResult.Saved -> {
+                is SaveModelResult.Saved -> {
                     applySnapshot(repository.snapshot(), rebuildDraft = setOf(task))
-                    updateTask(task) { it.copy(message = ModelSelectionMessage.SAVED) }
+                    val message = if (result.warning == null) {
+                        ModelSelectionMessage.SAVED
+                    } else {
+                        ModelSelectionMessage.SAVED_WITH_WARNING
+                    }
+                    updateTask(task) { it.copy(message = message) }
                 }
                 SaveModelResult.MissingApiKey ->
                     updateTask(task) { it.copy(message = ModelSelectionMessage.MISSING_API_KEY) }
@@ -111,14 +123,15 @@ class ModelSelectionViewModel @Inject constructor(
     /** Bỏ lựa chọn riêng: về mặc định, hoặc chưa chọn với sinh ảnh (dùng template ảnh offline). */
     fun reset(task: LlmTask) {
         if (_uiState.value.busy || task !in _uiState.value.tasks) return
-        launchOperation {
+        launchOperation(task) {
             repository.reset(task)
             applySnapshot(repository.snapshot(), rebuildDraft = setOf(task))
             updateTask(task) { it.copy(message = ModelSelectionMessage.RESET) }
         }
     }
 
-    private fun launchOperation(block: suspend () -> Unit) {
+    /** [task] là loại việc đang thao tác: lỗi chỉ gắn vào thẻ đó; thao tác tải lại ([task] = null) lỗi thì báo lỗi tải. */
+    private fun launchOperation(task: LlmTask? = null, block: suspend () -> Unit) {
         _uiState.update { it.copy(busy = true) }
         viewModelScope.launch {
             try {
@@ -126,15 +139,17 @@ class ModelSelectionViewModel @Inject constructor(
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Exception) {
-                _uiState.update { state ->
-                    if (state.tasks.isEmpty()) {
-                        state.copy(loadFailed = true)
-                    } else {
-                        state.copy(tasks = state.tasks.mapValues { it.value.copy(message = ModelSelectionMessage.ERROR) })
-                    }
+                if (task != null) {
+                    updateTask(task) { it.copy(message = ModelSelectionMessage.ERROR) }
+                } else {
+                    _uiState.update { it.copy(loadFailed = true) }
                 }
             } finally {
                 _uiState.update { it.copy(busy = false, loading = false) }
+                if (refreshPending) {
+                    refreshPending = false
+                    refresh()
+                }
             }
         }
     }

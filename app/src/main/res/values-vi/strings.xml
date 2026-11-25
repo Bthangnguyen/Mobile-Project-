@@ -185,6 +185,7 @@
     <string name="models_status_not_selected">Chưa chọn model. Ứng dụng sẽ dùng template ảnh offline.</string>
     <string name="models_status_invalid">Model đã lưu không hợp lệ cho loại việc này. Hãy chọn model khác.</string>
     <string name="models_msg_saved">Đã lưu lựa chọn.</string>
+    <string name="models_msg_saved_warning">Đã lưu, nhưng tên model này không giống model dùng cho loại việc này. Hãy kiểm tra tài khoản của bạn có dùng được không.</string>
     <string name="models_msg_reset">Đã đặt lại về mặc định.</string>
     <string name="models_msg_missing_key">Nhà cung cấp này chưa có API key. Hãy thêm key trong phần API key trước.</string>
     <string name="models_msg_empty">Nhập model ID.</string>

@@ -11,7 +11,8 @@ data class ModelSelectionSnapshot(
 )
 
 sealed interface SaveModelResult {
-    data object Saved : SaveModelResult
+    /** [warning] khác null khi model ngoài danh mục và tên không giống loại model của việc này; vẫn đã lưu. */
+    data class Saved(val warning: ModelWarning? = null) : SaveModelResult
     data object MissingApiKey : SaveModelResult
     data class Invalid(val reason: ModelValidation) : SaveModelResult
 }
@@ -34,7 +35,7 @@ class ModelSelectionRepository @Inject constructor(
         if (validation != ModelValidation.VALID) return SaveModelResult.Invalid(validation)
         if (!keys.isConfigured(provider)) return SaveModelResult.MissingApiKey
         store.save(task, TaskModelSelection(provider, modelId))
-        return SaveModelResult.Saved
+        return SaveModelResult.Saved(LlmModelCatalog.warning(provider, task, modelId))
     }
 
     /** Xóa lựa chọn riêng: loại việc quay về mặc định (hoặc chưa chọn với sinh ảnh). */

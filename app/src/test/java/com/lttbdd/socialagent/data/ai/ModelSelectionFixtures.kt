@@ -9,6 +9,9 @@ internal class FakeTaskModelStore : TaskModelSelectionStore {
     var saveCalls = 0
     var failure: Exception? = null
 
+    /** Chỉ làm hỏng thao tác ghi, để đọc lại trạng thái vẫn chạy được. */
+    var saveFailure: Exception? = null
+
     override suspend fun get(task: LlmTask): TaskModelSelection? {
         failure?.let { throw it }
         return values[task]
@@ -16,6 +19,7 @@ internal class FakeTaskModelStore : TaskModelSelectionStore {
 
     override suspend fun save(task: LlmTask, selection: TaskModelSelection) {
         failure?.let { throw it }
+        saveFailure?.let { throw it }
         saveCalls++
         values[task] = selection
     }

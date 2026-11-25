@@ -2,6 +2,8 @@ package com.lttbdd.socialagent.data.ai
 
 import com.lttbdd.socialagent.core.model.LlmProvider
 import com.lttbdd.socialagent.core.model.LlmTask
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -67,6 +69,53 @@ class LlmModelCatalogTest {
             ModelValidation.INCOMPATIBLE_WITH_TASK,
             LlmModelCatalog.validate(LlmProvider.OPENAI, LlmTask.CLASSIFY_COMMENT, "gpt-6.1-terra"),
         )
+    }
+
+    @Test
+    fun `uses the same id rule as the router so every saveable gemini id is callable`() = runTest {
+        val ids = listOf("gemini-2.5-flash", "models/gemini-2.5-flash", "my.tuned_model-1", "tunedModels/x", "g:001", "a/b", "models/")
+        for (id in ids) {
+            val saveable = LlmModelCatalog.validate(LlmProvider.GEMINI, LlmTask.WRITE_POST, id) == ModelValidation.VALID
+            val router = RoutingLlmClient(
+                LlmConfigurationSource { LlmModelConfiguration(LlmProvider.GEMINI, id) },
+                ApiKeySource { syntheticKey() },
+                setOf(GeminiClient(FakeSseTransport(geminiFrames))),
+            )
+            if (saveable) {
+                router.streamChat(chatRequest()).toList()
+            } else {
+                expectFailure(LlmFailure.INVALID_REQUEST) { router.streamChat(chatRequest()).toList() }
+            }
+        }
+    }
+
+    @Test
+    fun `rejects gemini ids with path or version separators but keeps them for openai`() {
+        for (id in listOf("tunedModels/my-model", "gemini-2.5-flash:001", "a/b", "models/")) {
+            assertEquals(id, ModelValidation.INVALID_FORMAT, LlmModelCatalog.validate(LlmProvider.GEMINI, LlmTask.WRITE_POST, id))
+        }
+        assertEquals(ModelValidation.VALID, LlmModelCatalog.validate(LlmProvider.OPENAI, LlmTask.WRITE_POST, "ft:gpt-6-luna:org::1"))
+    }
+
+    @Test
+    fun `unknown ids are allowed and only warned about when the name does not fit the task`() {
+        // Model ngoài danh mục: không đủ dữ liệu để chặn, chỉ cảnh báo.
+        assertEquals(ModelValidation.VALID, LlmModelCatalog.validate(LlmProvider.OPENAI, LlmTask.WRITE_POST, "gpt-x-image-input"))
+        assertEquals(
+            ModelWarning.POSSIBLY_INCOMPATIBLE_WITH_TASK,
+            LlmModelCatalog.warning(LlmProvider.OPENAI, LlmTask.WRITE_POST, "gpt-x-image-input"),
+        )
+        assertEquals(ModelValidation.VALID, LlmModelCatalog.validate(LlmProvider.OPENAI, LlmTask.GENERATE_IMAGE, "my-model"))
+        assertEquals(
+            ModelWarning.POSSIBLY_INCOMPATIBLE_WITH_TASK,
+            LlmModelCatalog.warning(LlmProvider.OPENAI, LlmTask.GENERATE_IMAGE, "my-model"),
+        )
+        // Model ảnh phổ biến ngoài danh mục không bị cảnh báo nhầm.
+        assertNull(LlmModelCatalog.warning(LlmProvider.OPENAI, LlmTask.GENERATE_IMAGE, "dall-e-3"))
+        assertNull(LlmModelCatalog.warning(LlmProvider.GEMINI, LlmTask.GENERATE_IMAGE, "imagen-4.0"))
+        assertNull(LlmModelCatalog.warning(LlmProvider.GEMINI, LlmTask.WRITE_POST, "gemini-9-pro"))
+        // Model trong danh mục dùng khai báo sẵn: không cảnh báo (sai loại việc thì validate đã chặn).
+        assertNull(LlmModelCatalog.warning(LlmProvider.GEMINI, LlmTask.WRITE_POST, "gemini-2.5-flash"))
     }
 
     @Test

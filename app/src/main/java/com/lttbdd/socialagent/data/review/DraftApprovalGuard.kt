@@ -1,4 +1,4 @@
-package com.lttbdd.socialagent.feature.review
+package com.lttbdd.socialagent.data.review
 
 import com.lttbdd.socialagent.core.model.Draft
 
@@ -12,8 +12,11 @@ sealed interface PublishEligibility {
 }
 
 /**
- * Cổng bảo vệ nghiệp vụ cho yêu cầu F4 (#33):
+ * Cổng bảo vệ nghiệp vụ dùng chung cho yêu cầu F4 (#33) và hàng đợi đăng bài F5 (#37):
  * **Agent không bao giờ tự đăng khi chưa có sự phê duyệt tường minh của người dùng.**
+ *
+ * Đặt tại `data/review/` để cả `feature/review/`, `data/publishing/` và các luồng sinh bài (F2)
+ * dùng chung một nguồn sự thật duy nhất mà không phụ thuộc ngược vào `feature/`.
  */
 object DraftApprovalGuard {
 

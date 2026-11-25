@@ -23,7 +23,8 @@ data class ReviewDraftsUiState(
  * Sự kiện dùng một lần (one-shot event) phát từ [ReviewDraftsViewModel] sang [ReviewDraftsFragment].
  */
 sealed interface ReviewDraftsEvent {
-    data class ConfirmApprove(val draftId: String) : ReviewDraftsEvent
+    /** Mang theo [expectedText] đúng với nội dung người dùng đã xem lúc bấm Duyệt bài. */
+    data class ConfirmApprove(val draftId: String, val expectedText: String) : ReviewDraftsEvent
     data class ShowMessage(@param:StringRes val messageRes: Int) : ReviewDraftsEvent
     data class ReadyToPublish(val draft: Draft) : ReviewDraftsEvent
 }

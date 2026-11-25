@@ -3,6 +3,13 @@ package com.lttbdd.socialagent.feature.review
 import com.lttbdd.socialagent.R
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.Draft
+import com.lttbdd.socialagent.data.review.DraftApprovalGuard
+import com.lttbdd.socialagent.data.review.DraftApprovalResult
+import com.lttbdd.socialagent.data.review.DraftContentUpdateResult
+import com.lttbdd.socialagent.data.review.DraftReviewRepository
+import com.lttbdd.socialagent.data.review.DraftRevokeResult
+import com.lttbdd.socialagent.data.review.PublishEligibility
+import com.lttbdd.socialagent.data.review.PublishGateResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -68,16 +75,15 @@ class ReviewDraftsViewModelTest {
         viewModel.onPublishRequested("d1")
         advanceUntilIdle()
 
-        val event = viewModel.events.first()
         assertEquals(
             ReviewDraftsEvent.ShowMessage(R.string.review_publish_blocked_unapproved),
-            event,
+            viewModel.events.first(),
         )
         collector.cancel()
     }
 
     @Test
-    fun `approval requires confirmation and unlocks publishing`() = runTest {
+    fun `approval requires confirmation matching viewed text and unlocks publishing`() = runTest {
         val collector = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
             viewModel.uiState.collect {}
         }
@@ -92,12 +98,14 @@ class ReviewDraftsViewModelTest {
         )
         advanceUntilIdle()
 
-        viewModel.onApproveRequested("d2")
-        assertEquals(ReviewDraftsEvent.ConfirmApprove("d2"), viewModel.events.first())
-        // Chưa xác nhận thì vẫn chưa được duyệt
+        viewModel.onApproveRequested("d2", "Bài LinkedIn cần duyệt")
+        assertEquals(
+            ReviewDraftsEvent.ConfirmApprove("d2", "Bài LinkedIn cần duyệt"),
+            viewModel.events.first(),
+        )
         assertFalse(viewModel.uiState.value.drafts.first().draft.approved)
 
-        viewModel.onApproveConfirmed("d2")
+        viewModel.onApproveConfirmed("d2", "Bài LinkedIn cần duyệt")
         advanceUntilIdle()
 
         assertEquals(
@@ -117,6 +125,75 @@ class ReviewDraftsViewModelTest {
     }
 
     @Test
+    fun `confirming approval after content changed rejects approval and asks user to review again`() = runTest {
+        val collector = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.uiState.collect {}
+        }
+
+        fakeRepository.saveAgentDraft(
+            Draft(
+                id = "d-race",
+                topicId = "t-race",
+                channel = ChannelType.FACEBOOK,
+                text = "Nội dung v1",
+            ),
+        )
+        advanceUntilIdle()
+
+        // Mở hộp thoại với v1
+        viewModel.onApproveRequested("d-race", "Nội dung v1")
+        val confirmEvent = viewModel.events.first() as ReviewDraftsEvent.ConfirmApprove
+
+        // Nội dung thay đổi sang v2 trước khi người dùng bấm Xác nhận
+        fakeRepository.updateDraftContent("d-race", "Nội dung v2 đã đổi")
+        advanceUntilIdle()
+
+        viewModel.onApproveConfirmed(confirmEvent.draftId, confirmEvent.expectedText)
+        advanceUntilIdle()
+
+        assertEquals(
+            ReviewDraftsEvent.ShowMessage(R.string.review_draft_content_changed),
+            viewModel.events.first(),
+        )
+        assertFalse(viewModel.uiState.value.drafts.first().draft.approved)
+        assertFalse(viewModel.uiState.value.drafts.first().canPublish)
+        collector.cancel()
+    }
+
+    @Test
+    fun `storage error on approve or revoke shows action failed message without crashing`() = runTest {
+        val collector = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.uiState.collect {}
+        }
+
+        fakeRepository.saveAgentDraft(
+            Draft(
+                id = "d-io",
+                topicId = "t-io",
+                channel = ChannelType.FACEBOOK,
+                text = "Nội dung",
+            ),
+        )
+        fakeRepository.failWithStorageError = true
+        advanceUntilIdle()
+
+        viewModel.onApproveConfirmed("d-io", "Nội dung")
+        advanceUntilIdle()
+        assertEquals(
+            ReviewDraftsEvent.ShowMessage(R.string.review_draft_action_failed),
+            viewModel.events.first(),
+        )
+
+        viewModel.onRevokeApproval("d-io")
+        advanceUntilIdle()
+        assertEquals(
+            ReviewDraftsEvent.ShowMessage(R.string.review_draft_action_failed),
+            viewModel.events.first(),
+        )
+        collector.cancel()
+    }
+
+    @Test
     fun `revokeApproval re-locks publishing`() = runTest {
         val collector = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
             viewModel.uiState.collect {}
@@ -130,7 +207,7 @@ class ReviewDraftsViewModelTest {
                 text = "Nội dung bản nháp",
             ),
         )
-        fakeRepository.approveDraft("d3")
+        fakeRepository.approveDraft("d3", expectedText = "Nội dung bản nháp")
         advanceUntilIdle()
         assertTrue(viewModel.uiState.value.drafts.first().canPublish)
 
@@ -159,30 +236,49 @@ class ReviewDraftsViewModelTest {
 
     private class FakeDraftReviewRepository : DraftReviewRepository {
         private val items = MutableStateFlow<List<Draft>>(emptyList())
+        var failWithStorageError = false
 
         override fun observeDrafts(): Flow<List<Draft>> = items.asStateFlow()
 
-        override suspend fun saveAgentDraft(draft: Draft): Draft {
+        override suspend fun saveAgentDraft(draft: Draft): Result<Draft> {
             val sanitized = DraftApprovalGuard.sanitizeAgentDraft(draft)
             items.value = items.value.filterNot { it.id == sanitized.id } + sanitized
-            return sanitized
+            return Result.success(sanitized)
         }
 
-        override suspend fun approveDraft(draftId: String): Result<Draft> {
+        override suspend fun updateDraftContent(
+            draftId: String,
+            newText: String,
+        ): DraftContentUpdateResult {
+            if (newText.isBlank()) return DraftContentUpdateResult.EmptyContent
             val current = items.value.firstOrNull { it.id == draftId }
-                ?: return Result.failure(NoSuchElementException(draftId))
-            if (current.text.isBlank()) return Result.failure(IllegalStateException("blank"))
+                ?: return DraftContentUpdateResult.NotFound
+            val updated = DraftApprovalGuard.onDraftContentEdited(current.copy(text = newText))
+            items.value = items.value.map { if (it.id == draftId) updated else it }
+            return DraftContentUpdateResult.Updated(updated)
+        }
+
+        override suspend fun approveDraft(
+            draftId: String,
+            expectedText: String,
+        ): DraftApprovalResult {
+            if (failWithStorageError) return DraftApprovalResult.StorageError(IllegalStateException("IO"))
+            val current = items.value.firstOrNull { it.id == draftId }
+                ?: return DraftApprovalResult.NotFound
+            if (current.text != expectedText) return DraftApprovalResult.ContentChanged
+            if (current.text.isBlank()) return DraftApprovalResult.EmptyContent
             val updated = current.copy(approved = true)
             items.value = items.value.map { if (it.id == draftId) updated else it }
-            return Result.success(updated)
+            return DraftApprovalResult.Approved(updated)
         }
 
-        override suspend fun revokeApproval(draftId: String): Result<Draft> {
+        override suspend fun revokeApproval(draftId: String): DraftRevokeResult {
+            if (failWithStorageError) return DraftRevokeResult.StorageError(IllegalStateException("IO"))
             val current = items.value.firstOrNull { it.id == draftId }
-                ?: return Result.failure(NoSuchElementException(draftId))
+                ?: return DraftRevokeResult.NotFound
             val updated = current.copy(approved = false)
             items.value = items.value.map { if (it.id == draftId) updated else it }
-            return Result.success(updated)
+            return DraftRevokeResult.Revoked(updated)
         }
 
         override suspend fun requestPublish(draftId: String): PublishGateResult {

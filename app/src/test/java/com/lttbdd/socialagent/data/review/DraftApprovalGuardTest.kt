@@ -1,4 +1,4 @@
-package com.lttbdd.socialagent.feature.review
+package com.lttbdd.socialagent.data.review
 
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.Draft

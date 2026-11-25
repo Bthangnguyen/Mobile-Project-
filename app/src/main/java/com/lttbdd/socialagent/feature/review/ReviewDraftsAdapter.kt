@@ -15,7 +15,7 @@ import com.lttbdd.socialagent.databinding.ItemReviewDraftBinding
  * Adapter hiển thị danh sách bản nháp cần duyệt cùng trạng thái phê duyệt và nút Đăng bài có khóa an toàn.
  */
 class ReviewDraftsAdapter(
-    private val onApproveClick: (String) -> Unit,
+    private val onApproveClick: (draftId: String, displayedText: String) -> Unit,
     private val onRevokeClick: (String) -> Unit,
     private val onPublishClick: (String) -> Unit,
 ) : ListAdapter<ReviewDraftItemUiState, ReviewDraftsAdapter.DraftViewHolder>(DiffCallback) {
@@ -65,7 +65,7 @@ class ReviewDraftsAdapter(
             binding.btnRevoke.isVisible = draft.approved
             binding.btnPublish.isEnabled = item.canPublish
 
-            binding.btnApprove.setOnClickListener { onApproveClick(draft.id) }
+            binding.btnApprove.setOnClickListener { onApproveClick(draft.id, draft.text) }
             binding.btnRevoke.setOnClickListener { onRevokeClick(draft.id) }
             binding.btnPublish.setOnClickListener { onPublishClick(draft.id) }
         }

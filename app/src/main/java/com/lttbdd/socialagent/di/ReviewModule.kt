@@ -1,7 +1,7 @@
 package com.lttbdd.socialagent.di
 
-import com.lttbdd.socialagent.feature.review.DraftReviewRepository
-import com.lttbdd.socialagent.feature.review.RoomDraftReviewRepository
+import com.lttbdd.socialagent.data.review.DraftReviewRepository
+import com.lttbdd.socialagent.data.review.RoomDraftReviewRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn

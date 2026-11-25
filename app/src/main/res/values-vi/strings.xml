@@ -204,10 +204,11 @@
     <string name="review_approve_dialog_title">Xác nhận duyệt bản nháp?</string>
     <string name="review_approve_dialog_message">Xác nhận bạn đã kiểm tra nội dung và cho phép đăng bài này khi bạn bấm Đăng.</string>
     <string name="review_draft_approved_message">Đã duyệt bản nháp. Bạn có thể bấm Đăng bài.</string>
+    <string name="review_draft_content_changed">Nội dung bản nháp đã thay đổi trong lúc bạn xem. Vui lòng kiểm tra lại trước khi duyệt.</string>
     <string name="review_draft_revoked_message">Đã bỏ duyệt. Nút đăng bài đã được khóa lại.</string>
     <string name="review_draft_approve_failed">Không thể duyệt bản nháp trống hoặc không tồn tại.</string>
     <string name="review_draft_action_failed">Không thể cập nhật bản nháp. Vui lòng thử lại.</string>
     <string name="review_publish_blocked_unapproved">Bản nháp chưa được duyệt nên không thể đăng bài.</string>
     <string name="review_publish_blocked_empty">Bản nháp đang trống nội dung nên không thể đăng bài.</string>
-    <string name="review_publish_ready_message">Bản nháp đã qua kiểm duyệt và sẵn sàng đăng bài.</string>
+    <string name="review_publish_ready_message">Bản nháp đã qua kiểm duyệt. Hàng đợi đăng bài (F5) chưa được nối — bài viết chưa được đăng.</string>
 </resources>

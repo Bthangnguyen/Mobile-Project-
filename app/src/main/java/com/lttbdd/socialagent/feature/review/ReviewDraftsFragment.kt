@@ -94,7 +94,9 @@ class ReviewDraftsFragment : Fragment() {
                     messageRes = R.string.review_approve_dialog_message,
                     positiveActionRes = R.string.review_action_approve,
                     negativeActionRes = R.string.action_cancel,
-                    onPositiveAction = { viewModel.onApproveConfirmed(event.draftId) },
+                    onPositiveAction = {
+                        viewModel.onApproveConfirmed(event.draftId, event.expectedText)
+                    },
                 )
             }
             is ReviewDraftsEvent.ShowMessage -> {

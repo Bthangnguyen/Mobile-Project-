@@ -90,9 +90,14 @@ Lựa chọn lưu bền vững trong DataStore (`social_agent_task_models`), ch�
 - **Trạng thái `TaskModelResolution`:** `Ready`, `NeedsApiKey` (provider chưa có key hoặc key đã xóa),
   `NotSelected` (chỉ sinh ảnh), `InvalidSelection` (model đã lưu không hợp lệ cho loại việc). Không có trạng thái nào
   tự chuyển sang provider khác; router vẫn báo `MISSING_API_KEY` đúng nguyên nhân.
-- **Kiểm tra model:** `LlmModelCatalog.validate` kiểm tra định dạng ID (tối đa 128 ký tự, chỉ `A-Za-z0-9._:/-`) và khả
-  năng dùng cho loại việc. Model trong danh mục dùng khai báo sẵn; model tự nhập được xét theo quy ước tên: ID chứa
-  "image" là model ảnh. Đây là heuristic, không xác nhận tài khoản có quyền dùng model.
+- **Kiểm tra model:** `LlmModelCatalog.validate` kiểm tra định dạng ID (tối đa 128 ký tự) bằng
+  `isValidModelIdFormat`, dùng chung với `RoutingLlmClient` nên ID lưu được thì router cũng gọi được. Gemini: bỏ
+  tiền tố `models/` rồi chỉ nhận `A-Za-z0-9._-`; provider khác nhận thêm `:` và `/` (model tinh chỉnh).
+- **Khả năng dùng cho loại việc:** model trong danh mục dùng khai báo sẵn, sai loại việc thì **chặn**
+  (`INCOMPATIBLE_WITH_TASK`). Model ngoài danh mục **không bị chặn**, chỉ trả cảnh báo
+  `ModelWarning.POSSIBLY_INCOMPATIBLE_WITH_TASK` (vẫn lưu, UI hiện `models_msg_saved_warning`) khi tên không khớp loại
+  việc. Dấu hiệu model ảnh: ID chứa `image`, `imagen` hoặc `dall-e`. Đây là heuristic, không xác nhận tài khoản có
+  quyền dùng model.
 - **Key:** `ProviderKeyAvailability` chỉ hỏi `ApiKeyStore.status(provider) == CONFIGURED`, không đọc nội dung key.
   UI khóa provider chưa có key và dẫn tới màn API key.
 - **UI:** `feature/models/` (Cài đặt → Chọn model). Danh mục model gợi ý là cấu hình trong `LlmModelCatalog`,

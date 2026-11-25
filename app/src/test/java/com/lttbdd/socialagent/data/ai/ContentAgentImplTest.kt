@@ -10,6 +10,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.toList
@@ -214,6 +215,38 @@ class ContentAgentImplTest {
         val failed = failures(agent.generate(brief(setOf(fb))).toList()).single()
 
         assertEquals(ChannelFailureReason.UNKNOWN, failed.reason)
+    }
+
+    @Test
+    fun `timeout khi gui su kien ket thuc bi treo do backpressure van bao ChannelFailed`() = runTest {
+        val release = CompletableDeferred<Unit>()
+        val agent = ContentAgentImpl(
+            mapOf(
+                fb to ChannelSubAgent { _, emit ->
+                    // Làm đầy bộ đệm của Flow để lần send tiếp theo bị treo vì collector chậm.
+                    try {
+                        while (true) {
+                            withTimeout(100) { emit(AgentEvent.TextDelta(fb, AgentStep.DRAFT, "x")) }
+                        }
+                    } catch (_: TimeoutCancellationException) {
+                        // Bộ đệm đã đầy.
+                    }
+                    withTimeout(1_000) { emit(AgentEvent.ChannelDone(draft(fb))) }
+                },
+            ),
+        )
+        val events = mutableListOf<AgentEvent>()
+        val job = launch { agent.generate(brief(setOf(fb))).collect { events += it; release.await() } }
+
+        runCurrent()
+        advanceUntilIdle()
+        release.complete(Unit)
+        advanceUntilIdle()
+
+        assertTrue(job.isCompleted)
+        assertTrue(done(events).isEmpty())
+        val failed = failures(events).single()
+        assertEquals(ChannelFailureReason.TIMEOUT, failed.reason)
     }
 
     @Test

@@ -102,12 +102,11 @@ class ContentAgentImpl(
                 if (!event.belongsTo(channel)) return@run
                 state.mutex.withLock {
                     if (state.finished) return@withLock
-                    when (event) {
-                        is AgentEvent.StepStarted -> state.step = event.step
-                        is AgentEvent.ChannelDone, is AgentEvent.ChannelFailed -> state.finished = true
-                        else -> Unit
-                    }
+                    if (event is AgentEvent.StepStarted) state.step = event.step
                     send(event)
+                    // Chỉ đánh dấu kết thúc SAU khi send xong: nếu send bị treo (backpressure) rồi bị
+                    // timeout cắt thì kênh vẫn chưa có sự kiện kết thúc và catch bên dưới sẽ báo lỗi.
+                    if (event is AgentEvent.ChannelDone || event is AgentEvent.ChannelFailed) state.finished = true
                 }
             }
             failIfUnfinished(state, channel, ChannelFailureReason.NO_RESULT)
@@ -135,8 +134,8 @@ class ContentAgentImpl(
     ) {
         state.mutex.withLock {
             if (state.finished) return
-            state.finished = true
             send(AgentEvent.ChannelFailed(channel, step ?: state.step, reason))
+            state.finished = true
         }
     }
 

@@ -8,6 +8,8 @@ import com.lttbdd.socialagent.data.model.FacebookUserToken
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
@@ -35,6 +37,30 @@ class FacebookRefreshCoordinatorTest {
             error("Đang trong backoff.")
         }
         assertEquals(FacebookRefreshSkip.COOLDOWN, skipped.outcome.skipped)
+    }
+
+    @Test
+    fun cancelledAutomaticRefreshAllowsImmediateRetryInTheSameSession() = runTest {
+        val coordinator = FacebookRefreshCoordinator { 0L }
+        val user = FacebookUserToken("session", Long.MAX_VALUE, null, "owner")
+        val started = CompletableDeferred<Unit>()
+        val interrupted = async {
+            coordinator.check("owner", { user }, sessionVersion = { 1L }) { refresh ->
+                assertEquals(user, refresh())
+                started.complete(Unit)
+                awaitCancellation()
+            }
+        }
+
+        started.await()
+        interrupted.cancelAndJoin()
+
+        val result = coordinator.check("owner", { user }, sessionVersion = { 1L }) { refresh ->
+            assertEquals(user, refresh())
+            FacebookRefreshOutcome(skipped = FacebookRefreshSkip.NO_CHANGES)
+        }
+
+        assertEquals(FacebookRefreshSkip.NO_CHANGES, result.outcome.skipped)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)

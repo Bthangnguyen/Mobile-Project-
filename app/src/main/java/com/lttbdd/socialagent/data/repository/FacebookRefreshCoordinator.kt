@@ -6,6 +6,8 @@ import com.lttbdd.socialagent.data.model.FacebookRefreshIssue
 import com.lttbdd.socialagent.data.model.FacebookRefreshOutcome
 import com.lttbdd.socialagent.data.model.FacebookRefreshSkip
 import com.lttbdd.socialagent.data.model.FacebookUserToken
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -80,14 +82,17 @@ internal class FacebookRefreshCoordinator(private val elapsedRealtime: () -> Lon
                     attemptedAt = elapsedRealtime()
                     true
                 }
-            }
+            }.also { currentCoroutineContext().ensureActive() }
         } finally {
             synchronized(retryLock) {
                 inFlight.remove(request)
-                if (session.version == sessionVersion() && outcome?.skipped != FacebookRefreshSkip.SDK_SESSION_CHANGED) {
-                    if (attemptedAt != null || !outcome?.batchIssues.isNullOrEmpty()) {
-                        recordRetry(request, outcome, previous, attemptedAt ?: now, baseDelay)
-                    }
+                // Lượt bị hủy chưa có kết quả để tính thời gian chờ.
+                val completed = outcome
+                if (completed != null && completed.skipped != FacebookRefreshSkip.SDK_SESSION_CHANGED &&
+                    session.version == sessionVersion() &&
+                    (attemptedAt != null || completed.batchIssues.isNotEmpty())
+                ) {
+                    recordRetry(request, completed, previous, attemptedAt ?: now, baseDelay)
                 }
             }
         }
@@ -100,12 +105,12 @@ internal class FacebookRefreshCoordinator(private val elapsedRealtime: () -> Lon
 
     private fun recordRetry(
         request: Request,
-        outcome: FacebookRefreshOutcome?,
+        outcome: FacebookRefreshOutcome,
         previous: Retry?,
         startedAt: Long,
         baseDelay: Long,
     ) {
-        val issues = outcome?.batchIssues.orEmpty()
+        val issues = outcome.batchIssues
         val session = request.session
         if (issues.any { it in terminalIssues }) {
             blockedSessions[session.userId] = session
@@ -119,7 +124,7 @@ internal class FacebookRefreshCoordinator(private val elapsedRealtime: () -> Lon
             val delay = FACEBOOK_REFRESH_RETRY * (1L shl (failures - 1))
             retries[request] = Retry(startedAt, delay.coerceAtMost(MAX_RETRY_MILLIS), failures)
         } else {
-            retries[request] = Retry(startedAt, baseDelay, if (outcome == null) previous?.failures ?: 0 else 0)
+            retries[request] = Retry(startedAt, baseDelay)
         }
     }
 

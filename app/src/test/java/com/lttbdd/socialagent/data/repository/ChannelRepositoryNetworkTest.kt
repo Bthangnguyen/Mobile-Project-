@@ -6,15 +6,21 @@ import com.lttbdd.socialagent.data.model.ChannelException
 import com.lttbdd.socialagent.data.model.FacebookRefreshIssue
 import com.lttbdd.socialagent.data.model.FacebookRefreshSkip
 import com.lttbdd.socialagent.data.model.FacebookPage
+import com.lttbdd.socialagent.data.model.FacebookPageAccessIssue
+import com.lttbdd.socialagent.data.model.FACEBOOK_REFRESH_RETRY
 import com.lttbdd.socialagent.data.model.FacebookUserToken
 import com.lttbdd.socialagent.data.model.OAuthToken
 import com.lttbdd.socialagent.data.security.PendingChannelWrite
 import com.lttbdd.socialagent.data.security.TokenStore
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -113,6 +119,136 @@ class ChannelRepositoryNetworkTest {
 
     private fun failureError(result: Result<*>): ChannelError =
         (result.exceptionOrNull() as ChannelException).error
+
+    @Test
+    fun pageAccessUsesStoredTokensAndDistinguishesRevocationFromPermissions() = runTest {
+        val user = FacebookUserToken("sdk-user-token", Long.MAX_VALUE, null, "owner")
+        val subcodes = mapOf("revoked" to 458, "password" to 460, "permissions" to 492)
+        for (page in subcodes.keys + "healthy") {
+            repository.connectFacebookSelectedPage(user, FacebookPage(page, page, "token-$page")).getOrThrow()
+        }
+        handler = { request ->
+            val page = checkNotNull(request.header("Authorization")).removePrefix("Bearer token-")
+            val subcode = subcodes[page]
+            if (subcode == null) 200 to """{"id":"$page"}"""
+            else 400 to """{"error":{"code":190,"error_subcode":$subcode}}"""
+        }
+
+        repository.checkFacebookPageAccess()
+        repository.checkFacebookPageAccess()
+
+        assertEquals(
+            mapOf(
+                "revoked" to FacebookPageAccessIssue.RECONNECT_REQUIRED,
+                "password" to FacebookPageAccessIssue.RECONNECT_REQUIRED,
+                "permissions" to FacebookPageAccessIssue.PERMISSION_REQUIRED,
+            ),
+            repository.observeFacebookPageAccessIssues().first(),
+        )
+        assertEquals(4, requests.size)
+        for (request in requests) {
+            assertEquals("graph.facebook.com", request.url.host)
+            assertTrue(request.url.encodedPath.endsWith("/me"))
+            assertEquals("id", request.url.queryParameter("fields"))
+            assertNull(request.url.queryParameter("access_token"))
+        }
+        assertNull(repository.getTokenExpiresAt(ChannelType.FACEBOOK, "revoked"))
+        assertEquals("token-revoked", store.storage["FACEBOOK_revoked"]?.accessToken)
+    }
+
+    @Test
+    fun pageAccessIgnoresALateFailureAfterReconnectingTheSamePage() = runTest {
+        val user = FacebookUserToken("user", Long.MAX_VALUE, null, "owner")
+        val page = FacebookPage("page", "Page", "old")
+        repository.connectFacebookSelectedPage(user, page).getOrThrow()
+        val requested = CompletableDeferred<Unit>()
+        val finish = CompletableDeferred<Unit>()
+        handler = {
+            requested.complete(Unit)
+            runBlocking { withTimeout(5_000L) { finish.await() } }
+            400 to """{"error":{"code":190,"error_subcode":460}}"""
+        }
+        val check = async { repository.checkFacebookPageAccess() }
+        try {
+            requested.await()
+            repository.connectFacebookSelectedPage(user, page.copy(accessToken = "new")).getOrThrow()
+        } finally {
+            finish.complete(Unit)
+        }
+        check.await()
+
+        assertTrue(repository.observeFacebookPageAccessIssues().first().isEmpty())
+        assertEquals("new", store.storage["FACEBOOK_page"]?.accessToken)
+    }
+
+    @Test
+    fun pageAccessRestartsWithoutCooldownAfterCancellationMidBatch() = runTest {
+        val user = FacebookUserToken("user", Long.MAX_VALUE, null, "owner")
+        for (page in listOf("first", "second", "last")) {
+            repository.connectFacebookSelectedPage(user, FacebookPage(page, page, page)).getOrThrow()
+        }
+        val secondRequested = CompletableDeferred<Unit>()
+        val finishSecond = CompletableDeferred<Unit>()
+        handler = { request ->
+            when (request.header("Authorization")) {
+                "Bearer first" -> 200 to """{"id":"first"}"""
+                "Bearer second" -> {
+                    secondRequested.complete(Unit)
+                    runBlocking { withTimeout(5_000L) { finishSecond.await() } }
+                    200 to """{"id":"second"}"""
+                }
+                else -> 400 to """{"error":{"code":190,"error_subcode":458}}"""
+            }
+        }
+
+        val interrupted = async { repository.checkFacebookPageAccess() }
+        try {
+            secondRequested.await()
+            interrupted.cancel()
+        } finally {
+            finishSecond.complete(Unit)
+        }
+        interrupted.cancelAndJoin()
+        assertEquals(listOf("Bearer first", "Bearer second"), requests.map { it.header("Authorization") })
+
+        repository.checkFacebookPageAccess()
+
+        assertEquals("Bearer last", requests.last().header("Authorization"))
+        assertEquals(
+            mapOf("last" to FacebookPageAccessIssue.RECONNECT_REQUIRED),
+            repository.observeFacebookPageAccessIssues().first(),
+        )
+    }
+
+    @Test
+    fun pageAccessKeepsPermissionWarningOnNetworkFailureAndClearsItOnSuccess() = runTest {
+        val user = FacebookUserToken("user", Long.MAX_VALUE, null, "owner")
+        repository.connectFacebookSelectedPage(user, FacebookPage("page", "Page", "page-token")).getOrThrow()
+        var now = 0L
+        repository.elapsedRealtime = { now }
+        handler = { 400 to """{"error":{"code":190,"error_subcode":492}}""" }
+        repository.checkFacebookPageAccess()
+
+        now += FACEBOOK_REFRESH_RETRY
+        handler = { throw IOException("Mất mạng") }
+        repository.checkFacebookPageAccess()
+        assertEquals(
+            FacebookPageAccessIssue.PERMISSION_REQUIRED,
+            repository.observeFacebookPageAccessIssues().first()["page"],
+        )
+
+        now += FACEBOOK_REFRESH_RETRY
+        handler = { 200 to """{"id":"page"}""" }
+        repository.checkFacebookPageAccess()
+        assertTrue(repository.observeFacebookPageAccessIssues().first().isEmpty())
+    }
+
+    @Test
+    fun userPagesRequestDoesNotClassifySubcode492AsAnInvalidSession() = runTest {
+        handler = { 400 to """{"error":{"code":190,"error_subcode":492}}""" }
+
+        assertEquals(ChannelError.FACEBOOK_PAGES_LOAD_FAILED, failureError(repository.fetchFacebookPages("user")))
+    }
 
     // ---- Facebook: /me/accounts ----
 

@@ -11,7 +11,9 @@ import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.ConnectionStatus
 import com.lttbdd.socialagent.data.model.ChannelError
 import com.lttbdd.socialagent.data.model.ChannelException
+import com.lttbdd.socialagent.data.model.FACEBOOK_REFRESH_RETRY
 import com.lttbdd.socialagent.data.model.FacebookPage
+import com.lttbdd.socialagent.data.model.FacebookPageAccessIssue
 import com.lttbdd.socialagent.data.model.FacebookUserToken
 import com.lttbdd.socialagent.data.model.FacebookRefreshIssue
 import com.lttbdd.socialagent.data.model.FacebookRefreshCheck
@@ -63,9 +65,11 @@ class ChannelViewModel @Inject constructor(
     /** Danh sách và trạng thái gốc của kênh từ repository. */
     private var knownChannels: List<ChannelAccount> = emptyList()
     private val tokenExpiries = mutableMapOf<String, Long>()
+    private val facebookPageSessionExpiries = mutableMapOf<String, Long>()
     private val tokenExpiryClockRevision = MutableStateFlow(0L)
     private var tokenRevision = 0L
     private val legacyFacebookPages = mutableSetOf<String>()
+    private var facebookPageAccessIssues = emptyMap<String, FacebookPageAccessIssue>()
     private val invalidFacebookSessions = mutableSetOf<String>()
     private val unlistedFacebookPages = mutableSetOf<String>()
     private val retryableFacebookPages = mutableSetOf<String>()
@@ -144,6 +148,12 @@ class ChannelViewModel @Inject constructor(
 
     init {
         loadChannels()
+        viewModelScope.launch {
+            repository.observeFacebookPageAccessIssues().collect { issues ->
+                facebookPageAccessIssues = issues
+                if (_uiState.value is ChannelUiState.Success) publishChannels()
+            }
+        }
         viewModelScope.launch { callbackBus.callbacks.collect { onLinkedInCallback(it) } }
     }
 
@@ -167,6 +177,7 @@ class ChannelViewModel @Inject constructor(
                     // Nạp quyền và hạn token trước khi phát UiState để ma trận không hiện sai.
                     channels.forEach { loadTokenDetails(it) }
                     val facebookIds = channels.filter { it.type == ChannelType.FACEBOOK }.map { it.accountId }.toSet()
+                    facebookPageSessionExpiries.keys.retainAll(facebookIds)
                     invalidFacebookSessions.retainAll(facebookIds)
                     unlistedFacebookPages.retainAll(facebookIds)
                     retryableFacebookPages.retainAll(facebookIds)
@@ -188,9 +199,10 @@ class ChannelViewModel @Inject constructor(
         _uiState.value = ChannelUiState.Success(
             channels + demoChannels,
             tokenRevision,
-            legacyFacebookPages + invalidFacebookSessions,
+            channels.filter(::needsFacebookReconnect).map { it.accountId }.toSet(),
             unlistedFacebookPages.toSet(),
             retryableFacebookPages.toSet(),
+            channels.filter(::needsFacebookPagePermission).map { it.accountId }.toSet(),
         )
     }
 
@@ -211,10 +223,12 @@ class ChannelViewModel @Inject constructor(
         combine(uiState, tokenExpiryClockRevision) { state, _ -> state }.collectLatest { state ->
             if (state !is ChannelUiState.Success) return@collectLatest
             while (true) {
-                val nextExpiry = state.channels.asSequence()
-                    .filter { it.status == ConnectionStatus.CONNECTED }
-                    .mapNotNull { tokenExpiries[scopeKey(it)] }
-                    .minOrNull() ?: return@collectLatest
+                val connected = state.channels.asSequence().filter { it.status == ConnectionStatus.CONNECTED }
+                val tokenDeadlines = connected.mapNotNull { tokenExpiries[scopeKey(it)] }
+                val pageSessionDeadlines = connected
+                    .filter { it.type == ChannelType.FACEBOOK && it.accountId !in state.facebookReconnectIds }
+                    .mapNotNull { facebookPageSessionExpiries[it.accountId] }
+                val nextExpiry = (tokenDeadlines + pageSessionDeadlines).minOrNull() ?: return@collectLatest
                 val remaining = nextExpiry - clock()
                 if (remaining <= 0) {
                     publishChannels()
@@ -293,6 +307,12 @@ class ChannelViewModel @Inject constructor(
         pageTasks = pageTasks + (scopeKey(account) to repository.getPageTasks(account.type, account.accountId))
         if (account.type == ChannelType.FACEBOOK) {
             facebookProfiles[account.accountId] = repository.isFacebookProfile(account.accountId)
+            val sessionExpiry = repository.getFacebookPageSessionExpiresAt(account.accountId)
+            if (sessionExpiry == null) {
+                facebookPageSessionExpiries.remove(account.accountId)
+            } else {
+                facebookPageSessionExpiries[account.accountId] = sessionExpiry
+            }
             if (repository.needsFacebookReconnect(account.accountId)) {
                 legacyFacebookPages.add(account.accountId)
             } else {
@@ -315,7 +335,22 @@ class ChannelViewModel @Inject constructor(
 
     internal fun needsFacebookReconnect(account: ChannelAccount): Boolean =
         account.type == ChannelType.FACEBOOK &&
-            (account.accountId in legacyFacebookPages || account.accountId in invalidFacebookSessions)
+            (account.accountId in legacyFacebookPages || account.accountId in invalidFacebookSessions ||
+                facebookPageSessionExpiries[account.accountId]?.let { clock() >= it } == true ||
+                facebookPageAccessIssue(account) == FacebookPageAccessIssue.RECONNECT_REQUIRED)
+
+    internal fun facebookPageAccessIssue(account: ChannelAccount): FacebookPageAccessIssue? =
+        if (account.type == ChannelType.FACEBOOK) facebookPageAccessIssues[account.accountId] else null
+
+    private fun needsFacebookPagePermission(account: ChannelAccount): Boolean =
+        facebookPageAccessIssue(account) == FacebookPageAccessIssue.PERMISSION_REQUIRED
+
+    internal suspend fun monitorFacebookPageAccess() {
+        while (true) {
+            repository.checkFacebookPageAccess()
+            delay(FACEBOOK_REFRESH_RETRY)
+        }
+    }
 
     internal fun isFacebookPageUnlisted(account: ChannelAccount): Boolean =
         account.type == ChannelType.FACEBOOK && account.accountId in unlistedFacebookPages

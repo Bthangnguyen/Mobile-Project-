@@ -167,6 +167,7 @@ class ChannelFragment : Fragment() {
             isFacebookProfile = viewModel::isFacebookProfile,
             reconnect = ::reconnectAccount,
             needsFacebookReconnect = viewModel::needsFacebookReconnect,
+            facebookPageAccessIssue = viewModel::facebookPageAccessIssue,
             isFacebookPageUnlisted = viewModel::isFacebookPageUnlisted,
             canRetryFacebookPage = viewModel::canRetryFacebookPage,
             retryFacebookPage = ::retryFacebookPage,
@@ -242,6 +243,13 @@ class ChannelFragment : Fragment() {
     }
 
     private fun observeUiState() {
+        if (facebookLoginManager != null) {
+            viewLifecycleOwner.lifecycleScope.launch {
+                viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                    viewModel.monitorFacebookPageAccess()
+                }
+            }
+        }
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { monitorTokenExpiry() }

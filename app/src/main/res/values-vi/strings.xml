@@ -50,6 +50,7 @@
     <string name="channel_retry_page">Thử làm mới Trang</string>
     <string name="channel_retry_page_wait">Đang trong thời gian chờ. Hãy thử làm mới Trang sau.</string>
     <string name="channel_retry_page_sign_in">Hãy đăng nhập bằng tài khoản Facebook quản lý Trang này hoặc kết nối lại.</string>
+    <string name="channel_status_page_permission_required">Không có quyền truy cập Trang. Hãy kiểm tra quyền và nhiệm vụ được cấp trên Trang Facebook.</string>
     <string name="channel_status_page_unlisted">Trang này không có trong danh sách Trang của tài khoản Facebook hiện tại. Hãy kiểm tra quyền quản lý Trang, rồi thử làm mới hoặc kết nối lại.</string>
     <string name="channel_status_reconnect_required">Cần kết nối lại</string>
     <string name="channel_status_expired">Token đã hết hạn</string>
@@ -103,6 +104,7 @@
     <string name="cap_status_supported">Hỗ trợ ✅</string>
     <string name="cap_status_requires_perm">Cần cấp thêm quyền ⚠️</string>
     <string name="cap_status_requires_reconnect">Cần kết nối lại</string>
+    <string name="cap_fb_page_token_invalid">Token Trang Facebook không còn hợp lệ. Hãy kết nối lại Trang để dùng tính năng này.</string>
     <string name="cap_token_expired">Phiên kết nối đã hết hạn. Hãy đăng nhập lại để dùng tính năng này.</string>
     <string name="cap_status_handed_off">Bàn giao thủ công ✋</string>
 

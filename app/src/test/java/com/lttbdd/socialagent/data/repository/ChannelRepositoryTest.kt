@@ -147,17 +147,21 @@ class ChannelRepositoryTest {
     }
 
     @Test
-    fun expiredFacebookUserSessionDoesNotInvalidatePageToken() = runTest {
+    fun expiredFacebookUserSessionRequestsReconnectWithoutInvalidatingPageToken() = runTest {
         val type = ChannelType.FACEBOOK
         val user = FacebookUserToken("old-user", 1L, "pages_show_list", "owner")
         repository.connectFacebookSelectedPage(user, FacebookPage("page", "Page", "old-page")).getOrThrow()
+        repository.connectFacebookSelectedPage(
+            user.copy(userId = "different-owner"), FacebookPage("other", "Other page", "other-token"),
+        ).getOrThrow()
         repository.clock = { 5L }
 
         val outcome = repository.refreshFacebookChannels("owner", expiresBefore = 10L) { user }.outcome
 
         assertEquals(setOf(FacebookRefreshIssue.USER_SESSION_EXPIRED), outcome.issues)
-        assertTrue(outcome.reconnectAccountIds.isEmpty())
+        assertEquals(setOf("page"), outcome.reconnectAccountIds)
         assertNull(repository.getTokenExpiresAt(type, "page"))
+        assertEquals(1L, repository.getFacebookPageSessionExpiresAt("page"))
         assertEquals("old-page", fakeTokenStore.storage["FACEBOOK_page"]?.accessToken)
     }
 

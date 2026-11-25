@@ -107,6 +107,7 @@ private fun classifySdkFailure(exception: FacebookException?): FacebookRefreshEx
         else -> "Unknown"
     }
     val issue = when {
+        error?.subErrorCode == 492 -> FacebookRefreshIssue.PAGES_UNAVAILABLE
         code == 190 -> FacebookRefreshIssue.SESSION_INVALID
         status == 429 || code in rateLimitCodes -> FacebookRefreshIssue.RATE_LIMITED
         exception?.cause is IOException -> FacebookRefreshIssue.NETWORK

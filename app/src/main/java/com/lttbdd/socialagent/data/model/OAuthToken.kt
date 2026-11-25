@@ -13,6 +13,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class OAuthToken(
     val accessToken: String,
+    /** Hạn đã xác nhận của chính token. Null nghĩa là chưa xác định được hạn. */
     val expiresAt: Long?,
     val scope: String? = null,
     val tokenType: String = "Bearer",
@@ -22,11 +23,14 @@ data class OAuthToken(
     val isFacebookProfile: Boolean? = null,
     /** ID người cấp quyền cho token Facebook, lưu cùng token đã mã hóa. */
     val facebookUserId: String? = null,
-    /** Hạn phiên người cấp quyền, dùng để lên lịch refresh Page. */
+    /** Hạn phiên người cấp quyền, dùng để lên lịch refresh Page và nhắc kết nối lại. */
     val facebookUserSessionExpiresAt: Long? = null,
 ) {
     /**
-     * Kiểm tra xem token đã hết hạn chưa.
+     * Kiểm tra token đã qua thời điểm hết hạn đã xác nhận.
+     * Khi [expiresAt] là null, kết quả false chỉ có nghĩa chưa biết hạn.
+     * Với Facebook Page, luồng gọi Graph phải phân biệt token không hợp lệ (190)
+     * và lỗi quyền (subcode 492) của token đang dùng.
      */
     fun isExpired(currentTimeMillis: Long = System.currentTimeMillis()): Boolean {
         return expiresAt?.let { currentTimeMillis >= it } ?: false

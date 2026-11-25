@@ -12,6 +12,7 @@ import com.lttbdd.socialagent.R
 import com.lttbdd.socialagent.core.model.ChannelAccount
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.ConnectionStatus
+import com.lttbdd.socialagent.data.model.FacebookPageAccessIssue
 import com.lttbdd.socialagent.databinding.ItemCapabilityRowBinding
 import com.lttbdd.socialagent.databinding.ItemChannelAccountBinding
 
@@ -21,6 +22,7 @@ class ChannelAdapter(
     private val isFacebookProfile: (ChannelAccount) -> Boolean? = { null },
     private val reconnect: (ChannelAccount) -> Unit,
     private val needsFacebookReconnect: (ChannelAccount) -> Boolean,
+    private val facebookPageAccessIssue: (ChannelAccount) -> FacebookPageAccessIssue?,
     private val isFacebookPageUnlisted: (ChannelAccount) -> Boolean,
     private val canRetryFacebookPage: (ChannelAccount) -> Boolean,
     private val retryFacebookPage: (ChannelAccount) -> Unit,
@@ -34,7 +36,7 @@ class ChannelAdapter(
         )
         return ChannelViewHolder(
             binding, getScopeForAccount, getTasksForAccount, isFacebookProfile, reconnect,
-            needsFacebookReconnect, isFacebookPageUnlisted, canRetryFacebookPage, retryFacebookPage,
+            needsFacebookReconnect, facebookPageAccessIssue, isFacebookPageUnlisted, canRetryFacebookPage, retryFacebookPage,
         )
     }
 
@@ -49,6 +51,7 @@ class ChannelAdapter(
         private val isFacebookProfile: (ChannelAccount) -> Boolean?,
         private val reconnect: (ChannelAccount) -> Unit,
         private val needsFacebookReconnect: (ChannelAccount) -> Boolean,
+        private val facebookPageAccessIssue: (ChannelAccount) -> FacebookPageAccessIssue?,
         private val isFacebookPageUnlisted: (ChannelAccount) -> Boolean,
         private val canRetryFacebookPage: (ChannelAccount) -> Boolean,
         private val retryFacebookPage: (ChannelAccount) -> Unit,
@@ -65,10 +68,13 @@ class ChannelAdapter(
             binding.tvDisplayName.text = account.displayName
 
             val needsReconnect = needsFacebookReconnect(account)
+            val pageAccessIssue = facebookPageAccessIssue(account)
+            val pagePermissionRequired = pageAccessIssue == FacebookPageAccessIssue.PERMISSION_REQUIRED
             val pageUnlisted = isFacebookPageUnlisted(account)
             val showReconnect = needsReconnect || pageUnlisted || account.status == ConnectionStatus.TOKEN_EXPIRED
             val statusRes = when {
                 needsReconnect -> R.string.channel_status_reconnect_required
+                pagePermissionRequired -> R.string.channel_status_page_permission_required
                 pageUnlisted -> R.string.channel_status_page_unlisted
                 account.status == ConnectionStatus.TOKEN_EXPIRED -> R.string.channel_status_expired
                 account.status == ConnectionStatus.CONNECTED -> R.string.status_connected
@@ -83,7 +89,7 @@ class ChannelAdapter(
                 ContextCompat.getColor(
                     context,
                     when {
-                        showReconnect -> R.color.channel_status_expired
+                        showReconnect || pagePermissionRequired -> R.color.channel_status_expired
                         account.status == ConnectionStatus.CONNECTED -> R.color.channel_status_connected
                         else -> R.color.channel_status_disconnected
                     },
@@ -94,7 +100,11 @@ class ChannelAdapter(
             binding.containerCapabilities.removeAllViews()
             val scopeString = getScopeForAccount(account)
             val capabilityItems = ChannelCapabilityEvaluator.evaluateCapabilities(
-                account, scopeString, getTasksForAccount(account), isFacebookProfile(account),
+                account = account,
+                scopeString = scopeString,
+                pageTasks = getTasksForAccount(account),
+                isFacebookProfile = isFacebookProfile(account),
+                pageAccessIssue = pageAccessIssue,
             )
 
             val inflater = LayoutInflater.from(context)

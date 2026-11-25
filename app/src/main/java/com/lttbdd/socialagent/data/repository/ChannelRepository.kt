@@ -7,8 +7,10 @@ import com.lttbdd.socialagent.data.model.FacebookRefreshCheck
 import com.lttbdd.socialagent.data.model.FacebookRefreshOutcome
 import com.lttbdd.socialagent.data.model.FacebookRefreshSkip
 import com.lttbdd.socialagent.data.model.FacebookPage
+import com.lttbdd.socialagent.data.model.FacebookPageAccessIssue
 import com.lttbdd.socialagent.data.model.FacebookUserToken
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 
 /**
  * Repository quản lý việc kết nối kênh mạng xã hội qua OAuth.
@@ -67,6 +69,15 @@ interface ChannelRepository {
     suspend fun isFacebookProfile(accountId: String): Boolean? = null
 
     suspend fun needsFacebookReconnect(accountId: String): Boolean = false
+
+    /** Hạn phiên người cấp quyền cho Page, độc lập với hạn của Page token. */
+    suspend fun getFacebookPageSessionExpiresAt(accountId: String): Long? = null
+
+    /** Lỗi truy cập Graph của Page token hiện tại, theo ID Page. */
+    fun observeFacebookPageAccessIssues(): Flow<Map<String, FacebookPageAccessIssue>> = flowOf(emptyMap())
+
+    /** Kiểm tra bằng Page token đã lưu, không phụ thuộc vào phiên người dùng trong Meta SDK. */
+    suspend fun checkFacebookPageAccess() {}
 
     /**
      * Gọi SDK qua [refresh] khi có kênh đủ điều kiện. Callback trả null nếu phiên đã đổi.

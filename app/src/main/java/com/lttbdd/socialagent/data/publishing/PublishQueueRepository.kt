@@ -143,7 +143,7 @@ class PublishQueueRepository @Inject constructor(
 
     /** Gọi khi app khởi động: hẹn worker để xử lý bài QUEUED/PUBLISHING còn sót (app bị tắt trước khi kịp hẹn). */
     fun resumePendingWork() {
-        scheduler.schedule()
+        scheduler.scheduleIfIdle()
     }
 
     /** Người dùng xác nhận bài không rõ kết quả thật ra ĐÃ lên mạng xã hội. */
@@ -162,9 +162,17 @@ class PublishQueueRepository @Inject constructor(
 
     private suspend fun publishOne(postId: String): Outcome {
         if (postDao.claimForPublishing(postId, clock.nowMillis()) == 0) return Outcome.SKIPPED
-        val post = postDao.getById(postId) ?: return Outcome.SKIPPED
+        // Lỗi đọc DB lúc này xảy ra trước khi gọi API: chắc chắn chưa gửi, nên trả bài về hàng đợi ngay thay vì
+        // để nó kẹt PUBLISHING rồi bị coi là "không rõ kết quả" sau STALE_PUBLISHING_MILLIS.
+        val (post, draft) = try {
+            val post = postDao.getById(postId) ?: return Outcome.SKIPPED
+            post to post.draftId?.let { draftDao.getById(it) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return releaseClaim(postId)
+        }
 
-        val draft = post.draftId?.let { draftDao.getById(it) }
         if (draft == null) return post.fail(REASON_DRAFT_MISSING)
         // Bản nháp có thể bị sửa và mất trạng thái duyệt sau khi vào hàng đợi: không được đăng.
         if (!draft.approved) return post.fail(REASON_NOT_APPROVED)
@@ -222,9 +230,24 @@ class PublishQueueRepository @Inject constructor(
     /**
      * Request chắc chắn chưa tới server: hoàn lại lượt mà [PostDao.claimForPublishing] đã cộng, để mạng chập chờn
      * không làm bài chạm [MAX_RETRYABLE_ATTEMPTS] trước khi kênh thật sự trả lỗi.
+     *
+     * Hệ quả: lỗi "chưa gửi" kéo dài (ví dụ DNS hoặc base URL sai) giữ bài ở QUEUED mãi, worker thử lại theo
+     * backoff mũ của WorkManager (tối đa 5 giờ/lần). #39 bổ sung ngưỡng theo thời gian và báo lý do cho người dùng.
      */
     private suspend fun PostEntity.requeueNotSent(): Outcome =
         copy(attemptCount = (attemptCount - 1).coerceAtLeast(0)).requeue(REASON_NOT_SENT)
+
+    /** Trả lại chỗ giữ khi lỗi trước lúc gọi API. Nếu chính lệnh này cũng lỗi, bài đi theo đường xử lý bài kẹt. */
+    private suspend fun releaseClaim(postId: String): Outcome {
+        try {
+            postDao.releaseClaim(postId, REASON_STORAGE, clock.nowMillis())
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // DB vẫn lỗi: worker thử lại theo backoff; bài PUBLISHING sẽ được đánh dấu cần xác nhận khi quá hạn.
+        }
+        return Outcome.RETRY_LATER
+    }
 
     private suspend fun PostEntity.fail(reason: String): Outcome {
         postDao.update(copy(status = PostStatus.FAILED, errorMessage = reason, updatedAtMillis = clock.nowMillis()))
@@ -261,6 +284,7 @@ class PublishQueueRepository @Inject constructor(
 
         // Lý do lưu trong errorMessage; UI (#39) đổi sang chuỗi VI/EN, không hiển thị nguyên văn.
         const val REASON_NOT_SENT = "network_unavailable"
+        const val REASON_STORAGE = "storage_error"
         const val REASON_OUTCOME_UNKNOWN = "outcome_unknown"
         const val REASON_DRAFT_MISSING = "draft_missing"
         const val REASON_NOT_APPROVED = "draft_not_approved"

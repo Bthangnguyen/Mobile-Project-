@@ -571,10 +571,63 @@ class PublishQueueRepositoryTest {
     }
 
     @Test
-    fun `resume on app start schedules worker`() = runTest {
+    fun `resume on app start schedules worker only if idle`() = runTest {
         repository().resumePendingWork()
 
-        assertEquals(1, scheduler.calls)
+        assertEquals(1, scheduler.idleCalls)
+        assertEquals("Mở app không nối thêm lượt vào chuỗi đang chờ", 0, scheduler.calls)
+    }
+
+    @Test
+    fun `storage error before calling api returns post to queue without counting attempt`() = runTest {
+        saveDraft()
+        val failing = FailingUpdatePostDao(db.postDao())
+        val repo = repository(postDao = failing)
+        val id = queuedId(repo)
+        failing.failNextGetById = true
+
+        val result = repo.processQueue()
+
+        assertEquals(1, result.retryLater)
+        assertEquals(0, facebook.calls)
+        val released = post(id)
+        assertEquals(PostStatus.QUEUED, released.status)
+        assertEquals(0, released.attemptCount)
+        assertNull(released.attemptStartedAtMillis)
+        assertFalse(released.outcomeUnknown)
+        assertEquals(PublishQueueRepository.REASON_STORAGE, released.errorMessage)
+
+        repo.processQueue()
+
+        assertEquals(PostStatus.PUBLISHED, post(id).status)
+        assertEquals(1, facebook.calls)
+    }
+
+    @Test
+    fun `publishing post without start time is treated as stale`() = runTest {
+        saveDraft()
+        db.postDao().insertIfAbsent(
+            existingPost("legacy", PostStatus.PUBLISHING, createdAt = 1).copy(attemptStartedAtMillis = null),
+        )
+
+        repository().processQueue()
+
+        assertTrue(post("legacy").outcomeUnknown)
+        assertEquals(0, facebook.calls)
+    }
+
+    @Test
+    fun `release claim does not touch posts that need confirmation or are published`() = runTest {
+        saveDraft()
+        saveDraft(id = "d2")
+        val postDao = db.postDao()
+        postDao.insertIfAbsent(existingPost("unknown", PostStatus.PUBLISHING, 1).copy(outcomeUnknown = true))
+        postDao.insertIfAbsent(existingPost("done", PostStatus.PUBLISHED, 2, draftId = "d2"))
+
+        assertEquals(0, postDao.releaseClaim("unknown", "x", nowMillis))
+        assertEquals(0, postDao.releaseClaim("done", "x", nowMillis))
+        assertTrue(post("unknown").outcomeUnknown)
+        assertEquals(PostStatus.PUBLISHED, post("done").status)
     }
 
     // ---------- Test doubles ----------
@@ -600,9 +653,14 @@ class PublishQueueRepositoryTest {
 
     private class CountingScheduler : PublishScheduler {
         var calls = 0
+        var idleCalls = 0
         val staleCheckDelays = mutableListOf<Long>()
         override fun schedule() {
             calls++
+        }
+
+        override fun scheduleIfIdle() {
+            idleCalls++
         }
 
         override fun scheduleStaleCheck(delayMillis: Long) {
@@ -640,6 +698,16 @@ class PublishQueueRepositoryTest {
     /** Giả lập ghi DB thất bại ngay sau khi API đăng thành công. */
     private class FailingUpdatePostDao(private val delegate: PostDao) : PostDao by delegate {
         var failNextUpdate = false
+        var failNextGetById = false
+
+        override suspend fun getById(id: String): PostEntity? {
+            if (failNextGetById) {
+                failNextGetById = false
+                error("disk I/O error")
+            }
+            return delegate.getById(id)
+        }
+
         override suspend fun update(post: PostEntity) {
             if (failNextUpdate && post.status == PostStatus.PUBLISHED) {
                 failNextUpdate = false

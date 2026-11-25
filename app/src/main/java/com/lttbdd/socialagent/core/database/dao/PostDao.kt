@@ -67,20 +67,42 @@ interface PostDao {
     /**
      * Bài kẹt ở [PostStatus.PUBLISHING] quá [startedBeforeMillis] mà chưa có `remotePostId` (process bị huỷ giữa
      * chừng, hoặc gọi API xong nhưng ghi DB lỗi) bị đánh dấu `outcomeUnknown`: không biết đã lên mạng xã hội chưa,
-     * nên không được tự đăng lại. Trả về số bài bị đánh dấu.
+     * nên không được tự đăng lại. Trả về số bài bị đánh dấu. Bài PUBLISHING thiếu `attemptStartedAtMillis` (dữ liệu
+     * cũ hoặc ghi tay) được coi là đã quá hạn, vì `NULL < x` trong SQL luôn sai và bài sẽ kẹt mãi.
      */
     @Query(
         """
         UPDATE posts
         SET outcomeUnknown = 1, updatedAtMillis = :nowMillis
         WHERE status = :publishing AND remotePostId IS NULL AND outcomeUnknown = 0
-          AND attemptStartedAtMillis < :startedBeforeMillis
+          AND COALESCE(attemptStartedAtMillis, 0) < :startedBeforeMillis
         """,
     )
     suspend fun markStalePublishingAsUnknown(
         startedBeforeMillis: Long,
         nowMillis: Long,
         publishing: PostStatus = PostStatus.PUBLISHING,
+    ): Int
+
+    /**
+     * Trả lại chỗ đã giữ bằng [claimForPublishing] khi lỗi xảy ra **trước** lúc gọi API (đọc DB lỗi…): bài về
+     * [PostStatus.QUEUED], hoàn lại lượt thử và xoá `attemptStartedAtMillis`. Chỉ áp dụng cho bài còn PUBLISHING,
+     * chưa có `remotePostId` và chưa bị coi là không rõ kết quả. Trả về 1 nếu thành công.
+     */
+    @Query(
+        """
+        UPDATE posts
+        SET status = :queued, attemptCount = MAX(attemptCount - 1, 0), attemptStartedAtMillis = NULL,
+            errorMessage = :reason, updatedAtMillis = :nowMillis
+        WHERE id = :id AND status = :publishing AND remotePostId IS NULL AND outcomeUnknown = 0
+        """,
+    )
+    suspend fun releaseClaim(
+        id: String,
+        reason: String,
+        nowMillis: Long,
+        publishing: PostStatus = PostStatus.PUBLISHING,
+        queued: PostStatus = PostStatus.QUEUED,
     ): Int
 
     /** Số bài đang [PostStatus.PUBLISHING] mà chưa bị coi là không rõ kết quả (có thể worker khác đang đăng). */

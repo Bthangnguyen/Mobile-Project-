@@ -1,6 +1,7 @@
 package com.lttbdd.socialagent.feature.review
 
 import com.lttbdd.socialagent.core.model.ChannelType
+import java.text.Normalizer
 
 /** Mức cảnh báo độ dài ký tự so với giới hạn của từng kênh. */
 enum class CharacterLimitLevel {
@@ -25,13 +26,21 @@ data class CharacterCountStatus(
 /**
  * Bộ đếm và kiểm tra giới hạn ký tự cho từng kênh mạng xã hội (F4, Issue #34).
  * Giới hạn được đọc trực tiếp từ [ChannelType.maxChars], không viết cứng.
+ * Đếm theo Unicode code point sau khi chuẩn hóa NFC để emoji (surrogate pair) và chữ có dấu tổ hợp (NFD)
+ * được tính là 1 ký tự khớp với cách mạng xã hội tính độ dài.
  */
 object DraftCharacterCounter {
 
     private const val NEAR_LIMIT_RATIO = 0.9
 
+    fun countCharacters(text: String): Int {
+        if (text.isEmpty()) return 0
+        val normalized = Normalizer.normalize(text, Normalizer.Form.NFC)
+        return normalized.codePointCount(0, normalized.length)
+    }
+
     fun evaluate(text: String, channel: ChannelType): CharacterCountStatus {
-        val current = text.length
+        val current = countCharacters(text)
         val max = channel.maxChars
         val remaining = max - current
         val level = when {

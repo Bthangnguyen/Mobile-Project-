@@ -211,4 +211,11 @@
     <string name="preview_action_save">Lưu chỉnh sửa</string>
     <string name="preview_save_success">Đã lưu chỉnh sửa. Cần duyệt lại trước khi đăng bài.</string>
     <string name="preview_save_failed">Không thể lưu bản nháp. Vui lòng kiểm tra lại nội dung.</string>
+    <string name="preview_not_found_title">Không tìm thấy bản nháp</string>
+    <string name="preview_not_found_message">Bản nháp được yêu cầu không tồn tại hoặc đã bị xóa.</string>
+    <string name="preview_publishing_locked_warning">Bản nháp đang có bài chờ đăng hoặc đang đăng nên tạm khóa chỉnh sửa.</string>
+    <string name="preview_discard_dialog_title">Bỏ thay đổi chưa lưu?</string>
+    <string name="preview_discard_dialog_message">Bạn đang có nội dung chỉnh sửa chưa lưu. Thoát ngay sẽ mất các thay đổi này.</string>
+    <string name="preview_discard_action">Bỏ thay đổi</string>
+    <string name="preview_stay_action">Ở lại</string>
 </resources>

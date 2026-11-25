@@ -26,6 +26,21 @@ class DraftCharacterCounterTest {
     }
 
     @Test
+    fun `countCharacters counts emoji and NFD diacritics as single NFC code points`() {
+        // Emoji là surrogate pair (UTF-16 length = 2), nhưng code point = 1
+        assertEquals(2, "🚀".length)
+        assertEquals(1, DraftCharacterCounter.countCharacters("🚀"))
+
+        // Chữ tiếng Việt dạng tổ hợp NFD: "e" + dấu sắc kết hợp (UTF-16 length = 2), NFC = 1
+        val nfdChar = "e\u0301"
+        assertEquals(2, nfdChar.length)
+        assertEquals(1, DraftCharacterCounter.countCharacters(nfdChar))
+
+        // Chuỗi kết hợp chữ NFD và emoji
+        assertEquals(3, DraftCharacterCounter.countCharacters("a\u0301b🚀"))
+    }
+
+    @Test
     fun `evaluate marks NEAR_LIMIT at 90 percent and exact limit`() {
         val ninetyPercent = "a".repeat(2_700) // 90% of 3_000
         val nearStatus = DraftCharacterCounter.evaluate(ninetyPercent, ChannelType.LINKEDIN)
@@ -50,7 +65,7 @@ class DraftCharacterCounterTest {
         assertEquals(-12, status.remainingChars)
         assertEquals(12, status.excessChars)
         assertFalse(DraftCharacterCounter.canSave(overLinkedIn, ChannelType.LINKEDIN))
-        // Same 3,012-char text is valid on Facebook (63,206 limit)
+        // Cùng 3.012 ký tự vẫn hợp lệ cho Facebook (giới hạn 63.206)
         assertTrue(DraftCharacterCounter.canSave(overLinkedIn, ChannelType.FACEBOOK))
     }
 

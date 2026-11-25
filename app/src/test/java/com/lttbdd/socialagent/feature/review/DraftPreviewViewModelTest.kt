@@ -48,41 +48,50 @@ class DraftPreviewViewModelTest {
     }
 
     @Test
-    fun `loads draft by id and computes initial character count`() = runTest {
-        val handle = SavedStateHandle(mapOf(DraftPreviewViewModel.ARG_DRAFT_ID to "draft-fb"))
-        val viewModel = DraftPreviewViewModel(fakeRepository, handle)
+    fun `missing or unknown draftId sets isDraftNotFound true`() = runTest {
+        val noArgVm = DraftPreviewViewModel(fakeRepository, SavedStateHandle())
         advanceUntilIdle()
+        assertTrue(noArgVm.uiState.value.isDraftNotFound)
+        assertNull(noArgVm.uiState.value.draft)
 
-        val state = viewModel.uiState.value
-        assertFalse(state.isLoading)
-        assertEquals("draft-fb", state.draft?.id)
-        assertEquals(ChannelType.FACEBOOK, state.selectedChannel)
-        assertEquals("Bài nháp ban đầu cho Facebook", state.editedText)
-        assertEquals(29, state.characterCount.currentLength)
-        assertEquals(ChannelType.FACEBOOK.maxChars, state.characterCount.maxChars)
-        assertFalse(state.hasUnsavedChanges)
-        assertNull(state.textErrorRes)
+        val unknownVm = DraftPreviewViewModel(
+            fakeRepository,
+            SavedStateHandle(mapOf(DraftPreviewViewModel.ARG_DRAFT_ID to "unknown-id")),
+        )
+        advanceUntilIdle()
+        assertTrue(unknownVm.uiState.value.isDraftNotFound)
     }
 
     @Test
-    fun `switching channel recalculates character limit and flags over-limit text`() = runTest {
+    fun `switching preview channel does not change draft channel or block valid Facebook save`() = runTest {
         val handle = SavedStateHandle(mapOf(DraftPreviewViewModel.ARG_DRAFT_ID to "draft-fb"))
         val viewModel = DraftPreviewViewModel(fakeRepository, handle)
         advanceUntilIdle()
 
-        val longText = "a".repeat(3_500)
-        viewModel.onTextChanged(longText)
-        assertFalse(viewModel.uiState.value.characterCount.isOverLimit)
-        assertTrue(viewModel.uiState.value.canSave)
-
+        val longFacebookText = "a".repeat(3_500)
+        viewModel.onTextChanged(longFacebookText)
         viewModel.onChannelPreviewSelected(ChannelType.LINKEDIN)
-        val liState = viewModel.uiState.value
-        assertEquals(ChannelType.LINKEDIN, liState.selectedChannel)
-        assertEquals(ChannelType.LINKEDIN.maxChars, liState.characterCount.maxChars)
-        assertTrue(liState.characterCount.isOverLimit)
-        assertEquals(500, liState.characterCount.excessChars)
-        assertEquals(R.string.preview_error_over_limit, liState.textErrorRes)
-        assertFalse(liState.canSave)
+
+        val previewState = viewModel.uiState.value
+        assertEquals(ChannelType.LINKEDIN, previewState.selectedChannel)
+        // Bộ đếm xem trước theo LinkedIn báo vượt 500 ký tự
+        assertTrue(previewState.characterCount.isOverLimit)
+        assertEquals(500, previewState.characterCount.excessChars)
+        // Nhưng vẫn cho phép lưu vì kênh thật của bản nháp là FACEBOOK (giới hạn 63.206)
+        assertTrue(previewState.canSave)
+        assertNull(previewState.textErrorRes)
+
+        viewModel.onSaveClicked()
+        advanceUntilIdle()
+
+        val savedState = viewModel.uiState.value
+        assertEquals(ChannelType.FACEBOOK, savedState.draft?.channel)
+        assertEquals(longFacebookText, savedState.draft?.text)
+        assertFalse(savedState.draft?.approved ?: true)
+        assertEquals(
+            DraftPreviewEvent.ShowMessage(R.string.preview_save_success),
+            viewModel.events.first(),
+        )
     }
 
     @Test
@@ -107,25 +116,42 @@ class DraftPreviewViewModelTest {
         assertFalse(savedState.hasUnsavedChanges)
         assertEquals("Nội dung cuối cùng", savedState.draft?.text)
         assertFalse(savedState.draft?.approved ?: true)
+    }
+
+    @Test
+    fun `storage failure during save emits preview_save_failed without crashing`() = runTest {
+        fakeRepository.failNextSaveWithStorageError = true
+        val handle = SavedStateHandle(mapOf(DraftPreviewViewModel.ARG_DRAFT_ID to "draft-fb"))
+        val viewModel = DraftPreviewViewModel(fakeRepository, handle)
+        advanceUntilIdle()
+
+        viewModel.onTextChanged("Nội dung mới")
+        viewModel.onSaveClicked()
+        advanceUntilIdle()
+
         assertEquals(
-            DraftPreviewEvent.ShowMessage(R.string.preview_save_success),
+            DraftPreviewEvent.ShowMessage(R.string.preview_save_failed),
             viewModel.events.first(),
         )
     }
 
     @Test
-    fun `clearing text shows empty error and disables save`() = runTest {
+    fun `draft with active publishing post locks editing`() = runTest {
+        fakeRepository.activePublishingDraftIds.add("draft-fb")
         val handle = SavedStateHandle(mapOf(DraftPreviewViewModel.ARG_DRAFT_ID to "draft-fb"))
         val viewModel = DraftPreviewViewModel(fakeRepository, handle)
         advanceUntilIdle()
 
-        viewModel.onTextChanged("   ")
-        assertEquals(R.string.preview_error_empty, viewModel.uiState.value.textErrorRes)
-        assertFalse(viewModel.uiState.value.canSave)
+        val state = viewModel.uiState.value
+        assertTrue(state.isEditingLockedByPublishing)
+        assertFalse(state.canSave)
+
+        viewModel.onTextChanged("Thử sửa khi đang khóa")
+        assertEquals("Bài nháp ban đầu cho Facebook", viewModel.uiState.value.editedText)
     }
 
     @Test
-    fun `SavedStateHandle restores editedText and selectedChannel after process death`() = runTest {
+    fun `SavedStateHandle restores normal text but skips oversized text to avoid TransactionTooLargeException`() = runTest {
         val handle = SavedStateHandle(mapOf(DraftPreviewViewModel.ARG_DRAFT_ID to "draft-fb"))
         val firstVm = DraftPreviewViewModel(fakeRepository, handle)
         advanceUntilIdle()
@@ -135,30 +161,43 @@ class DraftPreviewViewModelTest {
 
         val restoredVm = DraftPreviewViewModel(fakeRepository, handle)
         advanceUntilIdle()
+        assertEquals("Chưa kịp lưu", restoredVm.uiState.value.editedText)
+        assertEquals(ChannelType.LINKEDIN, restoredVm.uiState.value.selectedChannel)
 
-        val restoredState = restoredVm.uiState.value
-        assertEquals("Chưa kịp lưu", restoredState.editedText)
-        assertEquals(ChannelType.LINKEDIN, restoredState.selectedChannel)
-        assertTrue(restoredState.hasUnsavedChanges)
+        // Nội dung vượt ngưỡng MAX_SAVED_STATE_CHARS không bị đẩy vào SavedStateHandle
+        val hugeText = "x".repeat(DraftPreviewViewModel.MAX_SAVED_STATE_CHARS + 500)
+        restoredVm.onTextChanged(hugeText)
+        val afterProcessDeathVm = DraftPreviewViewModel(fakeRepository, handle)
+        advanceUntilIdle()
+        assertEquals("Bài nháp ban đầu cho Facebook", afterProcessDeathVm.uiState.value.editedText)
     }
 
     private class FakeDraftEditorRepository(
         initialDrafts: List<Draft>,
     ) : DraftEditorRepository {
         private val store = initialDrafts.associateBy { it.id }.toMutableMap()
+        val activePublishingDraftIds = mutableSetOf<String>()
+        var failNextSaveWithStorageError = false
 
         override suspend fun getDraft(draftId: String): Draft? = store[draftId]
 
-        override suspend fun getLatestDraft(): Draft? = store.values.firstOrNull()
+        override suspend fun hasActivePublishingPosts(draftId: String): Boolean =
+            draftId in activePublishingDraftIds
 
-        override suspend fun saveEditedDraft(draft: Draft, newText: String): Result<Draft> {
-            if (newText.isBlank()) return Result.failure(IllegalArgumentException("blank"))
-            if (DraftCharacterCounter.evaluate(newText, draft.channel).isOverLimit) {
-                return Result.failure(IllegalArgumentException("over limit"))
+        override suspend fun saveEditedDraft(draftId: String, newText: String): DraftSaveResult {
+            if (failNextSaveWithStorageError) {
+                failNextSaveWithStorageError = false
+                return DraftSaveResult.StorageError(IllegalStateException("Simulated DB failure"))
             }
-            val updated = draft.copy(text = newText, approved = false)
-            store[updated.id] = updated
-            return Result.success(updated)
+            val current = store[draftId] ?: return DraftSaveResult.NotFound
+            if (draftId in activePublishingDraftIds) return DraftSaveResult.BlockedByActivePublish
+            if (newText.isBlank()) return DraftSaveResult.BlockedBlankContent
+            if (DraftCharacterCounter.evaluate(newText, current.channel).isOverLimit) {
+                return DraftSaveResult.BlockedOverLimit
+            }
+            val updated = current.copy(text = newText, approved = false)
+            store[draftId] = updated
+            return DraftSaveResult.Saved(updated)
         }
     }
 }

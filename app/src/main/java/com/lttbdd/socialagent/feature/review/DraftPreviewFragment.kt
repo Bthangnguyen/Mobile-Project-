@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.activity.OnBackPressedCallback
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
@@ -12,8 +13,10 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.navigation.fragment.findNavController
 import com.lttbdd.socialagent.R
 import com.lttbdd.socialagent.core.model.ChannelType
+import com.lttbdd.socialagent.core.ui.components.AppDialog
 import com.lttbdd.socialagent.core.ui.components.AppSnackbar
 import com.lttbdd.socialagent.databinding.FragmentDraftPreviewBinding
 import dagger.hilt.android.AndroidEntryPoint
@@ -31,6 +34,24 @@ class DraftPreviewFragment : Fragment() {
 
     private val viewModel: DraftPreviewViewModel by viewModels()
 
+    private val unsavedChangesBackCallback = object : OnBackPressedCallback(false) {
+        override fun handleOnBackPressed() {
+            AppDialog.show(
+                context = requireContext(),
+                titleRes = R.string.preview_discard_dialog_title,
+                messageRes = R.string.preview_discard_dialog_message,
+                positiveActionRes = R.string.preview_discard_action,
+                negativeActionRes = R.string.preview_stay_action,
+                onPositiveAction = {
+                    isEnabled = false
+                    if (!findNavController().navigateUp()) {
+                        requireActivity().onBackPressedDispatcher.onBackPressed()
+                    }
+                },
+            )
+        }
+    }
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -42,8 +63,20 @@ class DraftPreviewFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        requireActivity().onBackPressedDispatcher.addCallback(
+            viewLifecycleOwner,
+            unsavedChangesBackCallback,
+        )
+        setupEmptyState()
         setupListeners()
         observeViewModel()
+    }
+
+    private fun setupEmptyState() {
+        binding.emptyStateNotFound.setContent(
+            title = getString(R.string.preview_not_found_title),
+            message = getString(R.string.preview_not_found_message),
+        )
     }
 
     private fun setupListeners() {
@@ -92,7 +125,15 @@ class DraftPreviewFragment : Fragment() {
 
     private fun renderUiState(state: DraftPreviewUiState) {
         binding.loadingIndicator.isVisible = state.isLoading
-        binding.contentContainer.isVisible = !state.isLoading
+        binding.emptyStateNotFound.isVisible = !state.isLoading && state.isDraftNotFound
+        binding.contentContainer.isVisible = !state.isLoading && !state.isDraftNotFound
+        unsavedChangesBackCallback.isEnabled = state.hasUnsavedChanges
+
+        if (state.isLoading || state.isDraftNotFound) return
+
+        // Cảnh báo & khóa sửa khi bản nháp đang có bài chờ đăng / đang đăng (F5)
+        binding.tvPublishingLockedWarning.isVisible = state.isEditingLockedByPublishing
+        binding.etDraftContent.isEnabled = !state.isEditingLockedByPublishing
 
         // Cập nhật bộ chọn kênh xem trước
         val targetRadioId = if (state.selectedChannel == ChannelType.LINKEDIN) {
@@ -113,7 +154,7 @@ class DraftPreviewFragment : Fragment() {
         }
         binding.layoutDraftContent.error = state.textErrorRes?.let { getString(it) }
 
-        // Bộ đếm ký tự theo giới hạn kênh
+        // Bộ đếm ký tự theo giới hạn kênh xem trước
         renderCharacterCounter(state.characterCount)
 
         // Nút Khôi phục và Lưu chỉnh sửa
@@ -132,7 +173,8 @@ class DraftPreviewFragment : Fragment() {
             if (isLinkedIn) R.string.preview_linkedin_meta else R.string.preview_facebook_meta,
         )
         binding.tvPreviewBody.text = previewBody
-        binding.tvPreviewSeeMore.isVisible = isLinkedIn && text.length > LINKEDIN_FOLD_CHARS
+        binding.tvPreviewSeeMore.isVisible = isLinkedIn &&
+            DraftCharacterCounter.countCharacters(text) > LINKEDIN_FOLD_CHARS
         binding.tvPreviewActions.setText(
             if (isLinkedIn) R.string.preview_linkedin_actions else R.string.preview_facebook_actions,
         )

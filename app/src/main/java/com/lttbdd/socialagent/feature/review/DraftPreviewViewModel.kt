@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lttbdd.socialagent.R
 import com.lttbdd.socialagent.core.model.ChannelType
+import com.lttbdd.socialagent.core.model.Draft
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -42,18 +43,28 @@ class DraftPreviewViewModel @Inject constructor(
             val draft = if (!draftId.isNullOrBlank()) {
                 repository.getDraft(draftId)
             } else {
-                repository.getLatestDraft()
+                null
             }
 
+            if (draft == null) {
+                _uiState.value = DraftPreviewUiState(
+                    isLoading = false,
+                    isDraftNotFound = true,
+                )
+                return@launch
+            }
+
+            val isLocked = repository.hasActivePublishingPosts(draft.id)
             val restoredText = savedStateHandle.get<String>(KEY_EDITED_TEXT)
             val restoredChannel = savedStateHandle.get<String>(KEY_SELECTED_CHANNEL)
                 ?.let { name -> ChannelType.entries.firstOrNull { it.name == name } }
 
-            val activeChannel = restoredChannel ?: draft?.channel ?: ChannelType.FACEBOOK
-            val activeText = restoredText ?: draft?.text.orEmpty()
+            val activeChannel = restoredChannel ?: draft.channel
+            val activeText = if (isLocked) draft.text else (restoredText ?: draft.text)
 
             _uiState.value = buildState(
                 isLoading = false,
+                isEditingLockedByPublishing = isLocked,
                 draft = draft,
                 selectedChannel = activeChannel,
                 editedText = activeText,
@@ -65,10 +76,13 @@ class DraftPreviewViewModel @Inject constructor(
     /** Cập nhật nội dung khi người dùng sửa tay và tính lại bộ đếm ký tự theo thời gian thực. */
     fun onTextChanged(newText: String) {
         _uiState.update { current ->
-            if (newText == current.editedText) return@update current
-            savedStateHandle[KEY_EDITED_TEXT] = newText
+            if (current.isEditingLockedByPublishing || newText == current.editedText) {
+                return@update current
+            }
+            persistEditedTextSafely(newText)
             buildState(
                 isLoading = current.isLoading,
+                isEditingLockedByPublishing = current.isEditingLockedByPublishing,
                 draft = current.draft,
                 selectedChannel = current.selectedChannel,
                 editedText = newText,
@@ -77,13 +91,17 @@ class DraftPreviewViewModel @Inject constructor(
         }
     }
 
-    /** Chuyển kênh xem trước (Facebook Page / LinkedIn) và tính lại giới hạn ký tự theo kênh. */
+    /**
+     * Chuyển kênh xem trước (Facebook Page / LinkedIn): chỉ đổi giao diện xem trước và bộ đếm hiển thị,
+     * KHÔNG làm thay đổi kênh thật (`draft.channel`) của bản nháp khi lưu.
+     */
     fun onChannelPreviewSelected(channel: ChannelType) {
         _uiState.update { current ->
             if (channel == current.selectedChannel) return@update current
             savedStateHandle[KEY_SELECTED_CHANNEL] = channel.name
             buildState(
                 isLoading = current.isLoading,
+                isEditingLockedByPublishing = current.isEditingLockedByPublishing,
                 draft = current.draft,
                 selectedChannel = channel,
                 editedText = current.editedText,
@@ -95,10 +113,12 @@ class DraftPreviewViewModel @Inject constructor(
     /** Khôi phục nội dung về bản nháp đã lưu gần nhất. */
     fun onResetEdits() {
         _uiState.update { current ->
+            if (current.isEditingLockedByPublishing) return@update current
             val originalText = current.draft?.text.orEmpty()
-            savedStateHandle[KEY_EDITED_TEXT] = originalText
+            persistEditedTextSafely(originalText)
             buildState(
                 isLoading = current.isLoading,
+                isEditingLockedByPublishing = current.isEditingLockedByPublishing,
                 draft = current.draft,
                 selectedChannel = current.selectedChannel,
                 editedText = originalText,
@@ -107,63 +127,111 @@ class DraftPreviewViewModel @Inject constructor(
         }
     }
 
-    /** Lưu nội dung đã chỉnh sửa xuống Room (chỉ cho phép khi không rỗng và không vượt giới hạn). */
+    /**
+     * Lưu nội dung đã chỉnh sửa xuống Room theo kênh thật của bản nháp (`draft.channel`).
+     */
     fun onSaveClicked() {
         val current = _uiState.value
         val draft = current.draft ?: return
+        if (current.isEditingLockedByPublishing) {
+            _events.trySend(DraftPreviewEvent.ShowMessage(R.string.preview_publishing_locked_warning))
+            return
+        }
 
-        val count = DraftCharacterCounter.evaluate(current.editedText, current.selectedChannel)
         if (current.editedText.isBlank()) {
             _uiState.update { it.copy(textErrorRes = R.string.preview_error_empty, canSave = false) }
             return
         }
-        if (count.isOverLimit) {
+        if (DraftCharacterCounter.evaluate(current.editedText, draft.channel).isOverLimit) {
             _uiState.update { it.copy(textErrorRes = R.string.preview_error_over_limit, canSave = false) }
             return
         }
 
         viewModelScope.launch {
-            val targetDraft = draft.copy(channel = current.selectedChannel)
-            val result = repository.saveEditedDraft(targetDraft, current.editedText)
-            if (result.isSuccess) {
-                val saved = result.getOrThrow()
-                savedStateHandle[KEY_EDITED_TEXT] = saved.text
-                _uiState.value = buildState(
-                    isLoading = false,
-                    draft = saved,
-                    selectedChannel = current.selectedChannel,
-                    editedText = saved.text,
-                    showBlankError = false,
-                )
-                _events.trySend(DraftPreviewEvent.ShowMessage(R.string.preview_save_success))
-            } else {
-                _events.trySend(DraftPreviewEvent.ShowMessage(R.string.preview_save_failed))
+            when (val result = repository.saveEditedDraft(draft.id, current.editedText)) {
+                is DraftSaveResult.Saved -> {
+                    val saved = result.draft
+                    persistEditedTextSafely(saved.text)
+                    _uiState.value = buildState(
+                        isLoading = false,
+                        isEditingLockedByPublishing = false,
+                        draft = saved,
+                        selectedChannel = current.selectedChannel,
+                        editedText = saved.text,
+                        showBlankError = false,
+                    )
+                    _events.trySend(DraftPreviewEvent.ShowMessage(R.string.preview_save_success))
+                }
+                DraftSaveResult.BlockedByActivePublish -> {
+                    _uiState.update {
+                        buildState(
+                            isLoading = false,
+                            isEditingLockedByPublishing = true,
+                            draft = it.draft,
+                            selectedChannel = it.selectedChannel,
+                            editedText = it.editedText,
+                            showBlankError = false,
+                        )
+                    }
+                    _events.trySend(DraftPreviewEvent.ShowMessage(R.string.preview_publishing_locked_warning))
+                }
+                DraftSaveResult.BlockedBlankContent -> {
+                    _uiState.update { it.copy(textErrorRes = R.string.preview_error_empty, canSave = false) }
+                }
+                DraftSaveResult.BlockedOverLimit -> {
+                    _uiState.update { it.copy(textErrorRes = R.string.preview_error_over_limit, canSave = false) }
+                }
+                DraftSaveResult.NotFound -> {
+                    _uiState.value = DraftPreviewUiState(isLoading = false, isDraftNotFound = true)
+                }
+                is DraftSaveResult.StorageError -> {
+                    _events.trySend(DraftPreviewEvent.ShowMessage(R.string.preview_save_failed))
+                }
             }
+        }
+    }
+
+    /**
+     * Giới hạn dung lượng lưu vào [SavedStateHandle] để tránh `TransactionTooLargeException`
+     * khi người dùng soạn bài Facebook rất dài (tới 63.206 ký tự).
+     */
+    private fun persistEditedTextSafely(text: String) {
+        if (text.length <= MAX_SAVED_STATE_CHARS) {
+            savedStateHandle[KEY_EDITED_TEXT] = text
+        } else {
+            savedStateHandle.remove<String>(KEY_EDITED_TEXT)
         }
     }
 
     private fun buildState(
         isLoading: Boolean,
-        draft: com.lttbdd.socialagent.core.model.Draft?,
+        isEditingLockedByPublishing: Boolean,
+        draft: Draft?,
         selectedChannel: ChannelType,
         editedText: String,
         showBlankError: Boolean,
     ): DraftPreviewUiState {
-        val count = DraftCharacterCounter.evaluate(editedText, selectedChannel)
+        val previewCount = DraftCharacterCounter.evaluate(editedText, selectedChannel)
+        val draftChannelOverLimit = draft != null &&
+            DraftCharacterCounter.evaluate(editedText, draft.channel).isOverLimit
         val errorRes = when {
-            count.isOverLimit -> R.string.preview_error_over_limit
+            draftChannelOverLimit -> R.string.preview_error_over_limit
             showBlankError && editedText.isBlank() -> R.string.preview_error_empty
             else -> null
         }
-        val hasUnsavedChanges = draft != null && editedText != draft.text
-        val canSave = draft != null && DraftCharacterCounter.canSave(editedText, selectedChannel)
+        val hasUnsavedChanges = draft != null && !isEditingLockedByPublishing && editedText != draft.text
+        val canSave = draft != null &&
+            !isEditingLockedByPublishing &&
+            DraftCharacterCounter.canSave(editedText, draft.channel)
 
         return DraftPreviewUiState(
             isLoading = isLoading,
+            isDraftNotFound = draft == null && !isLoading,
+            isEditingLockedByPublishing = isEditingLockedByPublishing,
             draft = draft,
             selectedChannel = selectedChannel,
             editedText = editedText,
-            characterCount = count,
+            characterCount = previewCount,
             hasUnsavedChanges = hasUnsavedChanges,
             canSave = canSave,
             textErrorRes = errorRes,
@@ -172,6 +240,7 @@ class DraftPreviewViewModel @Inject constructor(
 
     companion object {
         const val ARG_DRAFT_ID = "draftId"
+        const val MAX_SAVED_STATE_CHARS = 8_000
         private const val KEY_EDITED_TEXT = "preview_edited_text"
         private const val KEY_SELECTED_CHANNEL = "preview_selected_channel"
     }

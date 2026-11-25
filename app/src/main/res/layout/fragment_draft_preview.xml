@@ -18,6 +18,13 @@
             android:layout_gravity="center"
             android:indeterminate="true" />
 
+        <com.lttbdd.socialagent.core.ui.components.AppEmptyState
+            android:id="@+id/emptyStateNotFound"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top"
+            android:visibility="gone" />
+
         <LinearLayout
             android:id="@+id/contentContainer"
             android:layout_width="match_parent"
@@ -38,6 +45,16 @@
                 android:layout_marginTop="@dimen/component_spacing_xsmall"
                 android:text="@string/preview_header_subtitle"
                 android:textAppearance="@style/TextAppearance.SocialAgent.Caption" />
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/tvPublishingLockedWarning"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/component_spacing_small"
+                android:text="@string/preview_publishing_locked_warning"
+                android:textAppearance="@style/TextAppearance.SocialAgent.Caption"
+                android:textColor="@color/brand_warning"
+                android:visibility="gone" />
 
             <!-- Bộ chọn kênh xem trước -->
             <RadioGroup

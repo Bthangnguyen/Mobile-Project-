@@ -6,9 +6,13 @@ import com.lttbdd.socialagent.core.model.Draft
 
 /**
  * Trạng thái UI cho màn hình xem trước theo kênh, sửa tay và đếm ký tự (F4, Issue #34).
+ * [selectedChannel] chỉ phục vụ xem trước giao diện và bộ đếm mô phỏng; việc kiểm tra giới hạn lưu
+ * luôn dựa trên kênh thật của [draft] (`draft.channel`).
  */
 data class DraftPreviewUiState(
     val isLoading: Boolean = true,
+    val isDraftNotFound: Boolean = false,
+    val isEditingLockedByPublishing: Boolean = false,
     val draft: Draft? = null,
     val selectedChannel: ChannelType = ChannelType.FACEBOOK,
     val editedText: String = "",

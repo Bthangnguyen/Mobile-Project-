@@ -137,11 +137,8 @@ class PublishStatusViewModelTest {
     fun `published post with web link can be opened`() {
         val url = "https://www.facebook.com/123_456"
         assertEquals(url, PublishStatusViewModel.openableUrl(published(url)))
-        assertEquals(
-            "Khoảng trắng thừa ở hai đầu bị bỏ",
-            "http://example.com/p",
-            PublishStatusViewModel.openableUrl(published("  http://example.com/p ")),
-        )
+        val withQuery = "http://example.com/p?id=1#c"
+        assertEquals(withQuery, PublishStatusViewModel.openableUrl(published(withQuery)))
         assertEquals(
             "Không phân biệt hoa thường ở scheme",
             "HTTPS://linkedin.com/feed/update/urn:li:share:1",
@@ -168,6 +165,15 @@ class PublishStatusViewModelTest {
             "file:///sdcard/secret.txt",
             "content://contacts/people/1",
             "https://example.com/a b",
+            // AC #40: khoảng trắng ở đầu/cuối cũng bị chặn, không tự cắt bỏ.
+            "  https://example.com/post  ",
+            " https://example.com/post",
+            "https://example.com/post\n",
+            // Thiếu host.
+            "https:///post/1",
+            "https://?q=1",
+            "http:example.com",
+            "https:",
             "ftp://example.com/p",
         ).forEach { url ->
             assertEquals(url.toString(), null, PublishStatusViewModel.openableUrl(published(url)))

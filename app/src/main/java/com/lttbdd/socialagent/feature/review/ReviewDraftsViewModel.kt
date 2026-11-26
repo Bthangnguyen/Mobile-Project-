@@ -3,12 +3,16 @@ package com.lttbdd.socialagent.feature.review
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lttbdd.socialagent.R
+import com.lttbdd.socialagent.core.model.PostStatus
+import com.lttbdd.socialagent.core.publishing.EnqueueResult
+import com.lttbdd.socialagent.core.publishing.PublishQueue
 import com.lttbdd.socialagent.data.review.DraftApprovalGuard
 import com.lttbdd.socialagent.data.review.DraftApprovalResult
 import com.lttbdd.socialagent.data.review.DraftReviewRepository
 import com.lttbdd.socialagent.data.review.DraftRevokeResult
 import com.lttbdd.socialagent.data.review.PublishGateResult
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
@@ -27,6 +31,7 @@ import javax.inject.Inject
 @HiltViewModel
 class ReviewDraftsViewModel @Inject constructor(
     private val repository: DraftReviewRepository,
+    private val publishQueue: PublishQueue,
 ) : ViewModel() {
 
     val uiState: StateFlow<ReviewDraftsUiState> = repository.observeDrafts()
@@ -85,27 +90,38 @@ class ReviewDraftsViewModel @Inject constructor(
 
     /**
      * Yêu cầu đăng bản nháp — luôn đi qua cổng chặn cứng [DraftReviewRepository.requestPublish]
-     * để phòng vệ theo chiều sâu kể cả khi bị gọi ngoài UI.
+     * để phòng vệ theo chiều sâu kể cả khi bị gọi ngoài UI, rồi mới thêm vào hàng đợi F5 (#37).
+     * Thêm vào hàng đợi chưa phải là đã đăng: thông báo chỉ nói bài đang chờ đăng.
      */
     fun onPublishRequested(draftId: String) {
         viewModelScope.launch {
-            when (val gate = repository.requestPublish(draftId)) {
-                is PublishGateResult.ReadyToPublish -> {
-                    _events.trySend(ReviewDraftsEvent.ReadyToPublish(gate.draft))
-                }
-                is PublishGateResult.BlockedUnapproved -> {
-                    _events.trySend(ReviewDraftsEvent.ShowMessage(R.string.review_publish_blocked_unapproved))
-                }
-                is PublishGateResult.BlockedEmptyContent -> {
-                    _events.trySend(ReviewDraftsEvent.ShowMessage(R.string.review_publish_blocked_empty))
-                }
+            val messageRes = when (repository.requestPublish(draftId)) {
+                is PublishGateResult.ReadyToPublish -> enqueue(draftId)
+                is PublishGateResult.BlockedUnapproved -> R.string.review_publish_blocked_unapproved
+                is PublishGateResult.BlockedEmptyContent -> R.string.review_publish_blocked_empty
                 PublishGateResult.NotFound,
                 is PublishGateResult.StorageError,
-                -> {
-                    _events.trySend(ReviewDraftsEvent.ShowMessage(R.string.review_draft_action_failed))
-                }
+                -> R.string.review_draft_action_failed
             }
+            _events.trySend(ReviewDraftsEvent.ShowMessage(messageRes))
         }
+    }
+
+    private suspend fun enqueue(draftId: String): Int = try {
+        when (val result = publishQueue.enqueue(draftId)) {
+            is EnqueueResult.Queued -> R.string.review_publish_queued
+            is EnqueueResult.AlreadyActive -> when (result.status) {
+                PostStatus.QUEUED -> R.string.review_publish_already_queued
+                else -> R.string.review_publish_in_progress
+            }
+            is EnqueueResult.AlreadyPublished -> R.string.review_publish_already_published
+            EnqueueResult.NotApproved -> R.string.review_publish_blocked_unapproved
+            EnqueueResult.DraftNotFound -> R.string.review_draft_action_failed
+        }
+    } catch (ce: CancellationException) {
+        throw ce
+    } catch (e: Exception) {
+        R.string.review_draft_action_failed
     }
 
     private companion object {

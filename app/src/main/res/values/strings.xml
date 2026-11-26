@@ -262,5 +262,8 @@
     <string name="review_draft_action_failed">Could not update draft. Please try again.</string>
     <string name="review_publish_blocked_unapproved">This draft has not been approved yet and cannot be published.</string>
     <string name="review_publish_blocked_empty">Draft content is empty and cannot be published.</string>
-    <string name="review_publish_ready_message">Draft passed approval check. Publishing queue (F5) is not connected yet — nothing was published.</string>
+    <string name="review_publish_queued">Added to the publishing queue. It will be posted automatically when you are online.</string>
+    <string name="review_publish_already_queued">This draft is already waiting in the publishing queue.</string>
+    <string name="review_publish_in_progress">This draft is being published or waiting for you to confirm its result.</string>
+    <string name="review_publish_already_published">This draft has already been published.</string>
 </resources>

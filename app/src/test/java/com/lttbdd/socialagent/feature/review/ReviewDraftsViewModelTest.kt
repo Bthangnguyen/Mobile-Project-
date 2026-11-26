@@ -3,6 +3,9 @@ package com.lttbdd.socialagent.feature.review
 import com.lttbdd.socialagent.R
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.Draft
+import com.lttbdd.socialagent.core.model.PostStatus
+import com.lttbdd.socialagent.core.publishing.EnqueueResult
+import com.lttbdd.socialagent.core.publishing.PublishQueue
 import com.lttbdd.socialagent.data.review.DraftApprovalGuard
 import com.lttbdd.socialagent.data.review.DraftApprovalResult
 import com.lttbdd.socialagent.data.review.DraftContentUpdateResult
@@ -35,13 +38,15 @@ class ReviewDraftsViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var fakeRepository: FakeDraftReviewRepository
+    private lateinit var fakeQueue: FakePublishQueue
     private lateinit var viewModel: ReviewDraftsViewModel
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         fakeRepository = FakeDraftReviewRepository()
-        viewModel = ReviewDraftsViewModel(fakeRepository)
+        fakeQueue = FakePublishQueue()
+        viewModel = ReviewDraftsViewModel(fakeRepository, fakeQueue)
     }
 
     @After
@@ -79,6 +84,7 @@ class ReviewDraftsViewModelTest {
             ReviewDraftsEvent.ShowMessage(R.string.review_publish_blocked_unapproved),
             viewModel.events.first(),
         )
+        assertTrue(fakeQueue.enqueuedDraftIds.isEmpty())
         collector.cancel()
     }
 
@@ -118,9 +124,11 @@ class ReviewDraftsViewModelTest {
         viewModel.onPublishRequested("d2")
         advanceUntilIdle()
 
-        val publishEvent = viewModel.events.first()
-        assertTrue(publishEvent is ReviewDraftsEvent.ReadyToPublish)
-        assertEquals("d2", (publishEvent as ReviewDraftsEvent.ReadyToPublish).draft.id)
+        assertEquals(
+            ReviewDraftsEvent.ShowMessage(R.string.review_publish_queued),
+            viewModel.events.first(),
+        )
+        assertEquals(listOf("d2"), fakeQueue.enqueuedDraftIds)
         collector.cancel()
     }
 
@@ -234,9 +242,84 @@ class ReviewDraftsViewModelTest {
         collector.cancel()
     }
 
+    @Test
+    fun `each enqueue result shows its own message and never says published on queue`() = runTest {
+        approvedDraft("d-q")
+        val cases = listOf(
+            EnqueueResult.Queued("p1") to R.string.review_publish_queued,
+            EnqueueResult.AlreadyActive("p1", PostStatus.QUEUED) to R.string.review_publish_already_queued,
+            EnqueueResult.AlreadyActive("p1", PostStatus.PUBLISHING) to R.string.review_publish_in_progress,
+            EnqueueResult.AlreadyActive("p1", PostStatus.HANDED_OFF) to R.string.review_publish_in_progress,
+            EnqueueResult.AlreadyPublished("p1", "https://example.com/p1") to
+                R.string.review_publish_already_published,
+            EnqueueResult.NotApproved to R.string.review_publish_blocked_unapproved,
+            EnqueueResult.DraftNotFound to R.string.review_draft_action_failed,
+        )
+        for ((result, expectedMessage) in cases) {
+            fakeQueue.nextResult = result
+            viewModel.onPublishRequested("d-q")
+            advanceUntilIdle()
+            assertEquals(result.toString(), ReviewDraftsEvent.ShowMessage(expectedMessage), viewModel.events.first())
+        }
+        assertEquals(cases.size, fakeQueue.enqueuedDraftIds.size)
+    }
+
+    @Test
+    fun `empty approved draft is blocked before reaching the queue`() = runTest {
+        fakeRepository.putDraft(
+            Draft(id = "d-empty", topicId = "t", channel = ChannelType.FACEBOOK, text = " ", approved = true),
+        )
+
+        viewModel.onPublishRequested("d-empty")
+        advanceUntilIdle()
+
+        assertEquals(
+            ReviewDraftsEvent.ShowMessage(R.string.review_publish_blocked_empty),
+            viewModel.events.first(),
+        )
+        assertTrue(fakeQueue.enqueuedDraftIds.isEmpty())
+    }
+
+    @Test
+    fun `queue storage error shows action failed message without crashing`() = runTest {
+        approvedDraft("d-err")
+        fakeQueue.error = IllegalStateException("IO")
+
+        viewModel.onPublishRequested("d-err")
+        advanceUntilIdle()
+
+        assertEquals(
+            ReviewDraftsEvent.ShowMessage(R.string.review_draft_action_failed),
+            viewModel.events.first(),
+        )
+    }
+
+    private fun approvedDraft(id: String) {
+        fakeRepository.putDraft(
+            Draft(id = id, topicId = "t", channel = ChannelType.LINKEDIN, text = "Nội dung đã duyệt", approved = true),
+        )
+    }
+
+    private class FakePublishQueue : PublishQueue {
+        val enqueuedDraftIds = mutableListOf<String>()
+        var nextResult: EnqueueResult = EnqueueResult.Queued("post-1")
+        var error: Exception? = null
+
+        override suspend fun enqueue(draftId: String): EnqueueResult {
+            error?.let { throw it }
+            enqueuedDraftIds += draftId
+            return nextResult
+        }
+    }
+
     private class FakeDraftReviewRepository : DraftReviewRepository {
         private val items = MutableStateFlow<List<Draft>>(emptyList())
         var failWithStorageError = false
+
+        /** Đặt thẳng bản nháp (bỏ qua guard) để dựng trạng thái đã duyệt trong test. */
+        fun putDraft(draft: Draft) {
+            items.value = items.value.filterNot { it.id == draft.id } + draft
+        }
 
         override fun observeDrafts(): Flow<List<Draft>> = items.asStateFlow()
 

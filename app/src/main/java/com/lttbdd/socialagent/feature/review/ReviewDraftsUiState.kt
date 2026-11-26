@@ -26,5 +26,4 @@ sealed interface ReviewDraftsEvent {
     /** Mang theo [expectedText] đúng với nội dung người dùng đã xem lúc bấm Duyệt bài. */
     data class ConfirmApprove(val draftId: String, val expectedText: String) : ReviewDraftsEvent
     data class ShowMessage(@param:StringRes val messageRes: Int) : ReviewDraftsEvent
-    data class ReadyToPublish(val draft: Draft) : ReviewDraftsEvent
 }

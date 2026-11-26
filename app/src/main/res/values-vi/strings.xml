@@ -260,5 +260,8 @@
     <string name="review_draft_action_failed">Không thể cập nhật bản nháp. Vui lòng thử lại.</string>
     <string name="review_publish_blocked_unapproved">Bản nháp chưa được duyệt nên không thể đăng bài.</string>
     <string name="review_publish_blocked_empty">Bản nháp đang trống nội dung nên không thể đăng bài.</string>
-    <string name="review_publish_ready_message">Bản nháp đã qua kiểm duyệt. Hàng đợi đăng bài (F5) chưa được nối — bài viết chưa được đăng.</string>
+    <string name="review_publish_queued">Đã thêm vào hàng đợi đăng bài. Bài sẽ tự đăng khi có mạng.</string>
+    <string name="review_publish_already_queued">Bản nháp này đã nằm trong hàng đợi đăng bài.</string>
+    <string name="review_publish_in_progress">Bản nháp này đang được đăng hoặc đang chờ bạn xác nhận kết quả.</string>
+    <string name="review_publish_already_published">Bản nháp này đã được đăng trước đó.</string>
 </resources>

@@ -8,6 +8,8 @@ import com.lttbdd.socialagent.core.database.entity.PostEntity
 import com.lttbdd.socialagent.core.database.toModel
 import com.lttbdd.socialagent.core.model.PostStatus
 import com.lttbdd.socialagent.core.model.PublishResult
+import com.lttbdd.socialagent.core.publishing.EnqueueResult
+import com.lttbdd.socialagent.core.publishing.PublishQueue
 import com.lttbdd.socialagent.core.social.SocialChannelClient
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
@@ -22,23 +24,6 @@ import javax.inject.Singleton
 /** Nguồn thời gian, tách ra để test điều khiển được. */
 fun interface PublishClock {
     fun nowMillis(): Long
-}
-
-/** Kết quả khi người dùng bấm Đăng một bản nháp. */
-sealed interface EnqueueResult {
-    /** Đã thêm vào hàng đợi; sẽ tự đăng khi có mạng. */
-    data class Queued(val postId: String) : EnqueueResult
-
-    /** Bấm lặp: bản nháp đã có bài đang chờ, đang đăng, chờ xác nhận hoặc đã bàn giao — không tạo bài mới. */
-    data class AlreadyActive(val postId: String, val status: PostStatus) : EnqueueResult
-
-    /** Bản nháp đã được đăng thành công trước đó. */
-    data class AlreadyPublished(val postId: String, val url: String?) : EnqueueResult
-
-    data object DraftNotFound : EnqueueResult
-
-    /** Bản nháp chưa được duyệt: agent không được tự đăng (yêu cầu F4, quy tắc 6 của AGENTS.md). */
-    data object NotApproved : EnqueueResult
 }
 
 /** Tổng kết một lượt xử lý hàng đợi, để worker quyết định có cần chạy lại không. */
@@ -72,7 +57,7 @@ class PublishQueueRepository @Inject constructor(
     private val clients: Set<@JvmSuppressWildcards SocialChannelClient>,
     private val scheduler: PublishScheduler,
     private val clock: PublishClock,
-) {
+) : PublishQueue {
 
     fun observePosts(): Flow<List<PostEntity>> = postDao.observeAll()
 
@@ -82,7 +67,7 @@ class PublishQueueRepository @Inject constructor(
      * Thêm bản nháp vào hàng đợi. Gọi nhiều lần (bấm hai lần) chỉ tạo một bài: kiểm tra và thêm nằm trong
      * cùng một transaction. Bài cũ [PostStatus.FAILED] không chặn — người dùng được đăng lại với khoá mới.
      */
-    suspend fun enqueue(draftId: String): EnqueueResult {
+    override suspend fun enqueue(draftId: String): EnqueueResult {
         val result = database.withTransaction {
             val draft = draftDao.getById(draftId) ?: return@withTransaction EnqueueResult.DraftNotFound
             if (!draft.approved) return@withTransaction EnqueueResult.NotApproved

@@ -102,9 +102,6 @@ class ReviewDraftsFragment : Fragment() {
             is ReviewDraftsEvent.ShowMessage -> {
                 AppSnackbar.show(binding.root, event.messageRes)
             }
-            is ReviewDraftsEvent.ReadyToPublish -> {
-                AppSnackbar.show(binding.root, R.string.review_publish_ready_message)
-            }
         }
     }
 

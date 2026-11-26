@@ -17,6 +17,7 @@ import com.lttbdd.socialagent.core.model.Draft
 import com.lttbdd.socialagent.core.model.PostMetrics
 import com.lttbdd.socialagent.core.model.PostStatus
 import com.lttbdd.socialagent.core.model.PublishResult
+import com.lttbdd.socialagent.core.publishing.EnqueueResult
 import com.lttbdd.socialagent.core.social.SocialChannelClient
 import kotlinx.coroutines.test.runTest
 import org.junit.After

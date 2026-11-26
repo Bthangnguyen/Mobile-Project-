@@ -1,6 +1,8 @@
 package com.lttbdd.socialagent.di
 
+import com.lttbdd.socialagent.core.publishing.PublishQueue
 import com.lttbdd.socialagent.data.publishing.PublishClock
+import com.lttbdd.socialagent.data.publishing.PublishQueueRepository
 import com.lttbdd.socialagent.data.publishing.PublishScheduler
 import com.lttbdd.socialagent.data.publishing.WorkManagerPublishScheduler
 import dagger.Binds
@@ -16,6 +18,10 @@ abstract class PublishingModule {
 
     @Binds
     abstract fun publishScheduler(impl: WorkManagerPublishScheduler): PublishScheduler
+
+    /** Màn hình (feature/review) gọi hàng đợi qua interface `core/`, không import thẳng `data/publishing`. */
+    @Binds
+    abstract fun publishQueue(impl: PublishQueueRepository): PublishQueue
 
     companion object {
         @Provides

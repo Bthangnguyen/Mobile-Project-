@@ -49,6 +49,12 @@ class ReviewDraftsFragment : Fragment() {
 
     private fun setupViews() {
         adapter = ReviewDraftsAdapter(
+            onPreviewEditClick = { draftId ->
+                val args = Bundle().apply {
+                    putString(DraftPreviewViewModel.ARG_DRAFT_ID, draftId)
+                }
+                findNavController().navigate(R.id.action_posts_to_draft_preview, args)
+            },
             onApproveClick = viewModel::onApproveRequested,
             onRevokeClick = viewModel::onRevokeApproval,
             onPublishClick = viewModel::onPublishRequested,

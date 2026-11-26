@@ -75,4 +75,13 @@ class DraftCharacterCounterTest {
         assertFalse(DraftCharacterCounter.canSave("   ", ChannelType.LINKEDIN))
         assertTrue(DraftCharacterCounter.canSave("Valid post", ChannelType.LINKEDIN))
     }
+
+    @Test
+    fun `truncateByCodePoints folds text without splitting emoji or NFD combining marks`() {
+        val text = "a\u0301b🚀c"
+        assertEquals("á", DraftCharacterCounter.truncateByCodePoints(text, 1))
+        assertEquals("áb🚀", DraftCharacterCounter.truncateByCodePoints(text, 3))
+        assertEquals("áb🚀c", DraftCharacterCounter.truncateByCodePoints(text, 10))
+        assertEquals("", DraftCharacterCounter.truncateByCodePoints(text, 0))
+    }
 }

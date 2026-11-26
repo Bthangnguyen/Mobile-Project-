@@ -51,6 +51,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/component_spacing_small"
+                android:accessibilityLiveRegion="polite"
                 android:text="@string/preview_publishing_locked_warning"
                 android:textAppearance="@style/TextAppearance.SocialAgent.Caption"
                 android:textColor="@color/brand_warning"
@@ -168,6 +169,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
+                    android:accessibilityLiveRegion="polite"
                     android:textAppearance="@style/TextAppearance.SocialAgent.Caption"
                     android:textColor="@color/brand_error"
                     android:visibility="gone" />
@@ -176,8 +178,19 @@
                     android:id="@+id/tvCharCount"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:accessibilityLiveRegion="polite"
                     android:textAppearance="@style/TextAppearance.SocialAgent.Caption" />
             </LinearLayout>
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/tvPreviewReferenceNote"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/component_spacing_xsmall"
+                android:accessibilityLiveRegion="polite"
+                android:textAppearance="@style/TextAppearance.SocialAgent.Caption"
+                android:textColor="@color/brand_on_surface_variant"
+                android:visibility="gone" />
 
             <!-- Nút Khôi phục và Lưu chỉnh sửa -->
             <LinearLayout

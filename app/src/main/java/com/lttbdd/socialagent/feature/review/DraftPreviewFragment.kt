@@ -155,7 +155,7 @@ class DraftPreviewFragment : Fragment() {
         binding.layoutDraftContent.error = state.textErrorRes?.let { getString(it) }
 
         // Bộ đếm ký tự theo giới hạn kênh xem trước
-        renderCharacterCounter(state.characterCount)
+        renderCharacterCounter(state.characterCount, state.selectedChannel, state.draft?.channel)
 
         // Nút Khôi phục và Lưu chỉnh sửa
         binding.btnResetEdits.isEnabled = state.hasUnsavedChanges
@@ -163,8 +163,14 @@ class DraftPreviewFragment : Fragment() {
     }
 
     private fun renderChannelPreview(channel: ChannelType, text: String) {
-        val previewBody = text.ifBlank { getString(R.string.preview_placeholder_body) }
         val isLinkedIn = channel == ChannelType.LINKEDIN
+        val shouldFoldLinkedIn = isLinkedIn &&
+            DraftCharacterCounter.countCharacters(text) > LINKEDIN_FOLD_CHARS
+        val previewBody = when {
+            text.isBlank() -> getString(R.string.preview_placeholder_body)
+            shouldFoldLinkedIn -> DraftCharacterCounter.truncateByCodePoints(text, LINKEDIN_FOLD_CHARS)
+            else -> text
+        }
 
         binding.tvPreviewAuthorName.setText(
             if (isLinkedIn) R.string.preview_linkedin_author else R.string.preview_facebook_author,
@@ -173,14 +179,17 @@ class DraftPreviewFragment : Fragment() {
             if (isLinkedIn) R.string.preview_linkedin_meta else R.string.preview_facebook_meta,
         )
         binding.tvPreviewBody.text = previewBody
-        binding.tvPreviewSeeMore.isVisible = isLinkedIn &&
-            DraftCharacterCounter.countCharacters(text) > LINKEDIN_FOLD_CHARS
+        binding.tvPreviewSeeMore.isVisible = shouldFoldLinkedIn
         binding.tvPreviewActions.setText(
             if (isLinkedIn) R.string.preview_linkedin_actions else R.string.preview_facebook_actions,
         )
     }
 
-    private fun renderCharacterCounter(status: CharacterCountStatus) {
+    private fun renderCharacterCounter(
+        status: CharacterCountStatus,
+        selectedChannel: ChannelType,
+        draftChannel: ChannelType?,
+    ) {
         binding.tvCharCount.text = getString(
             R.string.preview_char_count_format,
             status.currentLength,
@@ -202,6 +211,26 @@ class DraftPreviewFragment : Fragment() {
         } else {
             binding.tvCharExcess.isVisible = false
         }
+
+        val showReferenceNote = status.isOverLimit &&
+            draftChannel != null &&
+            selectedChannel != draftChannel
+        if (showReferenceNote) {
+            val channelLabel = getString(
+                if (draftChannel == ChannelType.LINKEDIN) {
+                    R.string.compose_channel_linkedin
+                } else {
+                    R.string.compose_channel_facebook
+                },
+            )
+            binding.tvPreviewReferenceNote.text = getString(
+                R.string.preview_char_reference_note,
+                channelLabel,
+            )
+            binding.tvPreviewReferenceNote.isVisible = true
+        } else {
+            binding.tvPreviewReferenceNote.isVisible = false
+        }
     }
 
     override fun onDestroyView() {
@@ -210,6 +239,7 @@ class DraftPreviewFragment : Fragment() {
     }
 
     private companion object {
+        /** Ngưỡng ước lượng điểm gập nội dung trên feed LinkedIn (thực tế thay đổi theo thiết bị và số dòng). */
         const val LINKEDIN_FOLD_CHARS = 210
     }
 }

@@ -26,8 +26,8 @@ data class CharacterCountStatus(
 /**
  * Bộ đếm và kiểm tra giới hạn ký tự cho từng kênh mạng xã hội (F4, Issue #34).
  * Giới hạn được đọc trực tiếp từ [ChannelType.maxChars], không viết cứng.
- * Đếm theo Unicode code point sau khi chuẩn hóa NFC để emoji (surrogate pair) và chữ có dấu tổ hợp (NFD)
- * được tính là 1 ký tự khớp với cách mạng xã hội tính độ dài.
+ * Đếm theo Unicode code point sau khi chuẩn hóa NFC để tránh tính trùng emoji (surrogate pair)
+ * và chữ có dấu tổ hợp (NFD) thành nhiều ký tự (ước lượng thực tế, có thể chênh lệch nhẹ tùy nền tảng).
  */
 object DraftCharacterCounter {
 
@@ -37,6 +37,19 @@ object DraftCharacterCounter {
         if (text.isEmpty()) return 0
         val normalized = Normalizer.normalize(text, Normalizer.Form.NFC)
         return normalized.codePointCount(0, normalized.length)
+    }
+
+    /**
+     * Cắt chuỗi theo số Unicode code point sau chuẩn hóa NFC để không cắt đôi emoji (surrogate pair)
+     * hay dấu kết hợp khi mô phỏng điểm gập nội dung trên feed.
+     */
+    fun truncateByCodePoints(text: String, maxCodePoints: Int): String {
+        if (maxCodePoints <= 0 || text.isEmpty()) return ""
+        val normalized = Normalizer.normalize(text, Normalizer.Form.NFC)
+        val total = normalized.codePointCount(0, normalized.length)
+        if (total <= maxCodePoints) return normalized
+        val endIndex = normalized.offsetByCodePoints(0, maxCodePoints)
+        return normalized.substring(0, endIndex).trimEnd()
     }
 
     fun evaluate(text: String, channel: ChannelType): CharacterCountStatus {

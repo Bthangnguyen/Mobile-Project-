@@ -13,6 +13,7 @@ import com.lttbdd.socialagent.core.database.toEntity
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.Draft
 import com.lttbdd.socialagent.core.model.PostStatus
+import com.lttbdd.socialagent.data.review.RoomDraftReviewRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
@@ -39,7 +40,11 @@ class RoomDraftEditorRepositoryTest {
         db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
             .allowMainThreadQueries()
             .build()
-        repository = RoomDraftEditorRepository(db.draftDao(), db.postDao())
+        repository = RoomDraftEditorRepository(
+            draftDao = db.draftDao(),
+            postDao = db.postDao(),
+            draftReviewRepository = RoomDraftReviewRepository(db.draftDao()),
+        )
     }
 
     @After
@@ -200,7 +205,11 @@ class RoomDraftEditorRepositoryTest {
             override suspend fun update(draft: DraftEntity): Int = 0
         }
 
-        val repoWithFailingDao = RoomDraftEditorRepository(failingDao, db.postDao())
+        val repoWithFailingDao = RoomDraftEditorRepository(
+            draftDao = failingDao,
+            postDao = db.postDao(),
+            draftReviewRepository = RoomDraftReviewRepository(failingDao),
+        )
         val result = repoWithFailingDao.saveEditedDraft("d-fail", "Nội dung mới")
 
         assertTrue(result is DraftSaveResult.StorageError)

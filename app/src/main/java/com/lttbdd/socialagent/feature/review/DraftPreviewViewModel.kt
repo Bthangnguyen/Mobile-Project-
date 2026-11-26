@@ -75,11 +75,12 @@ class DraftPreviewViewModel @Inject constructor(
 
     /** Cập nhật nội dung khi người dùng sửa tay và tính lại bộ đếm ký tự theo thời gian thực. */
     fun onTextChanged(newText: String) {
+        var didUpdate = false
         _uiState.update { current ->
             if (current.isEditingLockedByPublishing || newText == current.editedText) {
                 return@update current
             }
-            persistEditedTextSafely(newText)
+            didUpdate = true
             buildState(
                 isLoading = current.isLoading,
                 isEditingLockedByPublishing = current.isEditingLockedByPublishing,
@@ -89,6 +90,9 @@ class DraftPreviewViewModel @Inject constructor(
                 showBlankError = true,
             )
         }
+        if (didUpdate) {
+            persistEditedTextSafely(newText)
+        }
     }
 
     /**
@@ -96,9 +100,10 @@ class DraftPreviewViewModel @Inject constructor(
      * KHÔNG làm thay đổi kênh thật (`draft.channel`) của bản nháp khi lưu.
      */
     fun onChannelPreviewSelected(channel: ChannelType) {
+        var didUpdate = false
         _uiState.update { current ->
             if (channel == current.selectedChannel) return@update current
-            savedStateHandle[KEY_SELECTED_CHANNEL] = channel.name
+            didUpdate = true
             buildState(
                 isLoading = current.isLoading,
                 isEditingLockedByPublishing = current.isEditingLockedByPublishing,
@@ -108,14 +113,18 @@ class DraftPreviewViewModel @Inject constructor(
                 showBlankError = current.textErrorRes == R.string.preview_error_empty,
             )
         }
+        if (didUpdate) {
+            savedStateHandle[KEY_SELECTED_CHANNEL] = channel.name
+        }
     }
 
     /** Khôi phục nội dung về bản nháp đã lưu gần nhất. */
     fun onResetEdits() {
+        var restoredText: String? = null
         _uiState.update { current ->
             if (current.isEditingLockedByPublishing) return@update current
             val originalText = current.draft?.text.orEmpty()
-            persistEditedTextSafely(originalText)
+            restoredText = originalText
             buildState(
                 isLoading = current.isLoading,
                 isEditingLockedByPublishing = current.isEditingLockedByPublishing,
@@ -125,6 +134,7 @@ class DraftPreviewViewModel @Inject constructor(
                 showBlankError = false,
             )
         }
+        restoredText?.let { persistEditedTextSafely(it) }
     }
 
     /**

@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.lttbdd.socialagent.core.ui.components.AppCard xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="@dimen/component_spacing">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/tvChannel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textAppearance="@style/TextAppearance.SocialAgent.Title" />
+
+            <com.lttbdd.socialagent.core.ui.components.StatusIndicator
+                android:id="@+id/statusApproval"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/tvDraftText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing_small"
+            android:ellipsize="end"
+            android:maxLines="4"
+            android:textAppearance="@style/TextAppearance.SocialAgent.Body" />
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/tvApprovalHint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing_small"
+            android:text="@string/review_approval_required_hint"
+            android:textAppearance="@style/TextAppearance.SocialAgent.Caption" />
+
+        <com.lttbdd.socialagent.core.ui.components.OutlinedButton
+            android:id="@+id/btnPreviewEdit"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing"
+            android:text="@string/review_action_edit" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing_small"
+            android:orientation="horizontal">
+
+            <com.lttbdd.socialagent.core.ui.components.PrimaryButton
+                android:id="@+id/btnApprove"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/review_action_approve" />
+
+            <com.lttbdd.socialagent.core.ui.components.OutlinedButton
+                android:id="@+id/btnRevoke"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/review_action_revoke"
+                android:visibility="gone" />
+
+            <com.lttbdd.socialagent.core.ui.components.SecondaryButton
+                android:id="@+id/btnPublish"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/component_spacing_small"
+                android:layout_weight="1"
+                android:enabled="false"
+                android:text="@string/review_action_publish" />
+        </LinearLayout>
+    </LinearLayout>
+</com.lttbdd.socialagent.core.ui.components.AppCard>

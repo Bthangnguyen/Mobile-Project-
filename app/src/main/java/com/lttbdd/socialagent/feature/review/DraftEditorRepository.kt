@@ -5,6 +5,8 @@ import com.lttbdd.socialagent.core.database.dao.PostDao
 import com.lttbdd.socialagent.core.database.toModel
 import com.lttbdd.socialagent.core.model.Draft
 import com.lttbdd.socialagent.core.model.PostStatus
+import com.lttbdd.socialagent.data.review.DraftContentUpdateResult
+import com.lttbdd.socialagent.data.review.DraftReviewRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
@@ -32,8 +34,8 @@ interface DraftEditorRepository {
 
     /**
      * Lưu nội dung người dùng sửa tay vào DB cục bộ theo đúng [draftId].
-     * Luôn đọc lại bản ghi mới nhất từ DB để không ghi đè `channel`, `imageUri`, `imageAltText`,
-     * kiểm tra giới hạn theo `draft.channel`, chặn khi có bài đang đăng, và đặt lại `approved = false`.
+     * Thực hiện kiểm tra riêng của #34 (chặn khi có bài đang đăng, rỗng, vượt giới hạn theo `draft.channel`)
+     * rồi ủy quyền ghi và thu hồi duyệt qua [DraftReviewRepository.updateDraftContent] (#33).
      */
     suspend fun saveEditedDraft(draftId: String, newText: String): DraftSaveResult
 }
@@ -42,6 +44,7 @@ interface DraftEditorRepository {
 class RoomDraftEditorRepository @Inject constructor(
     private val draftDao: DraftDao,
     private val postDao: PostDao,
+    private val draftReviewRepository: DraftReviewRepository,
 ) : DraftEditorRepository {
 
     override suspend fun getDraft(draftId: String): Draft? =
@@ -64,15 +67,12 @@ class RoomDraftEditorRepository @Inject constructor(
             if (DraftCharacterCounter.evaluate(newText, freshEntity.channel).isOverLimit) {
                 return DraftSaveResult.BlockedOverLimit
             }
-            // Chỉ cập nhật text, approved và thời điểm sửa trên bản ghi mới nhất từ DB,
-            // giữ nguyên channel, imageUri, imageAltText để tránh ghi đè dữ liệu đồng thời hoặc vi phạm unique index.
-            val updatedEntity = freshEntity.copy(
-                text = newText,
-                approved = false,
-                updatedAtMillis = System.currentTimeMillis(),
-            )
-            draftDao.upsert(updatedEntity)
-            DraftSaveResult.Saved(updatedEntity.toModel())
+            when (val updateResult = draftReviewRepository.updateDraftContent(draftId, newText)) {
+                is DraftContentUpdateResult.Updated -> DraftSaveResult.Saved(updateResult.draft)
+                DraftContentUpdateResult.EmptyContent -> DraftSaveResult.BlockedBlankContent
+                DraftContentUpdateResult.NotFound -> DraftSaveResult.NotFound
+                is DraftContentUpdateResult.StorageError -> DraftSaveResult.StorageError(updateResult.cause)
+            }
         } catch (ce: CancellationException) {
             throw ce
         } catch (e: Exception) {

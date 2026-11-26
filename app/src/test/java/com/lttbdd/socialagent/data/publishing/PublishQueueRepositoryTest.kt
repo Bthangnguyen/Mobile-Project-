@@ -652,6 +652,27 @@ class PublishQueueRepositoryTest {
         updatedAtMillis = createdAt,
     )
 
+    // ---------- #36: đăng một lúc lên nhiều kênh ----------
+
+    @Test
+    fun `one channel failing does not block publishing to the other channel`() = runTest {
+        val linkedin = ScriptedClient(ChannelType.LINKEDIN)
+        saveDraft(id = "fb", channel = ChannelType.FACEBOOK)
+        saveDraft(id = "li", channel = ChannelType.LINKEDIN)
+        val repo = repository(clients = setOf(facebook, linkedin))
+        facebook.next(PublishResult.PermanentError("permission_denied"))
+        val fbId = queuedId(repo, "fb")
+        val liId = queuedId(repo, "li")
+
+        val run = repo.processQueue()
+
+        assertEquals(PostStatus.FAILED, post(fbId).status)
+        assertEquals(PostStatus.PUBLISHED, post(liId).status)
+        assertEquals(1, run.failed)
+        assertEquals(1, run.published)
+        assertEquals("Mỗi kênh gọi API đúng một lần", listOf(1, 1), listOf(facebook.calls, linkedin.calls))
+    }
+
     private class CountingScheduler : PublishScheduler {
         var calls = 0
         var idleCalls = 0

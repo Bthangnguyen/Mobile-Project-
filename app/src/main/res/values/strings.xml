@@ -43,7 +43,21 @@
     <string name="channel_subtitle">Connected social media accounts and platform capability statuses</string>
     <string name="channel_connect_facebook">Connect Facebook Page</string>
     <string name="channel_connect_linkedin">Connect LinkedIn</string>
+    <string name="channel_refresh_user_session_expired">Your Facebook sign-in has expired. Sign in again to resume automatic refresh.</string>
+    <string name="channel_refresh_storage_error">Could not save the Facebook refresh. The app will retry.</string>
+    <string name="channel_refresh_network_error">Could not reach Facebook to refresh the connection. The app will retry.</string>
+    <string name="channel_refresh_unavailable">Facebook refresh is temporarily unavailable. The app will retry.</string>
+    <string name="channel_refresh_page_access">Check Facebook Page access for the connections marked below.</string>
+    <string name="channel_retry_page">Retry Page refresh</string>
+    <string name="channel_retry_page_wait">Page refresh is on cooldown. Try again later.</string>
+    <string name="channel_retry_page_sign_in">Sign in with the Facebook account that manages this Page, or reconnect it.</string>
+    <string name="channel_status_page_permission_required">Page access denied. Check your Facebook Page permissions and assigned tasks.</string>
+    <string name="channel_status_page_unlisted">This Page is missing from the current Facebook account’s Page list. Check that you have permission to manage it, then retry or reconnect.</string>
+    <string name="channel_status_reconnect_required">Reconnect required</string>
     <string name="channel_status_expired">Token Expired</string>
+    <string name="channel_reconnect">Reconnect</string>
+    <string name="channel_error_reconnect_account_mismatch">Sign in again with the account that owns this connection.</string>
+    <string name="channel_error_reconnect_unavailable">Reconnect is unavailable because sign-in is not configured in this build.</string>
     <string name="channel_empty_desc">Connect a channel (Facebook Page or LinkedIn) to view platform capability statuses</string>
     <string name="channel_capabilities_header">Platform Capabilities Matrix:</string>
     <string name="channel_facebook_login_error">Facebook login error</string>
@@ -91,6 +105,7 @@
     <string name="cap_status_supported">Supported ✅</string>
     <string name="cap_status_requires_perm">Requires Permission ⚠️</string>
     <string name="cap_status_requires_reconnect">Reconnect required</string>
+    <string name="cap_fb_page_token_invalid">The Facebook Page token is no longer valid. Reconnect the Page to use this feature.</string>
     <string name="cap_token_expired">The connection has expired. Sign in again to use this feature.</string>
     <string name="cap_status_handed_off">Manual hand-off ✋</string>
 
@@ -165,6 +180,41 @@
     <string name="api_keys_settings_description">Add, check, replace or delete your own OpenAI and Gemini keys. Keys are encrypted and stored only on this device.</string>
     <string name="api_keys_settings_manage">Manage API keys</string>
 
+    <!-- Chọn model theo loại việc, Issue #54. -->
+    <string name="models_title">Models by task</string>
+    <string name="models_description">Choose the provider and model for each kind of work. Only providers with a saved API key can be selected, and the app never switches provider on its own.</string>
+    <string name="models_manage_keys">Manage API keys</string>
+    <string name="models_loading">Loading model settings…</string>
+    <string name="models_load_failed">Could not load model settings. Reopen this screen to retry.</string>
+    <string name="models_task_write_post">Write posts</string>
+    <string name="models_task_write_post_description">Drafts, rewrites and suggested replies.</string>
+    <string name="models_task_classify">Classify comments</string>
+    <string name="models_task_classify_description">Sorts comments into question, praise, feedback, negative and spam.</string>
+    <string name="models_task_image">Generate images</string>
+    <string name="models_task_image_description">Illustrations for posts. Image models can cost more and need access on your account.</string>
+    <string name="models_model_label">Model</string>
+    <string name="models_model_help">Pick a suggestion or type a model ID. Access depends on your account.</string>
+    <string name="models_save">Save selection</string>
+    <string name="models_reset">Use default</string>
+    <string name="models_status_ready">Ready: %1$s / %2$s</string>
+    <string name="models_status_ready_default">Ready (default): %1$s / %2$s</string>
+    <string name="models_status_needs_key">Needs an API key: add a %1$s key or choose another provider. Nothing is sent until then.</string>
+    <string name="models_status_not_selected">No model selected. The app will use offline image templates.</string>
+    <string name="models_status_invalid">The saved model is not valid for this task. Choose another model.</string>
+    <string name="models_msg_saved">Selection saved.</string>
+    <string name="models_msg_saved_warning">Saved, but this model name does not look like a model for this kind of work. Check that it works with your account.</string>
+    <string name="models_msg_reset">Reset to default.</string>
+    <string name="models_msg_missing_key">This provider has no API key yet. Add one in API keys first.</string>
+    <string name="models_msg_empty">Enter a model ID.</string>
+    <string name="models_msg_too_long">Model ID is too long (at most 128 characters).</string>
+    <string name="models_msg_invalid_format">Model ID may contain only letters, digits and . _ : / -</string>
+    <string name="models_msg_incompatible">This model cannot be used for this kind of work.</string>
+    <string name="models_msg_unsupported_provider">This provider is not supported yet.</string>
+    <string name="models_msg_error">The operation could not be completed. Retry.</string>
+    <!-- Mục chọn model trong màn Cài đặt. -->
+    <string name="models_settings_description">Choose which model writes posts, classifies comments and generates images.</string>
+    <string name="models_settings_manage">Choose models</string>
+
     <!-- Feature F3: Topic Input -->
     <string name="compose_header_title">Create New Post</string>
     <string name="compose_header_subtitle">Provide a brief to guide the AI agent</string>
@@ -192,4 +242,51 @@
     <string name="tone_casual">Casual</string>
     <string name="tone_inspirational">Inspirational</string>
     <string name="tone_persuasive">Persuasive</string>
+
+    <!-- Feature F4: Draft Approval Guard (Issue #33) -->
+    <string name="review_header_title">Drafts &amp; Approval</string>
+    <string name="review_header_subtitle">Review and approve AI-generated drafts before publishing. The agent never publishes automatically.</string>
+    <string name="review_empty_title">No drafts waiting</string>
+    <string name="review_empty_message">Create a topic first. Generated drafts will appear here for your approval before publishing.</string>
+    <string name="review_status_approved">Approved</string>
+    <string name="review_approval_required_hint">Approval required before this draft can be published.</string>
+    <string name="review_action_approve">Approve</string>
+    <string name="review_action_revoke">Revoke</string>
+    <string name="review_action_publish">Publish</string>
+    <string name="review_approve_dialog_title">Approve this draft?</string>
+    <string name="review_approve_dialog_message">Confirm that you have reviewed the content and allow it to be published when you choose.</string>
+    <string name="review_draft_approved_message">Draft approved. You can publish it now.</string>
+    <string name="review_draft_content_changed">Draft content changed while you were reviewing. Please review it again before approving.</string>
+    <string name="review_draft_revoked_message">Approval revoked. Publishing is locked again.</string>
+    <string name="review_draft_approve_failed">Cannot approve an empty or missing draft.</string>
+    <string name="review_draft_action_failed">Could not update draft. Please try again.</string>
+    <string name="review_publish_blocked_unapproved">This draft has not been approved yet and cannot be published.</string>
+    <string name="review_publish_blocked_empty">Draft content is empty and cannot be published.</string>
+    <string name="review_publish_queued">Added to the publishing queue. It will be posted automatically when you are online.</string>
+    <string name="review_publish_already_queued">This draft is already waiting in the publishing queue.</string>
+    <string name="review_publish_in_progress">This draft is being published or waiting for you to confirm its result.</string>
+    <string name="review_publish_already_published">This draft has already been published.</string>
+
+    <!-- F5 Trạng thái đăng (#36) -->
+    <string name="publish_status_title">Publishing status</string>
+    <string name="publish_status_subtitle">Each channel is published separately. An error on one channel does not stop the others.</string>
+    <string name="publish_status_empty_title">Nothing to publish yet</string>
+    <string name="publish_status_empty_message">Drafts you create will appear here with the publishing status of each channel.</string>
+    <string name="publish_status_publish_all">Publish all approved channels</string>
+    <string name="publish_status_retry">Retry</string>
+    <string name="publish_status_needs_check">Needs check</string>
+    <string name="publish_status_needs_approval_hint">Approve this draft in Drafts &amp; Approval before publishing.</string>
+    <string name="publish_status_needs_confirmation_hint">We could not tell whether this post went live. Check the channel, then choose below.</string>
+    <string name="publish_status_confirm_published">It is live</string>
+    <string name="publish_status_confirm_not_published">Not live, publish again</string>
+    <string name="publish_status_requeue_dialog_title">Publish this post again?</string>
+    <string name="publish_status_requeue_dialog_message">Only continue if you checked the channel and the post is not there. Otherwise it may be posted twice.</string>
+    <string name="publish_status_requeue_action">Publish again</string>
+    <string name="publish_status_all_queued">All approved channels were added to the publishing queue.</string>
+    <string name="publish_status_queued_some_unapproved">Approved channels were added to the queue. Channels not yet approved were skipped.</string>
+    <string name="publish_status_nothing_to_publish">No approved channel is waiting to be published.</string>
+    <string name="publish_status_marked_published">Marked as published.</string>
+    <string name="publish_status_requeued">Added back to the publishing queue.</string>
+    <string name="publish_status_state_changed">The status of this post has changed. Check the list again.</string>
+    <string name="publish_status_action_failed">Could not update the publishing queue. Please try again.</string>
 </resources>

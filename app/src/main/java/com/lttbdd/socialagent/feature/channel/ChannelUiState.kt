@@ -9,7 +9,14 @@ import com.lttbdd.socialagent.data.model.FacebookPage
 sealed interface ChannelUiState {
     data object Loading : ChannelUiState
     data object LoadFailed : ChannelUiState
-    data class Success(val channels: List<ChannelAccount>) : ChannelUiState
+    data class Success(
+        val channels: List<ChannelAccount>,
+        val tokenRevision: Long = 0,
+        val facebookReconnectIds: Set<String> = emptySet(),
+        val unlistedFacebookPageIds: Set<String> = emptySet(),
+        val facebookRetryPageIds: Set<String> = emptySet(),
+        val facebookPagePermissionIds: Set<String> = emptySet(),
+    ) : ChannelUiState
 }
 
 /** Danh sách Page để người dùng chọn khi tài khoản Facebook quản lý nhiều Page. */

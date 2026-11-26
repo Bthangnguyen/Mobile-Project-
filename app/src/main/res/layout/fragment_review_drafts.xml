@@ -20,6 +20,14 @@
         android:text="@string/review_header_subtitle"
         android:textAppearance="@style/TextAppearance.SocialAgent.Caption" />
 
+    <!-- Mở màn Trạng thái đăng (A, F5 #36). -->
+    <com.lttbdd.socialagent.core.ui.components.OutlinedButton
+        android:id="@+id/btnPublishStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/component_spacing_small"
+        android:text="@string/publish_status_title" />
+
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"

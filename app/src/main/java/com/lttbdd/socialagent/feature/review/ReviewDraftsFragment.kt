@@ -61,6 +61,13 @@ class ReviewDraftsFragment : Fragment() {
         )
         binding.rvDrafts.layoutManager = LinearLayoutManager(requireContext())
         binding.rvDrafts.adapter = adapter
+        binding.btnPublishStatus.setOnClickListener {
+            val navController = findNavController()
+            // Bỏ qua lần bấm lặp khi đã rời màn hình này.
+            if (navController.currentDestination?.id == R.id.postsFragment) {
+                navController.navigate(R.id.action_posts_to_publish_status)
+            }
+        }
         binding.emptyState.setContent(
             title = getString(R.string.review_empty_title),
             message = getString(R.string.review_empty_message),
@@ -108,9 +115,6 @@ class ReviewDraftsFragment : Fragment() {
             }
             is ReviewDraftsEvent.ShowMessage -> {
                 AppSnackbar.show(binding.root, event.messageRes)
-            }
-            is ReviewDraftsEvent.ReadyToPublish -> {
-                AppSnackbar.show(binding.root, R.string.review_publish_ready_message)
             }
         }
     }

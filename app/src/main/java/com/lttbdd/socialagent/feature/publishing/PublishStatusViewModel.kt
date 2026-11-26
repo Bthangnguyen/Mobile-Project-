@@ -20,6 +20,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.net.URI
+import java.net.URISyntaxException
 import javax.inject.Inject
 
 /**
@@ -160,12 +162,20 @@ class PublishStatusViewModel @Inject constructor(
          */
         fun openableUrl(state: ChannelPublishState): String? {
             if (state.status != PostStatus.PUBLISHED) return null
-            val url = state.url?.trim().orEmpty()
-            val isWeb = WEB_SCHEMES.any { url.startsWith(it, ignoreCase = true) && url.length > it.length }
-            return url.takeIf { isWeb && url.none(Char::isWhitespace) }
+            // Không trim: AC #40 chặn link có khoảng trắng ở bất kỳ đâu, kể cả đầu/cuối (review của Minh ở #106).
+            val url = state.url ?: return null
+            if (url.isEmpty() || url.any(Char::isWhitespace)) return null
+            // Parse thay vì chỉ so tiền tố, để chặn link thiếu host như `https:///post/1` hay `https://?q=1`.
+            val uri = try {
+                URI(url)
+            } catch (_: URISyntaxException) {
+                return null
+            }
+            val scheme = uri.scheme?.lowercase()
+            return url.takeIf { scheme in WEB_SCHEMES && !uri.host.isNullOrEmpty() }
         }
 
-        private val WEB_SCHEMES = listOf("https://", "http://")
+        private val WEB_SCHEMES = setOf("https", "http")
 
         /** Thao tác cho một kênh; tách hàm thuần để test. */
         fun actionFor(state: ChannelPublishState): ChannelAction = when {

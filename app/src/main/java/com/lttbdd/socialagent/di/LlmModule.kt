@@ -6,6 +6,7 @@ import com.lttbdd.socialagent.data.ai.ApiKeySource
 import com.lttbdd.socialagent.data.ai.GeminiClient
 import com.lttbdd.socialagent.data.ai.DataStoreTaskModelSelectionStore
 import com.lttbdd.socialagent.data.ai.LlmConfigurationSource
+import com.lttbdd.socialagent.data.ai.LlmUsageRecorder
 import com.lttbdd.socialagent.data.ai.OkHttpSseTransport
 import com.lttbdd.socialagent.data.ai.OpenAiClient
 import com.lttbdd.socialagent.data.ai.ProviderKeyAvailability
@@ -52,7 +53,11 @@ object LlmModule {
 
     @Provides
     @Singleton
-    fun llmClient(configurations: LlmConfigurationSource, keys: ApiKeySource): LlmClient {
+    fun llmClient(
+        configurations: LlmConfigurationSource,
+        keys: ApiKeySource,
+        usageRecorder: LlmUsageRecorder,
+    ): LlmClient {
         // Client riêng cho LLM, không ảnh hưởng HTTP/DI của mảng khác. Không có interceptor ghi log.
         val http = OkHttpClient.Builder()
             .followRedirects(false)
@@ -62,6 +67,12 @@ object LlmModule {
             .readTimeout(60, TimeUnit.SECONDS)
             .build()
         val transport = OkHttpSseTransport(EventSources.createFactory(http))
-        return RoutingLlmClient(configurations, keys, setOf(OpenAiClient(transport), GeminiClient(transport)))
+        // Usage cuối của mỗi lượt gọi được lưu để thống kê token/chi phí (#74, UsageModule).
+        return RoutingLlmClient(
+            configurations,
+            keys,
+            setOf(OpenAiClient(transport), GeminiClient(transport)),
+            usageRecorder,
+        )
     }
 }

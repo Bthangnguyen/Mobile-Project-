@@ -102,3 +102,47 @@ Lựa chọn lưu bền vững trong DataStore (`social_agent_task_models`), ch�
   UI khóa provider chưa có key và dẫn tới màn API key.
 - **UI:** `feature/models/` (Cài đặt → Chọn model). Danh mục model gợi ý là cấu hình trong `LlmModelCatalog`,
   cập nhật khi nhà cung cấp đổi model; ID tự nhập vẫn dùng được.
+
+## Theo dõi token và chi phí — Issue #74
+
+```text
+RoutingLlmClient ──usage cuối──► LlmUsageRecorder (RoomLlmUsageRecorder) ──► Room `llm_usage`
+UsageFragment → UsageViewModel → UsageRepository (RoomUsageRepository) → LlmUsageDao
+```
+
+- **Ghi ở router:** `RoutingLlmClient` nhớ `TokenUsage` của chunk cuối và gọi `LlmUsageRecorder.record` trong
+  `finally`, bọc `NonCancellable`. Nhờ vậy lượt gọi đã tốn phí vẫn được ghi khi bên gọi hủy ngay sau chunk cuối.
+  Lỗi khi ghi bị bỏ qua, không làm hỏng câu trả lời. Stream lỗi, bị hủy trước khi xong hoặc không có usage cuối
+  thì **không ghi** và không ước lượng từ độ dài text. Mỗi lần collect là một lượt gọi riêng, có id UUID riêng.
+- **Dữ liệu lưu:** id, thời điểm, provider, model ID (Gemini bỏ tiền tố `models/`), `LlmTask`, input/output token,
+  `costMicros` và `pricingVersion`. Không lưu prompt, nội dung trả về, comment hay key.
+  `FakeLlmClient` không đi qua router nên không được cộng vào thống kê.
+- **Giá:** `LlmPricing` là bảng giá cục bộ (USD/1M token, standard tier, không tính cache/batch). Chi phí tính
+  bằng micro-USD, làm tròn nửa lên một lần cho mỗi lượt gọi. Model không có trong bảng có `costMicros = null`
+  (chưa xác định), không bao giờ tính là 0 USD. `TokenUsage.costUsd` của adapter vẫn là NaN như quy ước ở trên.
+- **Bảng giá hiện tại (`VERSION = 2026-11-27`):**
+
+  | Provider | Model | Input / Output (USD/1M token) | Ghi chú |
+  |---|---|---|---|
+  | Gemini | `gemini-2.5-flash` | $0.30 / $2.50 | Output gồm thinking token. Deprecated, xem bên dưới |
+  | Gemini | `gemini-2.5-flash-lite` | $0.10 / $0.40 | Output gồm thinking token |
+  | Gemini | `gemini-3.5-flash-lite` | $0.30 / $2.50 | Model thay thế `gemini-2.5-flash` |
+  | OpenAI | `gpt-6-luna` | $0.10 / $0.50 | Trên 272K input token: $0.20 / $0.75 |
+  | OpenAI | `gpt-6.1-terra` | $1.00 / $5.00 | Trên 272K input token: $2.00 / $7.50 |
+
+  Ngày 27/11/2026 đã đối chiếu nguyên văn với bảng "Standard" trên
+  [OpenAI Pricing](https://developers.openai.com/api/docs/pricing) và bảng "Paid Tier" (Standard) trên
+  [Gemini Pricing](https://ai.google.dev/gemini-api/docs/pricing). Đổi giá thì sửa bảng và tăng `VERSION`;
+  bản ghi cũ giữ phiên bản giá lúc ghi.
+- **`gemini-2.5-flash` đã deprecated** (theo [Gemini Deprecations](https://ai.google.dev/gemini-api/docs/deprecations)).
+  Từ 01/12/2026, request gửi tới model này được tự chuyển sang `gemini-3.5-flash-lite` và tính theo giá của model đó.
+  Hai model đang cùng giá text nên chi phí ước tính không đổi. Model mặc định cho `WRITE_POST` trong `LlmModelCatalog`
+  (#54) vẫn là `gemini-2.5-flash`; việc đổi mặc định thuộc một issue riêng, không nằm trong #74.
+- **Tổng hợp:** `UsageAggregator` tính ngày/tháng bằng `java.time` theo múi giờ thiết bị (`UsageTimeSource`), khoảng
+  `[đầu kỳ, đầu kỳ sau)`. Ranh giới tính lúc bắt đầu collect; màn hình collect lại ở `onStart`.
+  Màn hình xem theo ngày trong tháng này hoặc theo 12 tháng gần nhất, và chi tiết tháng này theo provider/model/task.
+- **Cho #71 (trần ngân sách):** dùng `UsageRepository.summary(UsagePeriod.TODAY | THIS_MONTH)`; tổng tiền là
+  `knownCostMicros`, còn `unknownCostCalls` cho biết số lượt chưa rõ giá.
+- **Room:** `AppDatabase` version 2, `AutoMigration(1 → 2)` chỉ thêm bảng `llm_usage`. Schema ở `app/schemas/.../2.json`.
+- **Ngoài phạm vi:** chi phí sinh ảnh qua API (router chưa hỗ trợ `GENERATE_IMAGE`), hóa đơn hoặc số dư thật
+  của provider, giá cache/batch/priority, trần ngân sách (#71) và chế độ Demo (#73).

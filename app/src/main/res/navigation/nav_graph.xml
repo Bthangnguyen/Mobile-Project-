@@ -70,7 +70,16 @@
         <action
             android:id="@+id/action_settings_to_model_selection"
             app:destination="@id/modelSelectionFragment" />
+        <action
+            android:id="@+id/action_settings_to_usage"
+            app:destination="@id/usageFragment" />
     </fragment>
+
+    <!-- Token và chi phí LLM theo ngày/tháng (F8, #74) mở từ Cài đặt. -->
+    <fragment
+        android:id="@+id/usageFragment"
+        android:name="com.lttbdd.socialagent.feature.usage.UsageFragment"
+        android:label="@string/usage_title" />
 
     <fragment
         android:id="@+id/apiKeysFragment"

@@ -297,6 +297,16 @@
     <string name="preview_discard_action">Discard</string>
     <string name="preview_stay_action">Stay</string>
 
+    <!-- Feature F4: Pre-publish content warnings (Issue #65) -->
+    <string name="warning_banner_title">Pre-publish warnings</string>
+    <string name="warning_bullet_item">• %1$s</string>
+    <string name="warning_unsourced_statistic_item">Unsourced statistic detected (%1$s). Add a source or link before publishing.</string>
+    <string name="warning_personal_info_item">Possible personal information detected (%1$s). Remove sensitive details if unintended.</string>
+    <string name="warning_sensitive_language_item">Potentially sensitive or risky phrasing detected (%1$s). Review tone before publishing.</string>
+    <string name="warning_publish_dialog_title">Review warnings before publishing?</string>
+    <string name="warning_publish_dialog_message">We found potential issues in this draft:\n\n%1$s\n\nDo you still want to add it to the publishing queue?</string>
+    <string name="warning_publish_anyway_action">Publish anyway</string>
+
     <!-- F5 Trạng thái đăng (#36) -->
     <string name="publish_status_title">Publishing status</string>
     <string name="publish_status_subtitle">Each channel is published separately. An error on one channel does not stop the others.</string>

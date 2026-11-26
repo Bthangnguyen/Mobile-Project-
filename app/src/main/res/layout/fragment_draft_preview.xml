@@ -192,6 +192,37 @@
                 android:textColor="@color/brand_on_surface_variant"
                 android:visibility="gone" />
 
+            <!-- Cảnh báo nội dung trước khi đăng (F4, Issue #65) -->
+            <com.lttbdd.socialagent.core.ui.components.AppCard
+                android:id="@+id/cardPrePublishWarnings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/component_spacing"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/warning_banner_title"
+                        android:textAppearance="@style/TextAppearance.SocialAgent.Title"
+                        android:textColor="@color/brand_warning" />
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:id="@+id/tvPrePublishWarnings"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/component_spacing_xsmall"
+                        android:accessibilityLiveRegion="polite"
+                        android:textAppearance="@style/TextAppearance.SocialAgent.Caption"
+                        android:textColor="@color/brand_warning" />
+                </LinearLayout>
+            </com.lttbdd.socialagent.core.ui.components.AppCard>
+
             <!-- Nút Khôi phục và Lưu chỉnh sửa -->
             <LinearLayout
                 android:layout_width="match_parent"

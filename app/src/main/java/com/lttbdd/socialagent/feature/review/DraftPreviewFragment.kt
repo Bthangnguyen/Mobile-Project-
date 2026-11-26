@@ -157,6 +157,15 @@ class DraftPreviewFragment : Fragment() {
         // Bộ đếm ký tự theo giới hạn kênh xem trước
         renderCharacterCounter(state.characterCount, state.selectedChannel, state.draft?.channel)
 
+        // Cảnh báo nội dung trước khi đăng (số liệu chưa nguồn, PII, lời lẽ nhạy cảm)
+        if (state.prePublishWarnings.isNotEmpty()) {
+            binding.tvPrePublishWarnings.text =
+                PrePublishWarningFormatter.formatBulletList(requireContext(), state.prePublishWarnings)
+            binding.cardPrePublishWarnings.isVisible = true
+        } else {
+            binding.cardPrePublishWarnings.isVisible = false
+        }
+
         // Nút Khôi phục và Lưu chỉnh sửa
         binding.btnResetEdits.isEnabled = state.hasUnsavedChanges
         binding.btnSaveEdits.isEnabled = state.canSave && state.hasUnsavedChanges

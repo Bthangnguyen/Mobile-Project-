@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.lttbdd.socialagent.R
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.Draft
+import com.lttbdd.socialagent.data.review.PrePublishWarningAnalyzer
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -245,6 +246,7 @@ class DraftPreviewViewModel @Inject constructor(
             hasUnsavedChanges = hasUnsavedChanges,
             canSave = canSave,
             textErrorRes = errorRes,
+            prePublishWarnings = PrePublishWarningAnalyzer.analyze(editedText),
         )
     }
 

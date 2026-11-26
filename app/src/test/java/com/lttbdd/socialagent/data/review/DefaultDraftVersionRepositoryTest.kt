@@ -1,0 +1,213 @@
+package com.lttbdd.socialagent.data.review
+
+import android.app.Application
+import android.content.Context
+import android.database.sqlite.SQLiteException
+import androidx.room.Room
+import androidx.test.core.app.ApplicationProvider
+import com.lttbdd.socialagent.core.database.AppDatabase
+import com.lttbdd.socialagent.core.database.dao.DraftDao
+import com.lttbdd.socialagent.core.database.entity.DraftEntity
+import com.lttbdd.socialagent.core.database.entity.PostEntity
+import com.lttbdd.socialagent.core.database.toEntity
+import com.lttbdd.socialagent.core.model.ChannelType
+import com.lttbdd.socialagent.core.model.Draft
+import com.lttbdd.socialagent.core.model.PostStatus
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.test.runTest
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Rule
+import org.junit.Test
+import org.junit.rules.TemporaryFolder
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+
+@RunWith(RobolectricTestRunner::class)
+@Config(application = Application::class)
+class DefaultDraftVersionRepositoryTest {
+
+    @get:Rule
+    val tempFolder = TemporaryFolder()
+
+    private lateinit var db: AppDatabase
+    private lateinit var versionStore: FileDraftVersionStore
+    private lateinit var reviewRepository: RoomDraftReviewRepository
+    private lateinit var versionRepository: DefaultDraftVersionRepository
+
+    @Before
+    fun setUp() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        versionStore = FileDraftVersionStore(
+            baseDir = tempFolder.newFolder("draft_versions"),
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+        reviewRepository = RoomDraftReviewRepository(db.draftDao(), versionStore)
+        versionRepository = DefaultDraftVersionRepository(
+            draftDao = db.draftDao(),
+            postDao = db.postDao(),
+            draftReviewRepository = reviewRepository,
+            draftVersionStore = versionStore,
+        )
+    }
+
+    @After
+    fun tearDown() {
+        if (db.isOpen) db.close()
+    }
+
+    @Test
+    fun `saveAgentDraft and updateDraftContent record history and restoreVersion revokes approval`() = runTest {
+        val aiDraft = Draft(
+            id = "d-hist-1",
+            topicId = "topic-1",
+            channel = ChannelType.FACEBOOK,
+            text = "Bản AI ban đầu",
+            imageUri = "content://img/1.png",
+            imageAltText = "Ảnh minh họa",
+            approved = false,
+        )
+        reviewRepository.saveAgentDraft(aiDraft)
+        reviewRepository.updateDraftContent("d-hist-1", "Bản đã sửa tay")
+        reviewRepository.approveDraft("d-hist-1", "Bản đã sửa tay")
+
+        val versionsBeforeRestore = versionStore.getVersions("d-hist-1")
+        assertEquals(2, versionsBeforeRestore.size)
+        assertEquals(DraftVersionSource.MANUAL_EDIT, versionsBeforeRestore[0].source)
+        assertEquals(DraftVersionSource.AI_GENERATED, versionsBeforeRestore[1].source)
+
+        val v1Id = versionsBeforeRestore.last().id
+        val restoreResult = versionRepository.restoreVersion("d-hist-1", v1Id)
+
+        assertTrue(restoreResult is DraftRestoreResult.Restored)
+        val restored = (restoreResult as DraftRestoreResult.Restored).draft
+        assertEquals("Bản AI ban đầu", restored.text)
+        assertFalse(restored.approved)
+        assertEquals(ChannelType.FACEBOOK, restored.channel)
+        assertEquals("content://img/1.png", restored.imageUri)
+        assertEquals("Ảnh minh họa", restored.imageAltText)
+
+        val versionsAfterRestore = versionStore.getVersions("d-hist-1")
+        assertEquals(3, versionsAfterRestore.size)
+        assertEquals(DraftVersionSource.RESTORED, versionsAfterRestore.first().source)
+        assertEquals("Bản AI ban đầu", versionsAfterRestore.first().text)
+    }
+
+    @Test
+    fun `updateDraftContent captures INITIAL snapshot for pre-existing draft without prior history`() = runTest {
+        val legacyDraft = Draft(
+            id = "d-legacy",
+            topicId = "topic-legacy",
+            channel = ChannelType.LINKEDIN,
+            text = "Nội dung cũ trước khi có #62",
+            approved = true,
+        )
+        db.draftDao().upsert(legacyDraft.toEntity(updatedAtMillis = 1_000L))
+
+        reviewRepository.updateDraftContent("d-legacy", "Nội dung mới sau khi sửa")
+
+        val versions = versionStore.getVersions("d-legacy")
+        assertEquals(2, versions.size)
+        assertEquals(DraftVersionSource.MANUAL_EDIT, versions[0].source)
+        assertEquals("Nội dung mới sau khi sửa", versions[0].text)
+        assertEquals(DraftVersionSource.INITIAL, versions[1].source)
+        assertEquals("Nội dung cũ trước khi có #62", versions[1].text)
+    }
+
+    @Test
+    fun `restoreVersion blocks when draft has QUEUED, PUBLISHING, or HANDED_OFF post`() = runTest {
+        val draft = Draft(
+            id = "d-active",
+            topicId = "topic-active",
+            channel = ChannelType.FACEBOOK,
+            text = "Bản v1",
+            approved = false,
+        )
+        reviewRepository.saveAgentDraft(draft)
+        reviewRepository.updateDraftContent("d-active", "Bản v2")
+        val v1Id = versionStore.getVersions("d-active").last().id
+
+        db.postDao().insertIfAbsent(
+            PostEntity(
+                id = "post-active",
+                draftId = "d-active",
+                channel = ChannelType.FACEBOOK,
+                status = PostStatus.HANDED_OFF,
+                idempotencyKey = "idem-active",
+                remotePostId = null,
+                url = null,
+                errorMessage = null,
+                attemptCount = 1,
+                createdAtMillis = 1_000L,
+                updatedAtMillis = 1_000L,
+            ),
+        )
+
+        assertTrue(versionRepository.hasActivePublishingPosts("d-active"))
+        assertEquals(DraftRestoreResult.BlockedByActivePublish, versionRepository.restoreVersion("d-active", v1Id))
+        assertEquals("Bản v2", versionRepository.getDraft("d-active")?.text)
+    }
+
+    @Test
+    fun `restoreVersion returns DraftNotFound, VersionNotFound, and StorageError safely`() = runTest {
+        assertEquals(
+            DraftRestoreResult.DraftNotFound,
+            versionRepository.restoreVersion("missing-draft", "v-1"),
+        )
+
+        val draft = Draft(
+            id = "d-exists",
+            topicId = "topic-e",
+            channel = ChannelType.FACEBOOK,
+            text = "Bản gốc",
+        )
+        reviewRepository.saveAgentDraft(draft)
+        assertEquals(
+            DraftRestoreResult.VersionNotFound,
+            versionRepository.restoreVersion("d-exists", "missing-version"),
+        )
+
+        val existingEntity = draft.toEntity(updatedAtMillis = 1_000L)
+        val failingDao = object : DraftDao() {
+            override fun observeAll(): Flow<List<DraftEntity>> = emptyFlow()
+            override fun observeByTopic(topicId: String): Flow<List<DraftEntity>> = emptyFlow()
+            override suspend fun getById(id: String): DraftEntity? =
+                if (id == "d-exists") existingEntity else null
+
+            override suspend fun upsert(draft: DraftEntity) {
+                throw SQLiteException("Simulated DB write failure")
+            }
+
+            override suspend fun countPostsNotIn(draftId: String, finishedStatus: PostStatus): Int = 0
+            override suspend fun deleteAbandonablePosts(
+                draftId: String,
+                finishedStatus: PostStatus,
+                inFlightStatus: PostStatus,
+            ): Int = 0
+
+            override suspend fun deleteIfAllPostsIn(id: String, finishedStatus: PostStatus): Int = 0
+            override suspend fun insert(draft: DraftEntity) = Unit
+            override suspend fun update(draft: DraftEntity): Int = 0
+        }
+
+        val failingReviewRepo = RoomDraftReviewRepository(failingDao, versionStore)
+        val failingVersionRepo = DefaultDraftVersionRepository(
+            draftDao = failingDao,
+            postDao = db.postDao(),
+            draftReviewRepository = failingReviewRepo,
+            draftVersionStore = versionStore,
+        )
+        val existingVersionId = versionStore.getVersions("d-exists").first().id
+        val errorResult = failingVersionRepo.restoreVersion("d-exists", existingVersionId)
+        assertTrue(errorResult is DraftRestoreResult.StorageError)
+    }
+}

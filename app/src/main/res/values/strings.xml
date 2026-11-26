@@ -296,6 +296,27 @@
     <string name="preview_discard_dialog_message">You have unsaved edits. Leaving now will discard them.</string>
     <string name="preview_discard_action">Discard</string>
     <string name="preview_stay_action">Stay</string>
+    <string name="preview_action_history">Version history</string>
+
+    <!-- Feature F4: Draft Version History (Issue #62) -->
+    <string name="history_header_title">Version History</string>
+    <string name="history_header_subtitle">View saved versions of this draft and restore an earlier version anytime.</string>
+    <string name="history_empty_title">No version history yet</string>
+    <string name="history_empty_message">Versions are recorded automatically whenever the agent generates or you save edits to this draft.</string>
+    <string name="history_version_badge">v%1$d</string>
+    <string name="history_current_version_badge">Current</string>
+    <string name="history_source_initial">Original</string>
+    <string name="history_source_ai">AI generated</string>
+    <string name="history_source_manual">Manual edit</string>
+    <string name="history_source_restored">Restored</string>
+    <string name="history_char_count_format">%1$d chars</string>
+    <string name="history_meta_format">%1$s · %2$s</string>
+    <string name="history_action_restore">Restore this version</string>
+    <string name="history_restore_dialog_title">Restore this version?</string>
+    <string name="history_restore_dialog_message">This replaces the current draft content and revokes approval so you can review before publishing.</string>
+    <string name="history_restore_success">Version restored. Re-approval is required before publishing.</string>
+    <string name="history_restore_failed">Could not restore this version. Please try again.</string>
+    <string name="history_publishing_locked_warning">This draft has active publishing posts, so restoring versions is temporarily locked.</string>
 
     <!-- F5 Trạng thái đăng (#36) -->
     <string name="publish_status_title">Publishing status</string>

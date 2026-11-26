@@ -294,6 +294,27 @@
     <string name="preview_discard_dialog_message">Bạn đang có nội dung chỉnh sửa chưa lưu. Thoát ngay sẽ mất các thay đổi này.</string>
     <string name="preview_discard_action">Bỏ thay đổi</string>
     <string name="preview_stay_action">Ở lại</string>
+    <string name="preview_action_history">Lịch sử phiên bản</string>
+
+    <!-- Feature F4: Lịch sử phiên bản bản nháp (Issue #62) -->
+    <string name="history_header_title">Lịch sử phiên bản</string>
+    <string name="history_header_subtitle">Xem các phiên bản đã lưu của bản nháp này và khôi phục lại phiên bản trước bất cứ lúc nào.</string>
+    <string name="history_empty_title">Chưa có lịch sử phiên bản</string>
+    <string name="history_empty_message">Các phiên bản sẽ được lưu tự động khi AI tạo bản nháp hoặc khi bạn lưu chỉnh sửa.</string>
+    <string name="history_version_badge">v%1$d</string>
+    <string name="history_current_version_badge">Hiện tại</string>
+    <string name="history_source_initial">Bản gốc</string>
+    <string name="history_source_ai">AI tạo</string>
+    <string name="history_source_manual">Sửa tay</string>
+    <string name="history_source_restored">Khôi phục</string>
+    <string name="history_char_count_format">%1$d ký tự</string>
+    <string name="history_meta_format">%1$s · %2$s</string>
+    <string name="history_action_restore">Khôi phục phiên bản này</string>
+    <string name="history_restore_dialog_title">Khôi phục phiên bản này?</string>
+    <string name="history_restore_dialog_message">Thao tác này sẽ thay thế nội dung bản nháp hiện tại và thu hồi trạng thái duyệt để bạn kiểm tra lại trước khi đăng.</string>
+    <string name="history_restore_success">Đã khôi phục phiên bản. Cần duyệt lại trước khi đăng bài.</string>
+    <string name="history_restore_failed">Không thể khôi phục phiên bản này. Vui lòng thử lại.</string>
+    <string name="history_publishing_locked_warning">Bản nháp đang có bài chờ đăng hoặc đang đăng nên tạm khóa khôi phục phiên bản.</string>
 
     <!-- F5 Trạng thái đăng (#36) -->
     <string name="publish_status_title">Trạng thái đăng bài</string>

@@ -73,6 +73,12 @@ class DraftPreviewViewModel @Inject constructor(
         }
     }
 
+    /** Tải lại bản nháp mới nhất từ DB sau khi người dùng khôi phục phiên bản ở màn Lịch sử (#62). */
+    fun reloadDraftFromStorage() {
+        savedStateHandle.remove<String>(KEY_EDITED_TEXT)
+        loadDraft()
+    }
+
     /** Cập nhật nội dung khi người dùng sửa tay và tính lại bộ đếm ký tự theo thời gian thực. */
     fun onTextChanged(newText: String) {
         var didUpdate = false

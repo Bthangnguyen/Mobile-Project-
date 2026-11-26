@@ -71,6 +71,13 @@ interface DraftReviewRepository {
     suspend fun updateDraftContent(draftId: String, newText: String): DraftContentUpdateResult
 
     /**
+     * Khôi phục nội dung bản nháp từ một phiên bản lịch sử (#62): thu hồi duyệt qua [DraftApprovalGuard]
+     * và ghi nhận phiên bản mới với nguồn [DraftVersionSource.RESTORED].
+     */
+    suspend fun restoreDraftContent(draftId: String, newText: String): DraftContentUpdateResult =
+        updateDraftContent(draftId, newText)
+
+    /**
      * Người dùng phê duyệt tường minh bản nháp.
      * Chỉ chấp nhận khi nội dung hiện tại trong DB vẫn khớp đúng [expectedText] mà người dùng đã xem;
      * nếu nội dung đã đổi thì trả [DraftApprovalResult.ContentChanged] để yêu cầu xem lại.
@@ -90,14 +97,25 @@ interface DraftReviewRepository {
 @Singleton
 class RoomDraftReviewRepository @Inject constructor(
     private val draftDao: DraftDao,
+    private val draftVersionStore: DraftVersionStore,
 ) : DraftReviewRepository {
+
+    /** Constructor tiện ích cho unit test không cần theo dõi lịch sử phiên bản. */
+    constructor(draftDao: DraftDao) : this(draftDao, NoOpDraftVersionStore)
 
     override fun observeDrafts(): Flow<List<Draft>> =
         draftDao.observeAll().map { entities -> entities.map { it.toModel() } }
 
     override suspend fun saveAgentDraft(draft: Draft): Result<Draft> = try {
+        val now = System.currentTimeMillis()
         val unapprovedDraft = DraftApprovalGuard.sanitizeAgentDraft(draft)
-        draftDao.upsert(unapprovedDraft.toEntity(updatedAtMillis = System.currentTimeMillis()))
+        draftDao.upsert(unapprovedDraft.toEntity(updatedAtMillis = now))
+        recordVersionBestEffort(
+            draftId = unapprovedDraft.id,
+            text = unapprovedDraft.text,
+            source = DraftVersionSource.AI_GENERATED,
+            createdAtMillis = now,
+        )
         Result.success(unapprovedDraft)
     } catch (ce: CancellationException) {
         throw ce
@@ -108,6 +126,25 @@ class RoomDraftReviewRepository @Inject constructor(
     override suspend fun updateDraftContent(
         draftId: String,
         newText: String,
+    ): DraftContentUpdateResult = updateDraftContentInternal(
+        draftId = draftId,
+        newText = newText,
+        source = DraftVersionSource.MANUAL_EDIT,
+    )
+
+    override suspend fun restoreDraftContent(
+        draftId: String,
+        newText: String,
+    ): DraftContentUpdateResult = updateDraftContentInternal(
+        draftId = draftId,
+        newText = newText,
+        source = DraftVersionSource.RESTORED,
+    )
+
+    private suspend fun updateDraftContentInternal(
+        draftId: String,
+        newText: String,
+        source: DraftVersionSource,
     ): DraftContentUpdateResult = try {
         if (newText.isBlank()) {
             DraftContentUpdateResult.EmptyContent
@@ -116,15 +153,24 @@ class RoomDraftReviewRepository @Inject constructor(
             if (freshEntity == null) {
                 DraftContentUpdateResult.NotFound
             } else {
+                // Nếu bản nháp tồn tại từ trước khi có lịch sử phiên bản, lưu bản chụp gốc trước khi ghi đè.
+                ensureInitialSnapshotBestEffort(freshEntity.id, freshEntity.text, freshEntity.updatedAtMillis)
+                val now = System.currentTimeMillis()
                 val editedModel = DraftApprovalGuard.onDraftContentEdited(
                     freshEntity.toModel().copy(text = newText),
                 )
                 val updatedEntity = freshEntity.copy(
                     text = editedModel.text,
                     approved = editedModel.approved,
-                    updatedAtMillis = System.currentTimeMillis(),
+                    updatedAtMillis = now,
                 )
                 draftDao.upsert(updatedEntity)
+                recordVersionBestEffort(
+                    draftId = draftId,
+                    text = editedModel.text,
+                    source = source,
+                    createdAtMillis = now,
+                )
                 DraftContentUpdateResult.Updated(updatedEntity.toModel())
             }
         }
@@ -132,6 +178,49 @@ class RoomDraftReviewRepository @Inject constructor(
         throw ce
     } catch (e: Exception) {
         DraftContentUpdateResult.StorageError(e)
+    }
+
+    private suspend fun ensureInitialSnapshotBestEffort(
+        draftId: String,
+        existingText: String,
+        existingUpdatedAtMillis: Long,
+    ) {
+        if (existingText.isBlank()) return
+        try {
+            if (draftVersionStore.getVersions(draftId).isEmpty()) {
+                draftVersionStore.recordVersion(
+                    draftId = draftId,
+                    text = existingText,
+                    source = DraftVersionSource.INITIAL,
+                    createdAtMillis = existingUpdatedAtMillis,
+                )
+            }
+        } catch (ce: CancellationException) {
+            throw ce
+        } catch (_: Exception) {
+            // Lỗi lưu lịch sử không được làm hỏng thao tác lưu bản nháp chính.
+        }
+    }
+
+    private suspend fun recordVersionBestEffort(
+        draftId: String,
+        text: String,
+        source: DraftVersionSource,
+        createdAtMillis: Long,
+    ) {
+        if (text.isBlank()) return
+        try {
+            draftVersionStore.recordVersion(
+                draftId = draftId,
+                text = text,
+                source = source,
+                createdAtMillis = createdAtMillis,
+            )
+        } catch (ce: CancellationException) {
+            throw ce
+        } catch (_: Exception) {
+            // Lỗi lưu lịch sử không được làm hỏng thao tác lưu bản nháp chính.
+        }
     }
 
     override suspend fun approveDraft(

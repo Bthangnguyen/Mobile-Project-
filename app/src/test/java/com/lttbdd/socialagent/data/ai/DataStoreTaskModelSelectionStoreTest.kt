@@ -11,8 +11,10 @@ import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -49,9 +51,28 @@ class DataStoreTaskModelSelectionStoreTest {
         ),
     )
 
+    private val reopenScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /**
+     * Mở lại store trên tệp đang dùng sau khi đóng store cũ. Phải đợi scope cũ kết thúc hẳn
+     * (`cancelAndJoin`) vì `cancel()` chạy bất đồng bộ: DataStore chỉ nhả tệp khi scope hoàn tất,
+     * nếu mở ngay sẽ có lúc gặp "There are multiple DataStores active for the same file".
+     */
+    private suspend fun reopenStore(): DataStoreTaskModelSelectionStore {
+        scope.coroutineContext[Job]?.cancelAndJoin()
+        return DataStoreTaskModelSelectionStore(
+            PreferenceDataStoreFactory.create(
+                corruptionHandler = taskModelCorruptionHandler(),
+                scope = reopenScope,
+                produceFile = { file },
+            ),
+        )
+    }
+
     @After
     fun tearDown() {
         scope.cancel()
+        reopenScope.cancel()
     }
 
     @Test
@@ -80,14 +101,7 @@ class DataStoreTaskModelSelectionStoreTest {
     fun `selection survives creating a new store on the same file`() = runBlocking {
         val first = newStore()
         first.save(LlmTask.WRITE_POST, TaskModelSelection(LlmProvider.OPENAI, "gpt-6-luna"))
-        scope.cancel()
-        val reopened = DataStoreTaskModelSelectionStore(
-            PreferenceDataStoreFactory.create(
-                corruptionHandler = taskModelCorruptionHandler(),
-                scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
-                produceFile = { file },
-            ),
-        )
+        val reopened = reopenStore()
         assertEquals(TaskModelSelection(LlmProvider.OPENAI, "gpt-6-luna"), reopened.get(LlmTask.WRITE_POST))
     }
 
@@ -110,14 +124,7 @@ class DataStoreTaskModelSelectionStoreTest {
         val raw = file.readBytes().toString(Charsets.ISO_8859_1)
         assertTrue(raw.contains("OPENAI"))
         file.writeBytes(raw.replace("OPENAI", "XXXXXX").toByteArray(Charsets.ISO_8859_1))
-        scope.cancel()
-        val reopened = DataStoreTaskModelSelectionStore(
-            PreferenceDataStoreFactory.create(
-                corruptionHandler = taskModelCorruptionHandler(),
-                scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
-                produceFile = { file },
-            ),
-        )
+        val reopened = reopenStore()
         assertNull(reopened.get(LlmTask.WRITE_POST))
     }
 

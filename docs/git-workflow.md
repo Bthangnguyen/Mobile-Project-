@@ -72,8 +72,10 @@ Cả hai trường hợp PR vẫn phải đủ 2 approve như bình thường.
 
 ## Reviewer xoay vòng
 
-Workflow [`assign-reviewers.yml`](../.github/workflows/assign-reviewers.yml) tự gắn 2 reviewer khi mở PR
-(hoặc khi chuyển PR draft sang "Ready for review") và gán tác giả làm assignee:
+Workflow [`assign-reviewers.yml`](../.github/workflows/assign-reviewers.yml) đặt **đúng 2 reviewer** theo bảng
+khi mở PR, mở lại PR hoặc chuyển PR draft sang "Ready for review", và gán tác giả làm assignee. Lúc đó người được
+gắn thừa (ví dụ chọn cả nhóm ở ô Reviewers, hoặc AI agent chạy `gh pr create --reviewer …`) bị gỡ, người còn thiếu
+được thêm. Vì vậy khi mở PR cứ để trống ô Reviewers.
 
 | Tác giả | Reviewer |
 |---|---|
@@ -82,7 +84,8 @@ Workflow [`assign-reviewers.yml`](../.github/workflows/assign-reviewers.yml) t�
 | sangcotdo2407 (C) | quaanluuw0210, Bthangnguyen |
 | quaanluuw0210 (D) | Bthangnguyen, dhminh678 |
 
-Mỗi người review đúng 2 người khác. Reviewer bận thì có thể nhờ người còn lại thay, miễn đủ 2 approve.
+Mỗi người review đúng 2 người khác. Reviewer bận thì có thể nhờ người còn lại thay, miễn đủ 2 approve:
+gắn thêm người đó **sau khi** PR đã mở, workflow không gỡ (nó chỉ chạy ở các sự kiện trên).
 
 ## Viết review tốt
 

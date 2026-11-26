@@ -66,14 +66,16 @@ class PublishStatusAdapter(
                 else -> row.statusChannel.setStatus(state.status)
             }
 
-            row.tvChannelHint.isVisible =
-                item.action == ChannelAction.NEEDS_APPROVAL || item.action == ChannelAction.CONFIRM_OUTCOME
-            when (item.action) {
-                ChannelAction.NEEDS_APPROVAL -> row.tvChannelHint.setText(R.string.publish_status_needs_approval_hint)
-                ChannelAction.CONFIRM_OUTCOME ->
-                    row.tvChannelHint.setText(R.string.publish_status_needs_confirmation_hint)
-                else -> Unit
+            val reason = item.reasonRes?.let(context::getString)
+            val hint = when {
+                item.action == ChannelAction.NEEDS_APPROVAL -> context.getString(R.string.publish_status_needs_approval_hint)
+                item.action == ChannelAction.CONFIRM_OUTCOME ->
+                    context.getString(R.string.publish_status_needs_confirmation_hint)
+                reason != null && item.isRetrying -> context.getString(R.string.publish_status_retrying, reason)
+                else -> reason
             }
+            row.tvChannelHint.isVisible = hint != null
+            row.tvChannelHint.text = hint
 
             row.btnPublishChannel.isVisible = item.action == ChannelAction.PUBLISH
             row.btnPublishChannel.setText(

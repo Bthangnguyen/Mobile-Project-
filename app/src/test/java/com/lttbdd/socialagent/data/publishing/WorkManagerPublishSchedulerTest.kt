@@ -69,6 +69,18 @@ class WorkManagerPublishSchedulerTest {
     }
 
     @Test
+    fun `retry after uses its own chain with the requested delay`() {
+        scheduler.schedule()
+        scheduler.scheduleRetryAfter(60_000L)
+
+        val retry = pending(WorkManagerPublishScheduler.RETRY_AFTER_WORK_NAME)
+        assertEquals(1, retry.size)
+        assertEquals("Không chen vào chuỗi chính", 1, pending(WorkManagerPublishScheduler.UNIQUE_WORK_NAME).size)
+        assertTrue(retry.single().initialDelayMillis >= 60_000L)
+        assertTrue(retry.single().constraints.requiredNetworkType == NetworkType.CONNECTED)
+    }
+
+    @Test
     fun `stale check uses its own chain with the requested delay`() {
         scheduler.schedule()
         scheduler.scheduleStaleCheck(16 * 60 * 1000L)

@@ -146,7 +146,7 @@ class PublishStatusViewModel @Inject constructor(
         topicId = topicId,
         previewText = previewText,
         channels = channels.map {
-            ChannelPublishItem(state = it, action = actionFor(it), openUrl = openableUrl(it))
+            ChannelPublishItem(state = it, action = actionFor(it), openUrl = openableUrl(it), reasonRes = reasonFor(it))
         },
     )
 
@@ -166,6 +166,13 @@ class PublishStatusViewModel @Inject constructor(
         }
 
         private val WEB_SCHEMES = listOf("https://", "http://")
+
+        /** Lý do hiển thị (#39): chỉ cho bài lỗi và bài đang chờ thử lại; bài đã đăng có thể còn lý do cũ. */
+        @StringRes
+        fun reasonFor(state: ChannelPublishState): Int? = when (state.status) {
+            PostStatus.FAILED, PostStatus.QUEUED -> PublishErrorMessages.messageFor(state.errorReason)
+            else -> null
+        }
 
         /** Thao tác cho một kênh; tách hàm thuần để test. */
         fun actionFor(state: ChannelPublishState): ChannelAction = when {

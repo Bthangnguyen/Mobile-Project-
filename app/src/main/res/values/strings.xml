@@ -290,5 +290,19 @@
     <string name="publish_status_state_changed">The status of this post has changed. Check the list again.</string>
     <string name="publish_status_open_post">Open original post</string>
     <string name="publish_status_open_failed">No app on this device can open this link.</string>
+    <string name="publish_status_retrying">Will retry automatically. %1$s</string>
+    <string name="publish_error_network_unavailable">Could not reach the network.</string>
+    <string name="publish_error_rate_limited">The channel is limiting how often you can post.</string>
+    <string name="publish_error_server_error">The channel is having temporary problems.</string>
+    <string name="publish_error_retry_limit">Retried many times without success. Try again later.</string>
+    <string name="publish_error_permission_denied">The app is not allowed to post on this channel. Reconnect it in Settings › My Channels and allow posting.</string>
+    <string name="publish_error_auth_expired">Your sign-in to this channel has expired. Reconnect it in Settings › My Channels.</string>
+    <string name="publish_error_content_rejected">The channel rejected this content. Edit the draft, approve it again and retry.</string>
+    <string name="publish_error_duplicate_content">The channel rejected this post as a duplicate of an earlier post.</string>
+    <string name="publish_error_draft_missing">The draft for this post no longer exists.</string>
+    <string name="publish_error_not_approved">The draft was edited after approval. Approve it again before publishing.</string>
+    <string name="publish_error_channel_not_supported">Publishing to this channel is not available yet.</string>
+    <string name="publish_error_storage">Could not save to the device storage.</string>
+    <string name="publish_error_unknown">The channel returned an error.</string>
     <string name="publish_status_action_failed">Could not update the publishing queue. Please try again.</string>
 </resources>

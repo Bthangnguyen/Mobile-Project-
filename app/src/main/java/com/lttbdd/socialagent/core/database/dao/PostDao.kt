@@ -48,13 +48,15 @@ interface PostDao {
      * ghi `attemptStartedAtMillis` **trước** khi gọi API. Trả về 1 nếu giữ chỗ thành công, 0 nếu bài đã bị
      * worker khác lấy hoặc không còn ở hàng đợi — nhờ vậy hai worker chạy song song không gọi API hai lần.
      * `attemptCount` được cộng trước; repository hoàn lại khi request chắc chắn chưa được gửi.
+     * Bài có `nextAttemptAtMillis` còn ở tương lai (kênh yêu cầu chờ theo `Retry-After`, #39) không được giữ chỗ.
      */
     @Query(
         """
         UPDATE posts
         SET status = :publishing, attemptStartedAtMillis = :nowMillis, outcomeUnknown = 0,
-            attemptCount = attemptCount + 1, updatedAtMillis = :nowMillis
+            attemptCount = attemptCount + 1, updatedAtMillis = :nowMillis, nextAttemptAtMillis = NULL
         WHERE id = :id AND status = :queued
+          AND (nextAttemptAtMillis IS NULL OR nextAttemptAtMillis <= :nowMillis)
         """,
     )
     suspend fun claimForPublishing(
@@ -104,6 +106,13 @@ interface PostDao {
         publishing: PostStatus = PostStatus.PUBLISHING,
         queued: PostStatus = PostStatus.QUEUED,
     ): Int
+
+    /**
+     * Thời điểm sớm nhất mà một bài [PostStatus.QUEUED] đang chờ theo `Retry-After` được thử lại (#39), hoặc null
+     * nếu không có bài nào phải chờ sau [afterMillis]. Hàng đợi dùng để hẹn worker chạy đúng lúc.
+     */
+    @Query("SELECT MIN(nextAttemptAtMillis) FROM posts WHERE status = :queued AND nextAttemptAtMillis > :afterMillis")
+    suspend fun earliestNextAttemptAfter(afterMillis: Long, queued: PostStatus = PostStatus.QUEUED): Long?
 
     /** Số bài đang [PostStatus.PUBLISHING] mà chưa bị coi là không rõ kết quả (có thể worker khác đang đăng). */
     @Query("SELECT COUNT(*) FROM posts WHERE status = :publishing AND outcomeUnknown = 0 AND remotePostId IS NULL")

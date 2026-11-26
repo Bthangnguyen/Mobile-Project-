@@ -1,9 +1,12 @@
 package com.lttbdd.socialagent.feature.publishing
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.net.toUri
 import androidx.core.view.ViewCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
@@ -43,6 +46,7 @@ class PublishStatusFragment : Fragment() {
             onPublishChannel = viewModel::onPublishChannel,
             onConfirmPublished = viewModel::onConfirmPublished,
             onRequeue = viewModel::onRequeueRequested,
+            onOpenPost = ::openPost,
         )
         binding.rvTopics.layoutManager = LinearLayoutManager(requireContext())
         binding.rvTopics.adapter = adapter
@@ -77,6 +81,16 @@ class PublishStatusFragment : Fragment() {
                 negativeActionRes = R.string.action_cancel,
                 onPositiveAction = { viewModel.onRequeueConfirmed(event.postId) },
             )
+        }
+    }
+
+    /** Mở bài gốc bằng trình duyệt hoặc app mạng xã hội (#40). URL đã được ViewModel kiểm tra là http/https. */
+    private fun openPost(url: String) {
+        val intent = Intent(Intent.ACTION_VIEW, url.toUri()).addCategory(Intent.CATEGORY_BROWSABLE)
+        try {
+            startActivity(intent)
+        } catch (_: ActivityNotFoundException) {
+            AppSnackbar.show(binding.root, R.string.publish_status_open_failed)
         }
     }
 

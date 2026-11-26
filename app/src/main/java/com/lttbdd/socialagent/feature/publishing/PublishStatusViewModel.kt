@@ -145,11 +145,27 @@ class PublishStatusViewModel @Inject constructor(
     private fun TopicPublishState.toItem() = TopicPublishItem(
         topicId = topicId,
         previewText = previewText,
-        channels = channels.map { ChannelPublishItem(state = it, action = actionFor(it)) },
+        channels = channels.map {
+            ChannelPublishItem(state = it, action = actionFor(it), openUrl = openableUrl(it))
+        },
     )
 
     companion object {
         private const val STOP_TIMEOUT_MILLIS = 5_000L
+
+        /**
+         * Link bài gốc mở được (#40): chỉ bài [PostStatus.PUBLISHED] và chỉ `http`/`https`. Link do API mạng xã hội
+         * trả về hoặc người dùng nhập, nên chặn scheme khác (`intent:`, `javascript:`, `file:`…) để không mở nhầm
+         * ứng dụng hay tệp trên máy.
+         */
+        fun openableUrl(state: ChannelPublishState): String? {
+            if (state.status != PostStatus.PUBLISHED) return null
+            val url = state.url?.trim().orEmpty()
+            val isWeb = WEB_SCHEMES.any { url.startsWith(it, ignoreCase = true) && url.length > it.length }
+            return url.takeIf { isWeb && url.none(Char::isWhitespace) }
+        }
+
+        private val WEB_SCHEMES = listOf("https://", "http://")
 
         /** Thao tác cho một kênh; tách hàm thuần để test. */
         fun actionFor(state: ChannelPublishState): ChannelAction = when {

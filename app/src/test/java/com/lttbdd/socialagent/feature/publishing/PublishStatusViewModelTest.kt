@@ -88,6 +88,69 @@ class PublishStatusViewModelTest {
         assertTrue(item.canPublishAll)
     }
 
+    // ---------- #40: mở bài gốc ----------
+
+    @Test
+    fun `published post with web link can be opened`() {
+        val url = "https://www.facebook.com/123_456"
+        assertEquals(url, PublishStatusViewModel.openableUrl(published(url)))
+        assertEquals(
+            "Khoảng trắng thừa ở hai đầu bị bỏ",
+            "http://example.com/p",
+            PublishStatusViewModel.openableUrl(published("  http://example.com/p ")),
+        )
+        assertEquals(
+            "Không phân biệt hoa thường ở scheme",
+            "HTTPS://linkedin.com/feed/update/urn:li:share:1",
+            PublishStatusViewModel.openableUrl(published("HTTPS://linkedin.com/feed/update/urn:li:share:1")),
+        )
+    }
+
+    @Test
+    fun `link is hidden until the post is published`() {
+        listOf(PostStatus.QUEUED, PostStatus.PUBLISHING, PostStatus.FAILED, PostStatus.HANDED_OFF).forEach {
+            val state = state(it, postId = "p", url = "https://x.com/1")
+            assertEquals(it.name, null, PublishStatusViewModel.openableUrl(state))
+        }
+    }
+
+    @Test
+    fun `non web or malformed links are never opened`() {
+        listOf(
+            null,
+            "",
+            "https://",
+            "javascript:alert(1)",
+            "intent://scan/#Intent;scheme=zxing;end",
+            "file:///sdcard/secret.txt",
+            "content://contacts/people/1",
+            "https://example.com/a b",
+            "ftp://example.com/p",
+        ).forEach { url ->
+            assertEquals(url.toString(), null, PublishStatusViewModel.openableUrl(published(url)))
+        }
+    }
+
+    @Test
+    fun `ui state exposes the open link for published channels only`() = runTest {
+        collectState()
+        tracker.topics.value = listOf(
+            topic(
+                "t1",
+                state(PostStatus.PUBLISHED, draftId = "fb", postId = "p1", url = "https://facebook.com/p1"),
+                state(PostStatus.FAILED, draftId = "li", postId = "p2", url = "https://linkedin.com/p2"),
+            ),
+        )
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf("https://facebook.com/p1", null),
+            viewModel.uiState.value.topics.single().channels.map { it.openUrl },
+        )
+    }
+
+    private fun published(url: String?) = state(PostStatus.PUBLISHED, postId = "p", url = url)
+
     // ---------- Đăng một lúc lên nhiều kênh ----------
 
     @Test
@@ -244,6 +307,7 @@ class PublishStatusViewModelTest {
         approved: Boolean = true,
         postId: String? = null,
         needsConfirmation: Boolean = false,
+        url: String? = null,
     ) = ChannelPublishState(
         draftId = draftId,
         channel = ChannelType.FACEBOOK,
@@ -251,6 +315,7 @@ class PublishStatusViewModelTest {
         status = status,
         postId = postId,
         needsConfirmation = needsConfirmation,
+        url = url,
     )
 
     private class FakeTracker : PublishTracker {

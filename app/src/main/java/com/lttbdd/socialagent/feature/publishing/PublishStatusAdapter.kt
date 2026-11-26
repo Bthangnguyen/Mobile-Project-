@@ -18,6 +18,7 @@ class PublishStatusAdapter(
     private val onPublishChannel: (draftId: String) -> Unit,
     private val onConfirmPublished: (postId: String) -> Unit,
     private val onRequeue: (postId: String) -> Unit,
+    private val onOpenPost: (url: String) -> Unit,
 ) : ListAdapter<TopicPublishItem, PublishStatusAdapter.TopicViewHolder>(DiffCallback) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): TopicViewHolder =
@@ -79,6 +80,10 @@ class PublishStatusAdapter(
                 if (state.postId == null) R.string.review_action_publish else R.string.publish_status_retry,
             )
             row.btnPublishChannel.setOnClickListener { onPublishChannel(state.draftId) }
+
+            val openUrl = item.openUrl
+            row.btnOpenPost.isVisible = openUrl != null
+            row.btnOpenPost.setOnClickListener { openUrl?.let(onOpenPost) }
 
             val postId = state.postId
             row.confirmActions.isVisible = item.action == ChannelAction.CONFIRM_OUTCOME && postId != null

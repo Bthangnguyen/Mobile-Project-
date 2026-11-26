@@ -35,6 +35,14 @@
             android:visibility="gone" />
     </LinearLayout>
 
+    <!-- Mở bài gốc khi đã đăng (#40). -->
+    <com.lttbdd.socialagent.core.ui.components.TextButton
+        android:id="@+id/btnOpenPost"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/publish_status_open_post"
+        android:visibility="gone" />
+
     <com.google.android.material.textview.MaterialTextView
         android:id="@+id/tvChannelHint"
         android:layout_width="match_parent"

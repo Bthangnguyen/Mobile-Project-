@@ -21,6 +21,8 @@ enum class ChannelAction {
 data class ChannelPublishItem(
     val state: ChannelPublishState,
     val action: ChannelAction,
+    /** Link bài gốc đã kiểm tra là http/https, chỉ có khi bài đã đăng (#40); null thì ẩn nút Mở bài. */
+    val openUrl: String? = null,
 )
 
 data class TopicPublishItem(

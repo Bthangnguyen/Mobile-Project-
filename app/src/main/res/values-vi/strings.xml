@@ -264,4 +264,27 @@
     <string name="review_publish_already_queued">Bản nháp này đã nằm trong hàng đợi đăng bài.</string>
     <string name="review_publish_in_progress">Bản nháp này đang được đăng hoặc đang chờ bạn xác nhận kết quả.</string>
     <string name="review_publish_already_published">Bản nháp này đã được đăng trước đó.</string>
+
+    <!-- F5 Trạng thái đăng (#36) -->
+    <string name="publish_status_title">Trạng thái đăng bài</string>
+    <string name="publish_status_subtitle">Mỗi kênh được đăng riêng. Một kênh bị lỗi không ảnh hưởng các kênh khác.</string>
+    <string name="publish_status_empty_title">Chưa có bài để đăng</string>
+    <string name="publish_status_empty_message">Bản nháp bạn tạo sẽ hiện ở đây kèm trạng thái đăng của từng kênh.</string>
+    <string name="publish_status_publish_all">Đăng tất cả kênh đã duyệt</string>
+    <string name="publish_status_retry">Thử lại</string>
+    <string name="publish_status_needs_check">Cần kiểm tra</string>
+    <string name="publish_status_needs_approval_hint">Duyệt bản nháp này ở màn Duyệt bài trước khi đăng.</string>
+    <string name="publish_status_needs_confirmation_hint">Không rõ bài đã lên hay chưa. Hãy kiểm tra trên kênh rồi chọn bên dưới.</string>
+    <string name="publish_status_confirm_published">Bài đã lên</string>
+    <string name="publish_status_confirm_not_published">Chưa lên, đăng lại</string>
+    <string name="publish_status_requeue_dialog_title">Đăng lại bài này?</string>
+    <string name="publish_status_requeue_dialog_message">Chỉ tiếp tục nếu bạn đã kiểm tra trên kênh và không thấy bài. Nếu không, bài có thể bị đăng hai lần.</string>
+    <string name="publish_status_requeue_action">Đăng lại</string>
+    <string name="publish_status_all_queued">Đã thêm tất cả kênh đã duyệt vào hàng đợi đăng bài.</string>
+    <string name="publish_status_queued_some_unapproved">Đã thêm các kênh đã duyệt vào hàng đợi. Kênh chưa duyệt được bỏ qua.</string>
+    <string name="publish_status_nothing_to_publish">Không có kênh đã duyệt nào đang chờ đăng.</string>
+    <string name="publish_status_marked_published">Đã đánh dấu là đã đăng.</string>
+    <string name="publish_status_requeued">Đã đưa lại vào hàng đợi đăng bài.</string>
+    <string name="publish_status_state_changed">Trạng thái bài đã thay đổi. Hãy xem lại danh sách.</string>
+    <string name="publish_status_action_failed">Không cập nhật được hàng đợi đăng bài. Vui lòng thử lại.</string>
 </resources>

@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import com.lttbdd.socialagent.core.database.entity.PostEntity
+import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.PostStatus
 import kotlinx.coroutines.flow.Flow
 
@@ -37,6 +38,10 @@ interface PostDao {
     @Update
     suspend fun update(post: PostEntity)
 
+    /** Giữ bản ghi chống đăng trùng khi yêu cầu đăng đang chạy hoặc chưa rõ kết quả. */
+    @Query("DELETE FROM posts WHERE channel = :channel AND status != 'PUBLISHING' AND outcomeUnknown = 0")
+    suspend fun deleteByChannel(channel: ChannelType)
+
     @Query("SELECT * FROM posts WHERE id = :id")
     suspend fun getById(id: String): PostEntity?
 
@@ -55,6 +60,7 @@ interface PostDao {
         SET status = :publishing, attemptStartedAtMillis = :nowMillis, outcomeUnknown = 0,
             attemptCount = attemptCount + 1, updatedAtMillis = :nowMillis
         WHERE id = :id AND status = :queued
+          AND NOT EXISTS (SELECT 1 FROM deferred_channel_post_cleanup WHERE postId = :id)
         """,
     )
     suspend fun claimForPublishing(

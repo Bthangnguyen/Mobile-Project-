@@ -10,7 +10,13 @@ import com.lttbdd.socialagent.data.model.FacebookPage
 import com.lttbdd.socialagent.data.model.FacebookPageAccessIssue
 import com.lttbdd.socialagent.data.model.FacebookUserToken
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flowOf
+
+// Dùng chung một StateFlow cho bản cài đặt mặc định, tránh tạo flow mới mỗi lần đọc thuộc tính.
+private val NO_UNVERIFIED_FACEBOOK_SIGN_OUT: StateFlow<Boolean> = MutableStateFlow(false).asStateFlow()
 
 /**
  * Repository quản lý việc kết nối kênh mạng xã hội qua OAuth.
@@ -25,6 +31,28 @@ interface ChannelRepository {
      * Lấy danh sách các kênh đã kết nối. Flow báo lỗi nếu kho không đọc được, có thể thu thập lại để thử lại.
      */
     fun getConnectedChannels(): Flow<List<ChannelAccount>>
+
+    /** Có lượt ngắt kết nối đã được lưu và còn dữ liệu cần dọn. */
+    val hasPendingDisconnectCleanup: StateFlow<Boolean>
+
+    /**
+     * Có lượt ngắt kết nối đang chờ mà phiên Facebook SDK không xác minh được chủ sở hữu.
+     * Việc thử lại tự động không bao giờ đăng xuất phiên này; người dùng phải chọn qua
+     * [resolveUnverifiedFacebookSignOut].
+     */
+    val hasUnverifiedFacebookSignOut: StateFlow<Boolean>
+        get() = NO_UNVERIFIED_FACEBOOK_SIGN_OUT
+
+    /**
+     * Người dùng tự quyết định bước đăng xuất Facebook không xác minh được: đăng xuất phiên hiện tại
+     * ([signOutCurrentSession] = true) hoặc giữ nguyên SDK. Chỉ tác động lượt ghi mang dấu "chưa xác minh".
+     * Trả về true khi không còn lượt dọn nào.
+     */
+    suspend fun resolveUnverifiedFacebookSignOut(signOutCurrentSession: Boolean): Boolean =
+        !hasPendingDisconnectCleanup.value
+
+    /** Thử lại các lượt ngắt kết nối đã lưu. Trả về true khi không còn lượt nào cần dọn. */
+    suspend fun retryPendingDisconnectCleanup(): Boolean
 
     /**
      * Đăng ký phiên đăng nhập LinkedIn với BFF (`state` + `code_challenge` S256) trước khi mở trình duyệt.
@@ -43,7 +71,7 @@ interface ChannelRepository {
     ): Result<ChannelAccount> = Result.failure(UnsupportedOperationException("Chưa hỗ trợ đăng nhập LinkedIn qua BFF"))
 
     /**
-     * Ngắt kết nối một kênh và xóa token khỏi Keystore/SecureTokenStore.
+     * Ngắt kết nối và xoá token, metadata. Xoá dữ liệu cục bộ theo loại kênh khi ngắt tài khoản cuối.
      */
     suspend fun disconnectChannel(type: ChannelType, accountId: String): Result<Unit>
 

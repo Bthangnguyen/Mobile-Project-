@@ -3,6 +3,7 @@ package com.lttbdd.socialagent.core.database
 import android.app.Application
 import android.content.Context
 import android.database.sqlite.SQLiteConstraintException
+import android.database.sqlite.SQLiteDatabase
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.lttbdd.socialagent.core.database.dao.DraftDeletion
@@ -14,9 +15,13 @@ import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.CommentCategory
 import com.lttbdd.socialagent.core.model.CommentStatus
 import com.lttbdd.socialagent.core.model.PostStatus
+import com.lttbdd.socialagent.data.repository.LocalChannelDataCleanup
+import com.lttbdd.socialagent.data.publishing.PublishQueueRepository
+import com.lttbdd.socialagent.data.publishing.PublishScheduler
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -28,6 +33,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.io.File
 
 /**
  * Test DAO trên DB in-memory: chạy trên JVM nhờ Robolectric, không cần máy ảo.
@@ -93,6 +99,194 @@ class AppDatabaseTest {
             category = null,
             status = status,
         )
+
+    @Test
+    fun retryOfTheSameChannelCleanupPreservesDraftsCreatedAfterTheFirstCleanup() = runTest {
+        val type = ChannelType.FACEBOOK
+        db.draftDao().upsert(draft("original", 0))
+        LocalChannelDataCleanup(db).clear(type, "first-disconnect")
+
+        db.draftDao().upsert(draft("new", 1))
+        val cleanupRetry = LocalChannelDataCleanup(db)
+        cleanupRetry.clear(type, "first-disconnect")
+        assertEquals(listOf("new"), db.draftDao().observeAll().first().map { it.id })
+
+        cleanupRetry.clear(type, "second-disconnect")
+        assertTrue(db.draftDao().observeAll().first().isEmpty())
+    }
+
+    @Test
+    fun migrationFromVersionOnePreservesExistingDraftsAndAddsCleanupReceipts() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val name = "channel-cleanup-migration.db"
+        val oldSchema = JSONObject(File("schemas/${AppDatabase::class.java.name}/1.json").readText())
+            .getJSONObject("database")
+        val path = context.getDatabasePath(name)
+        path.parentFile?.mkdirs()
+        try {
+            SQLiteDatabase.openOrCreateDatabase(path, null).use { oldDb ->
+                installSchema(oldDb, oldSchema)
+                oldDb.execSQL(
+                    "INSERT INTO drafts (id, topicId, channel, text, approved, updatedAtMillis) " +
+                        "VALUES ('existing', 't1', 'FACEBOOK', 'Saved draft', 0, 1)",
+                )
+                oldDb.version = 1
+            }
+
+            val migrated = Room.databaseBuilder(context, AppDatabase::class.java, name).build()
+            try {
+                assertEquals("Saved draft", migrated.draftDao().getById("existing")?.text)
+                assertNull(migrated.channelCleanupDao().getCompletedOperation(ChannelType.FACEBOOK))
+            } finally {
+                migrated.close()
+            }
+        } finally {
+            context.deleteDatabase(name)
+        }
+    }
+
+    @Test
+    fun migrationFromVersionThreeDoesNotTrustTimestampForDeferredDraftDeletion() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val name = "deferred-cleanup-v3.db"
+        val oldSchema = JSONObject(File("schemas/${AppDatabase::class.java.name}/3.json").readText())
+            .getJSONObject("database")
+        val path = context.getDatabasePath(name)
+        path.parentFile?.mkdirs()
+        try {
+            SQLiteDatabase.openOrCreateDatabase(path, null).use { oldDb ->
+                installSchema(oldDb, oldSchema)
+                oldDb.execSQL(
+                    "INSERT INTO drafts (id, topicId, channel, text, approved, updatedAtMillis) " +
+                        "VALUES ('existing', 't1', 'FACEBOOK', 'Saved draft', 0, 1)",
+                )
+                oldDb.execSQL(
+                    "INSERT INTO posts (id, draftId, channel, status, idempotencyKey, attemptCount, " +
+                        "createdAtMillis, updatedAtMillis, outcomeUnknown) " +
+                        "VALUES ('resolved', 'existing', 'FACEBOOK', 'FAILED', 'key', 0, 1, 1, 0)",
+                )
+                oldDb.execSQL(
+                    "INSERT INTO deferred_channel_post_cleanup (postId, draftUpdatedAtMillis) VALUES ('resolved', 1)",
+                )
+                oldDb.version = 3
+            }
+
+            val migrated = Room.databaseBuilder(context, AppDatabase::class.java, name).build()
+            try {
+                migrated.channelCleanupDao().finishDeferredCleanup()
+                assertEquals("Saved draft", migrated.draftDao().getById("existing")?.text)
+                assertNull(migrated.postDao().getById("resolved"))
+            } finally {
+                migrated.close()
+            }
+        } finally {
+            context.deleteDatabase(name)
+        }
+    }
+
+    private fun installSchema(oldDb: SQLiteDatabase, oldSchema: JSONObject) {
+        val entities = oldSchema.getJSONArray("entities")
+        for (index in 0 until entities.length()) {
+            val entity = entities.getJSONObject(index)
+            val table = entity.getString("tableName")
+            oldDb.execSQL(entity.getString("createSql").replace("\${TABLE_NAME}", table))
+            val indices = entity.optJSONArray("indices") ?: continue
+            for (i in 0 until indices.length()) {
+                oldDb.execSQL(indices.getJSONObject(i).getString("createSql").replace("\${TABLE_NAME}", table))
+            }
+        }
+        val setup = oldSchema.getJSONArray("setupQueries")
+        for (index in 0 until setup.length()) oldDb.execSQL(setup.getString(index))
+    }
+
+    @Test
+    fun channelCleanupRemovesLocalRowsAndKeepsTheOtherNetwork() = runTest {
+        val facebook = ChannelType.FACEBOOK
+        val linkedin = ChannelType.LINKEDIN
+        db.draftDao().upsertAll(listOf(draft("d1", 0), draft("d2", 0, channel = linkedin)))
+        db.postDao().insertIfAbsent(post("p1", "key-a"))
+        db.postDao().insertIfAbsent(post("p2", "key-b").copy(channel = linkedin, draftId = "d2"))
+        db.commentDao().upsertAll(
+            listOf(
+                comment("c", facebook, "remote", CommentStatus.NEW, 0L),
+                comment("c", linkedin, "remote", CommentStatus.NEW, 0L),
+            ),
+        )
+        for (type in ChannelType.entries) {
+            db.metricsDao().insert(
+                MetricsSnapshotEntity(
+                    channel = type, remotePostId = "remote", likes = 1, comments = 0,
+                    shares = 0, impressions = null, capturedAtMillis = 0L,
+                ),
+            )
+        }
+
+        LocalChannelDataCleanup(db).clear(linkedin, "disconnect-linkedin")
+
+        assertEquals(listOf("d1"), db.draftDao().observeAll().first().map { it.id })
+        assertEquals(listOf("p1"), db.postDao().observeAll().first().map { it.id })
+        assertEquals(listOf(facebook), db.commentDao().observe().first().map { it.channel })
+        assertNull(db.metricsDao().getLatest(linkedin, "remote"))
+        assertNotNull(db.metricsDao().getLatest(facebook, "remote"))
+    }
+
+    @Test
+    fun channelCleanupPreservesInFlightAndUnknownPostsWithTheirDrafts() = runTest {
+        val type = ChannelType.FACEBOOK
+        db.draftDao().upsertAll(
+            listOf(
+                draft("d1", 0).copy(topicId = "in-flight"),
+                draft("d2", 0).copy(topicId = "unknown"),
+                draft("d3", 0).copy(topicId = "queued"),
+                draft("d5", 0).copy(topicId = "edited-later"),
+            ),
+        )
+        val inFlight = post("p1", "key-flight").copy(status = PostStatus.PUBLISHING, draftId = "d1")
+        val unknown = post("p2", "key-unknown").copy(
+            status = PostStatus.PUBLISHING, outcomeUnknown = true, draftId = "d2",
+        )
+        val queued = post("p3", "key-queued").copy(status = PostStatus.QUEUED, draftId = "d3")
+        val editedLater = post("p5", "key-edited").copy(status = PostStatus.PUBLISHING, draftId = "d5")
+        listOf(inFlight, unknown, queued, editedLater).forEach { db.postDao().insertIfAbsent(it) }
+
+        LocalChannelDataCleanup(db).clear(type, "disconnect-facebook")
+
+        assertEquals(inFlight, db.postDao().getById("p1"))
+        assertEquals(unknown, db.postDao().getById("p2"))
+        assertNull(db.postDao().getById("p3"))
+        assertNotNull(db.draftDao().getById("d1"))
+        assertNotNull(db.draftDao().getById("d2"))
+        assertNull(db.draftDao().getById("d3"))
+
+        val queue = PublishQueueRepository(
+            db, db.postDao(), db.draftDao(), emptySet(),
+            object : PublishScheduler {
+                override fun schedule() = Unit
+                override fun scheduleStaleCheck(delayMillis: Long) = Unit
+            },
+        ) { 10_000L }
+        val replacement = draft("d4", 0).copy(topicId = "new-after-disconnect")
+        db.draftDao().upsert(replacement)
+        db.postDao().insertIfAbsent(post("p4", "key-new").copy(status = PostStatus.PUBLISHED, draftId = "d4"))
+        val edited = draft("d5", 0, text = "Nội dung mới").copy(topicId = "edited-later")
+        db.draftDao().upsert(edited)
+        db.postDao().update(editedLater.copy(status = PostStatus.PUBLISHED))
+        db.postDao().update(inFlight.copy(status = PostStatus.FAILED))
+
+        queue.processQueue()
+
+        assertNull(db.postDao().getById("p1"))
+        assertNull(db.draftDao().getById("d1"))
+        assertNull(db.postDao().getById("p5"))
+        assertEquals(edited.copy(revision = 1), db.draftDao().getById("d5"))
+        assertEquals(unknown, db.postDao().getById("p2"))
+        assertNotNull(db.draftDao().getById("d2"))
+        assertTrue(queue.confirmPublishedManually("p2"))
+        assertNull(db.postDao().getById("p2"))
+        assertNull(db.draftDao().getById("d2"))
+        assertEquals(replacement, db.draftDao().getById("d4"))
+        assertNotNull(db.postDao().getById("p4"))
+    }
 
     @Test
     fun `drafts are returned newest first and upsert replaces existing draft`() = runTest {

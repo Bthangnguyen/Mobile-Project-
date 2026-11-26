@@ -242,4 +242,25 @@
     <string name="tone_casual">Casual</string>
     <string name="tone_inspirational">Inspirational</string>
     <string name="tone_persuasive">Persuasive</string>
+
+    <!-- Feature F4: Draft Approval Guard (Issue #33) -->
+    <string name="review_header_title">Drafts &amp; Approval</string>
+    <string name="review_header_subtitle">Review and approve AI-generated drafts before publishing. The agent never publishes automatically.</string>
+    <string name="review_empty_title">No drafts waiting</string>
+    <string name="review_empty_message">Create a topic first. Generated drafts will appear here for your approval before publishing.</string>
+    <string name="review_status_approved">Approved</string>
+    <string name="review_approval_required_hint">Approval required before this draft can be published.</string>
+    <string name="review_action_approve">Approve</string>
+    <string name="review_action_revoke">Revoke</string>
+    <string name="review_action_publish">Publish</string>
+    <string name="review_approve_dialog_title">Approve this draft?</string>
+    <string name="review_approve_dialog_message">Confirm that you have reviewed the content and allow it to be published when you choose.</string>
+    <string name="review_draft_approved_message">Draft approved. You can publish it now.</string>
+    <string name="review_draft_content_changed">Draft content changed while you were reviewing. Please review it again before approving.</string>
+    <string name="review_draft_revoked_message">Approval revoked. Publishing is locked again.</string>
+    <string name="review_draft_approve_failed">Cannot approve an empty or missing draft.</string>
+    <string name="review_draft_action_failed">Could not update draft. Please try again.</string>
+    <string name="review_publish_blocked_unapproved">This draft has not been approved yet and cannot be published.</string>
+    <string name="review_publish_blocked_empty">Draft content is empty and cannot be published.</string>
+    <string name="review_publish_ready_message">Draft passed approval check. Publishing queue (F5) is not connected yet — nothing was published.</string>
 </resources>

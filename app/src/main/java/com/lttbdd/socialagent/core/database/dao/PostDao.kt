@@ -108,11 +108,14 @@ interface PostDao {
     ): Int
 
     /**
-     * Thời điểm sớm nhất mà một bài [PostStatus.QUEUED] đang chờ theo `Retry-After` được thử lại (#39), hoặc null
-     * nếu không có bài nào phải chờ sau [afterMillis]. Hàng đợi dùng để hẹn worker chạy đúng lúc.
+     * Mốc `nextAttemptAtMillis` sớm nhất của các bài [PostStatus.QUEUED] còn mốc chờ (`Retry-After`, #39), hoặc null.
+     * Gồm cả mốc **đã qua**: bài tới giờ giữa lượt chạy (bị [claimForPublishing] từ chối lúc chưa tới giờ) vẫn còn mốc
+     * vì chỉ giữ chỗ thành công mới xoá mốc, nên hàng đợi biết để hẹn chạy lại ngay.
      */
-    @Query("SELECT MIN(nextAttemptAtMillis) FROM posts WHERE status = :queued AND nextAttemptAtMillis > :afterMillis")
-    suspend fun earliestNextAttemptAfter(afterMillis: Long, queued: PostStatus = PostStatus.QUEUED): Long?
+    @Query(
+        "SELECT MIN(nextAttemptAtMillis) FROM posts WHERE status = :queued AND nextAttemptAtMillis IS NOT NULL",
+    )
+    suspend fun earliestNextAttempt(queued: PostStatus = PostStatus.QUEUED): Long?
 
     /** Số bài đang [PostStatus.PUBLISHING] mà chưa bị coi là không rõ kết quả (có thể worker khác đang đăng). */
     @Query("SELECT COUNT(*) FROM posts WHERE status = :publishing AND outcomeUnknown = 0 AND remotePostId IS NULL")

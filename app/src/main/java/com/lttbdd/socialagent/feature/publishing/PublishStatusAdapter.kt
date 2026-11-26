@@ -68,7 +68,8 @@ class PublishStatusAdapter(
 
             val reason = item.reasonRes?.let(context::getString)
             val hint = when {
-                item.action == ChannelAction.NEEDS_APPROVAL -> context.getString(R.string.publish_status_needs_approval_hint)
+                item.action == ChannelAction.NEEDS_APPROVAL ->
+                    context.getString(R.string.publish_status_needs_approval_hint)
                 item.action == ChannelAction.CONFIRM_OUTCOME ->
                     context.getString(R.string.publish_status_needs_confirmation_hint)
                 reason != null && item.isRetrying -> context.getString(R.string.publish_status_retrying, reason)

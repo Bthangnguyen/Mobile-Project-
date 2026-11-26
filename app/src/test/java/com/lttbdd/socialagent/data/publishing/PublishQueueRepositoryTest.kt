@@ -671,11 +671,13 @@ class PublishQueueRepositoryTest {
         assertEquals(1, first.deferred)
         assertFalse("Không để backoff 30 giây của WorkManager gọi lại sớm", first.shouldRetry)
         assertEquals(listOf(60_000L), scheduler.retryAfterDelays)
+        assertEquals("Hẹn theo mốc tuyệt đối để lượt sau không hẹn trùng", listOf(nowMillis + 60_000), scheduler.retryAtMillis)
 
         nowMillis += 30_000
         val early = repo.processQueue()
         assertEquals("Chưa hết thời gian chờ thì không gọi API", 1, facebook.calls)
         assertEquals("Hẹn lại đúng phần thời gian còn lại", 30_000L, scheduler.retryAfterDelays.last())
+        assertEquals("Cùng một mốc", scheduler.retryAtMillis.first(), scheduler.retryAtMillis.last())
         assertEquals(0, early.published)
 
         nowMillis += 30_000
@@ -729,6 +731,31 @@ class PublishQueueRepositoryTest {
     }
 
     @Test
+    fun `post that becomes due during a run is scheduled again right away`() = runTest {
+        // Facebook chưa tới giờ lúc bị bỏ qua; LinkedIn đăng mất 10 giây nên khi lượt kết thúc Facebook đã tới giờ.
+        val slowLinkedin = object : SocialChannelClient by ScriptedClient(ChannelType.LINKEDIN) {
+            override suspend fun publish(draft: Draft, idempotencyKey: String): PublishResult {
+                nowMillis += 10_000
+                return PublishResult.Success("li-1", "https://linkedin.com/1")
+            }
+        }
+        saveDraft(id = "fb", channel = ChannelType.FACEBOOK)
+        saveDraft(id = "li", channel = ChannelType.LINKEDIN)
+        val repo = repository(clients = setOf(facebook, slowLinkedin))
+        val fbId = queuedId(repo, "fb")
+        nowMillis += 1 // Facebook tạo trước nên được xét trước trong lượt chạy.
+        queuedId(repo, "li")
+        db.postDao().update(post(fbId).copy(nextAttemptAtMillis = nowMillis + 5_000))
+        val scheduledBefore = scheduler.calls
+
+        repo.processQueue()
+
+        assertEquals("Facebook chưa được gọi trong lượt này", 0, facebook.calls)
+        assertEquals("Hẹn ngay trên chuỗi chính thay vì chờ mốc đã qua", scheduledBefore + 1, scheduler.calls)
+        assertTrue(scheduler.retryAtMillis.isEmpty())
+    }
+
+    @Test
     fun `claim refuses a post that must still wait`() = runTest {
         saveDraft()
         val id = queuedId(repository())
@@ -777,7 +804,9 @@ class PublishQueueRepositoryTest {
         }
 
         val retryAfterDelays = mutableListOf<Long>()
-        override fun scheduleRetryAfter(delayMillis: Long) {
+        val retryAtMillis = mutableListOf<Long>()
+        override fun scheduleRetryAt(retryAtMillis: Long, delayMillis: Long) {
+            this.retryAtMillis += retryAtMillis
             retryAfterDelays += delayMillis
         }
     }

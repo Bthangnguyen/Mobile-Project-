@@ -69,15 +69,35 @@ class WorkManagerPublishSchedulerTest {
     }
 
     @Test
-    fun `retry after uses its own chain with the requested delay`() {
+    fun `retry at uses its own work with the requested delay`() {
         scheduler.schedule()
-        scheduler.scheduleRetryAfter(60_000L)
+        scheduler.scheduleRetryAt(retryAtMillis = 1_060_000L, delayMillis = 60_000L)
 
-        val retry = pending(WorkManagerPublishScheduler.RETRY_AFTER_WORK_NAME)
+        val retry = pending(WorkManagerPublishScheduler.retryWorkName(1_060_000L))
         assertEquals(1, retry.size)
         assertEquals("Không chen vào chuỗi chính", 1, pending(WorkManagerPublishScheduler.UNIQUE_WORK_NAME).size)
         assertTrue(retry.single().initialDelayMillis >= 60_000L)
         assertTrue(retry.single().constraints.requiredNetworkType == NetworkType.CONNECTED)
+    }
+
+    @Test
+    fun `short retry is not blocked behind a longer one`() {
+        // Review #107: với một chuỗi APPEND_OR_REPLACE, work 60 giây bị BLOCKED sau work 24 giờ.
+        scheduler.scheduleRetryAt(retryAtMillis = 86_400_000L, delayMillis = 86_400_000L)
+        scheduler.scheduleRetryAt(retryAtMillis = 60_000L, delayMillis = 60_000L)
+
+        val long = pending(WorkManagerPublishScheduler.retryWorkName(86_400_000L)).single()
+        val short = pending(WorkManagerPublishScheduler.retryWorkName(60_000L)).single()
+        assertEquals(WorkInfo.State.ENQUEUED, long.state)
+        assertEquals("Mốc ngắn chạy độc lập, không chờ mốc dài", WorkInfo.State.ENQUEUED, short.state)
+    }
+
+    @Test
+    fun `scheduling the same retry time twice keeps one work`() {
+        scheduler.scheduleRetryAt(retryAtMillis = 60_000L, delayMillis = 60_000L)
+        scheduler.scheduleRetryAt(retryAtMillis = 60_000L, delayMillis = 30_000L)
+
+        assertEquals(1, pending(WorkManagerPublishScheduler.retryWorkName(60_000L)).size)
     }
 
     @Test

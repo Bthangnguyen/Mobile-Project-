@@ -146,7 +146,12 @@ class PublishStatusViewModel @Inject constructor(
         topicId = topicId,
         previewText = previewText,
         channels = channels.map {
-            ChannelPublishItem(state = it, action = actionFor(it), openUrl = openableUrl(it), reasonRes = reasonFor(it))
+            ChannelPublishItem(
+                state = it,
+                action = actionFor(it),
+                openUrl = openableUrl(it),
+                reasonRes = reasonFor(it),
+            )
         },
     )
 

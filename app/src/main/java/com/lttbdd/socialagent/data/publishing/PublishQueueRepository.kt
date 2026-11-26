@@ -126,14 +126,23 @@ class PublishQueueRepository @Inject constructor(
                 Outcome.SKIPPED -> result
             }
         }
-        // Hẹn lượt chạy khi bài chờ Retry-After sớm nhất tới giờ (kể cả bài được hẹn từ lượt trước).
-        val afterRun = clock.nowMillis()
-        postDao.earliestNextAttemptAfter(afterRun)?.let { scheduler.scheduleRetryAfter(it - afterRun) }
+        scheduleNextRetry()
         // Bài kẹt PUBLISHING chưa quá hạn (worker trước bị dừng giữa chừng) sẽ không còn ai xử lý nếu không hẹn
         // lượt sau: hẹn kiểm tra lại khi đã quá STALE_PUBLISHING_MILLIS để chuyển nó sang "chờ xác nhận".
         val inFlight = postDao.countInFlight()
         if (inFlight > 0) scheduler.scheduleStaleCheck(STALE_PUBLISHING_MILLIS + STALE_CHECK_MARGIN_MILLIS)
         return result.copy(inFlight = inFlight)
+    }
+
+    /**
+     * Hẹn lượt chạy cho bài chờ `Retry-After` sớm nhất (#39), kể cả bài được hẹn từ lượt trước. Mốc đã qua nghĩa là
+     * bài tới giờ trong lúc lượt này đang chạy (bị bỏ qua vì lúc giữ chỗ chưa tới giờ): hẹn ngay trên chuỗi chính,
+     * vì work của đúng mốc đó có thể chính là lượt đang chạy và `KEEP` sẽ bỏ qua yêu cầu.
+     */
+    private suspend fun scheduleNextRetry() {
+        val retryAt = postDao.earliestNextAttempt() ?: return
+        val delay = retryAt - clock.nowMillis()
+        if (delay > 0) scheduler.scheduleRetryAt(retryAt, delay) else scheduler.schedule()
     }
 
     /** Gọi khi app khởi động: hẹn worker để xử lý bài QUEUED/PUBLISHING còn sót (app bị tắt trước khi kịp hẹn). */

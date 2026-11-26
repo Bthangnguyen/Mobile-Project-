@@ -39,7 +39,8 @@ class PostRetryAfterMigrationTest {
                 assertEquals(PostStatus.QUEUED, post?.status)
                 assertEquals("key-1", post?.idempotencyKey)
                 assertNull(post?.nextAttemptAtMillis)
-                assertEquals("Bài cũ giữ chỗ được ngay sau khi nâng cấp", 1, migrated.postDao().claimForPublishing("p1", 10))
+                val claimed = migrated.postDao().claimForPublishing("p1", nowMillis = 10)
+                assertEquals("Bài cũ giữ chỗ được ngay sau khi nâng cấp", 1, claimed)
             } finally {
                 migrated.close()
             }
@@ -48,10 +49,18 @@ class PostRetryAfterMigrationTest {
         }
     }
 
+    /**
+     * Gradle chạy unit test trong thư mục module `app`, còn IDE có thể chạy từ thư mục gốc repo: thử cả hai.
+     */
+    private fun schemaFile(version: Int): File {
+        val relative = "schemas/${AppDatabase::class.java.name}/$version.json"
+        return listOf(File(relative), File("app", relative)).firstOrNull { it.isFile }
+            ?: error("Không tìm thấy $relative (thư mục làm việc: ${File("").absolutePath})")
+    }
+
     /** Dựng DB đúng schema v1 từ `schemas/.../1.json` đã commit, kèm một bài đang chờ đăng. */
     private fun createVersionOneDatabase(path: File) {
-        val schema = JSONObject(File("schemas/${AppDatabase::class.java.name}/1.json").readText())
-            .getJSONObject("database")
+        val schema = JSONObject(schemaFile(version = 1).readText()).getJSONObject("database")
         SQLiteDatabase.openOrCreateDatabase(path, null).use { db ->
             val entities = schema.getJSONArray("entities")
             for (index in 0 until entities.length()) {

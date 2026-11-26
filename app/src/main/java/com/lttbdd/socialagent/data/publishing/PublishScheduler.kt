@@ -29,10 +29,11 @@ interface PublishScheduler {
     fun scheduleStaleCheck(delayMillis: Long)
 
     /**
-     * Hẹn một lượt chạy sau [delayMillis] cho bài kênh yêu cầu chờ (`Retry-After`, #39). Mặc định dùng chung
-     * chuỗi trễ với [scheduleStaleCheck] (fake trong test không phải sửa).
+     * Hẹn một lượt chạy lúc [retryAtMillis] (còn [delayMillis] nữa) cho bài kênh yêu cầu chờ (`Retry-After`, #39).
+     * Gọi lại cùng mốc nhiều lần chỉ tạo một lượt; các mốc khác nhau chạy độc lập, mốc ngắn không phải chờ mốc dài.
+     * Mặc định dùng chung chuỗi trễ với [scheduleStaleCheck] (fake trong test không phải sửa).
      */
-    fun scheduleRetryAfter(delayMillis: Long) = scheduleStaleCheck(delayMillis)
+    fun scheduleRetryAt(retryAtMillis: Long, delayMillis: Long) = scheduleStaleCheck(delayMillis)
 }
 
 /**
@@ -44,9 +45,9 @@ interface PublishScheduler {
  * - [scheduleStaleCheck] giữ `APPEND_OR_REPLACE`: chính lượt kiểm tra đang chạy có thể cần hẹn lượt kế tiếp
  *   (còn bài khác đang đăng dở); `KEEP` sẽ bỏ qua yêu cầu đó vì lượt hiện tại vẫn đang RUNNING. Chuỗi này chỉ
  *   dài thêm khi `countInFlight() > 0`, nên không phình ra lúc offline.
- * - [scheduleRetryAfter] có chuỗi riêng, cũng `APPEND_OR_REPLACE` vì chính lượt thử lại đang chạy có thể hẹn lượt
- *   kế tiếp; `REPLACE` sẽ huỷ lượt đang gọi API. Lượt nối sau chỉ chạy muộn hơn, không bao giờ sớm hơn
- *   `nextAttemptAtMillis` vì [com.lttbdd.socialagent.core.database.dao.PostDao.claimForPublishing] chặn.
+ * - [scheduleRetryAt] tạo **một work riêng cho mỗi mốc** (`publish-queue-retry-at-<mốc>`) với `KEEP`: hẹn lại cùng
+ *   mốc ở lượt sau không nhân bản, còn mốc 60 giây không bị nối sau mốc 24 giờ như khi dùng chung một chuỗi
+ *   `APPEND_OR_REPLACE` (review #107). Work xong thì WorkManager tự dọn, nên số tên không tăng mãi.
  */
 class WorkManagerPublishScheduler @Inject constructor(
     @param:ApplicationContext private val context: Context,
@@ -59,8 +60,8 @@ class WorkManagerPublishScheduler @Inject constructor(
     override fun scheduleStaleCheck(delayMillis: Long) =
         enqueue(STALE_CHECK_WORK_NAME, delayMillis, ExistingWorkPolicy.APPEND_OR_REPLACE)
 
-    override fun scheduleRetryAfter(delayMillis: Long) =
-        enqueue(RETRY_AFTER_WORK_NAME, delayMillis, ExistingWorkPolicy.APPEND_OR_REPLACE)
+    override fun scheduleRetryAt(retryAtMillis: Long, delayMillis: Long) =
+        enqueue(retryWorkName(retryAtMillis), delayMillis.coerceAtLeast(0), ExistingWorkPolicy.KEEP)
 
     private fun enqueue(name: String, delayMillis: Long, policy: ExistingWorkPolicy) {
         val request = OneTimeWorkRequestBuilder<PublishQueueWorker>()
@@ -74,7 +75,10 @@ class WorkManagerPublishScheduler @Inject constructor(
     companion object {
         const val UNIQUE_WORK_NAME = "publish-queue"
         const val STALE_CHECK_WORK_NAME = "publish-queue-stale-check"
-        const val RETRY_AFTER_WORK_NAME = "publish-queue-retry-after"
+        private const val RETRY_AT_WORK_PREFIX = "publish-queue-retry-at-"
+
+        /** Tên work của một mốc thử lại; mỗi mốc một tên để các mốc không chặn nhau. */
+        fun retryWorkName(retryAtMillis: Long) = RETRY_AT_WORK_PREFIX + retryAtMillis
         private const val BACKOFF_SECONDS = 30L
     }
 }

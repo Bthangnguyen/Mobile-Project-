@@ -321,6 +321,24 @@
     <string name="publish_status_open_post">Open original post</string>
     <string name="publish_status_open_failed">No app on this device can open this link.</string>
     <string name="publish_status_retrying">Will retry automatically. %1$s</string>
+    <!-- #111: xác nhận "Bài đã lên", thông báo theo kênh, TalkBack -->
+    <string name="publish_status_confirm_published_dialog_title">Mark this post as live?</string>
+    <string name="publish_status_confirm_published_dialog_message">Only continue if you can see the post on the channel. After this, the app will not publish this post again.</string>
+    <string name="publish_status_confirm_published_action">Yes, it is live</string>
+    <string name="publish_status_publish_all_partial">%1$s, %2$s. Tap Retry on the failed channels.</string>
+    <plurals name="publish_status_channels_queued">
+        <item quantity="one">%d channel is in the publishing queue</item>
+        <item quantity="other">%d channels are in the publishing queue</item>
+    </plurals>
+    <plurals name="publish_status_channels_failed">
+        <item quantity="one">%d channel failed</item>
+        <item quantity="other">%d channels failed</item>
+    </plurals>
+    <string name="publish_status_cd_publish">Publish to %1$s</string>
+    <string name="publish_status_cd_retry">Retry publishing to %1$s</string>
+    <string name="publish_status_cd_open_post">Open original post on %1$s</string>
+    <string name="publish_status_cd_confirm_published">The post is live on %1$s</string>
+    <string name="publish_status_cd_requeue">The post is not live on %1$s, publish again</string>
     <string name="publish_error_network_unavailable">Could not reach the network.</string>
     <string name="publish_error_rate_limited">The channel is limiting how often you can post.</string>
     <string name="publish_error_server_error">The channel is having temporary problems.</string>

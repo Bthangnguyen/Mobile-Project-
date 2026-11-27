@@ -26,9 +26,14 @@ data class ChannelPublishItem(
     val openUrl: String? = null,
     /** Lý do lỗi dễ hiểu (#39): bài lỗi, hoặc bài đang chờ tự thử lại sau lỗi tạm thời. */
     @param:StringRes val reasonRes: Int? = null,
+    /** Lần bấm đăng gần nhất không đưa được kênh này vào hàng đợi (#111). */
+    val enqueueFailed: Boolean = false,
 ) {
     /** Bài vẫn ở hàng đợi sau lỗi tạm thời: hàng đợi sẽ tự thử lại. */
     val isRetrying: Boolean get() = state.status == PostStatus.QUEUED && reasonRes != null
+
+    /** Nút đăng của dòng này là "Thử lại": từng đăng lỗi, hoặc vừa không vào được hàng đợi. */
+    val isRetryAction: Boolean get() = action == ChannelAction.PUBLISH && (state.postId != null || enqueueFailed)
 }
 
 data class TopicPublishItem(
@@ -50,4 +55,10 @@ sealed interface PublishStatusEvent {
 
     /** Hỏi lại trước khi đưa bài không rõ kết quả vào hàng đợi, vì có thể làm bài bị đăng hai lần. */
     data class ConfirmRequeue(val postId: String) : PublishStatusEvent
+
+    /** Hỏi lại trước khi đánh dấu "Bài đã lên", vì sau đó không đăng lại bài này từ app được nữa (#111). */
+    data class ConfirmPublished(val postId: String) : PublishStatusEvent
+
+    /** "Đăng tất cả" có kênh lỗi (#111): [queued] kênh đang ở hàng đợi, [failed] kênh không vào được. */
+    data class PublishAllPartial(val queued: Int, val failed: Int) : PublishStatusEvent
 }

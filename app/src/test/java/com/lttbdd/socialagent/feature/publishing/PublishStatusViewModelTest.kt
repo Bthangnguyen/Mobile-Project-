@@ -263,7 +263,7 @@ class PublishStatusViewModelTest {
         advanceUntilIdle()
 
         assertEquals("Kênh sau vẫn được đưa vào hàng đợi", listOf("fb", "li"), queue.enqueued)
-        assertEquals(R.string.publish_status_action_failed, nextMessage())
+        assertEquals(PublishStatusEvent.PublishAllPartial(queued = 1, failed = 1), viewModel.events.first())
     }
 
     @Test
@@ -278,6 +278,74 @@ class PublishStatusViewModelTest {
 
         assertEquals(R.string.review_publish_already_queued, nextMessage())
     }
+
+    // ---------- #111: thông báo theo kênh khi "Đăng tất cả" có kênh lỗi ----------
+
+    @Test
+    fun `publish all partial failure counts queued and already queued channels`() = runTest {
+        collectState()
+        tracker.topics.value = listOf(
+            topic(
+                "t1",
+                state(PostStatus.DRAFT, draftId = "a"),
+                state(PostStatus.DRAFT, draftId = "b"),
+                state(PostStatus.DRAFT, draftId = "c"),
+                state(PostStatus.DRAFT, draftId = "d"),
+            ),
+        )
+        queue.results["b"] = EnqueueResult.AlreadyActive("p", PostStatus.QUEUED)
+        queue.results["c"] = EnqueueResult.DraftNotFound
+        queue.errorFor = "d"
+        advanceUntilIdle()
+
+        viewModel.onPublishAll("t1")
+        advanceUntilIdle()
+
+        assertEquals(
+            "Kênh đã có sẵn trong hàng đợi cũng tính là đã vào hàng đợi",
+            PublishStatusEvent.PublishAllPartial(queued = 2, failed = 2),
+            viewModel.events.first(),
+        )
+    }
+
+    @Test
+    fun `channel that failed to enqueue shows retry until it is queued`() = runTest {
+        collectState()
+        tracker.topics.value = listOf(
+            topic("t1", state(PostStatus.DRAFT, draftId = "fb"), state(PostStatus.DRAFT, draftId = "li")),
+        )
+        queue.errorFor = "fb"
+        advanceUntilIdle()
+        assertEquals(listOf(false, false), retryFlags())
+
+        viewModel.onPublishAll("t1")
+        advanceUntilIdle()
+        assertEquals("Chỉ kênh lỗi hiện Thử lại", listOf(true, false), retryFlags())
+
+        queue.errorFor = null
+        viewModel.onPublishChannel("fb")
+        advanceUntilIdle()
+        assertEquals("Vào hàng đợi được thì bỏ trạng thái lỗi", listOf(false, false), retryFlags())
+    }
+
+    @Test
+    fun `retry action covers failed posts and failed enqueues only`() {
+        val failedPost = ChannelPublishItem(state(PostStatus.FAILED, postId = "p"), ChannelAction.PUBLISH)
+        val newDraft = ChannelPublishItem(state(PostStatus.DRAFT), ChannelAction.PUBLISH)
+        val enqueueFailed = newDraft.copy(enqueueFailed = true)
+        val unapproved = ChannelPublishItem(
+            state(PostStatus.DRAFT, approved = false),
+            ChannelAction.NEEDS_APPROVAL,
+            enqueueFailed = true,
+        )
+
+        assertTrue(failedPost.isRetryAction)
+        assertFalse(newDraft.isRetryAction)
+        assertTrue(enqueueFailed.isRetryAction)
+        assertFalse("Không có nút đăng thì không có Thử lại", unapproved.isRetryAction)
+    }
+
+    private fun retryFlags(): List<Boolean> = viewModel.uiState.value.topics.single().channels.map { it.isRetryAction }
 
     // ---------- Từng kênh ----------
 
@@ -297,6 +365,21 @@ class PublishStatusViewModelTest {
             advanceUntilIdle()
             assertEquals(result.toString(), message, nextMessage())
         }
+    }
+
+    @Test
+    fun `marking a post as live asks for confirmation first`() = runTest {
+        viewModel.onConfirmPublishedRequested("p")
+        advanceUntilIdle()
+
+        assertEquals(PublishStatusEvent.ConfirmPublished("p"), viewModel.events.first())
+        assertTrue("Chưa đồng ý thì chưa đổi trạng thái", tracker.confirmed.isEmpty())
+
+        viewModel.onConfirmPublished("p")
+        advanceUntilIdle()
+
+        assertEquals(listOf("p"), tracker.confirmed)
+        assertEquals(R.string.publish_status_marked_published, nextMessage())
     }
 
     @Test

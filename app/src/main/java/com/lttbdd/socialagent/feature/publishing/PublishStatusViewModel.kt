@@ -14,11 +14,13 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.net.URI
 import java.net.URISyntaxException
@@ -36,8 +38,18 @@ class PublishStatusViewModel @Inject constructor(
     private val publishQueue: PublishQueue,
 ) : ViewModel() {
 
-    val uiState: StateFlow<PublishStatusUiState> = tracker.observeTopics()
-        .map { topics -> PublishStatusUiState(isLoading = false, topics = topics.map { it.toItem() }) }
+    /**
+     * Bản nháp vừa đưa vào hàng đợi không thành công (#111): dòng của kênh đó hiện nút "Thử lại" dù chưa từng
+     * có bài đăng. Bỏ khỏi tập khi đưa vào hàng đợi được.
+     */
+    private val enqueueFailedDraftIds = MutableStateFlow<Set<String>>(emptySet())
+
+    val uiState: StateFlow<PublishStatusUiState> = combine(
+        tracker.observeTopics(),
+        enqueueFailedDraftIds,
+    ) { topics, failed ->
+        PublishStatusUiState(isLoading = false, topics = topics.map { it.toItem(failed) })
+    }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
@@ -61,23 +73,24 @@ class PublishStatusViewModel @Inject constructor(
         val skippedUnapproved = topic.channels.any { it.action == ChannelAction.NEEDS_APPROVAL }
         viewModelScope.launch {
             var queued = 0
+            var alreadyActive = 0
             var failed = 0
             for (target in targets) {
-                when (safeEnqueue(target.state.draftId)) {
+                when (trackedEnqueue(target.state.draftId)) {
                     is EnqueueResult.Queued -> queued++
-                    // Đã ở hàng đợi hoặc đã đăng (bấm hai lần, hoặc màn hình chưa kịp cập nhật): không phải lỗi.
-                    is EnqueueResult.AlreadyActive, is EnqueueResult.AlreadyPublished -> Unit
+                    // Đã ở hàng đợi (bấm hai lần, hoặc màn hình chưa kịp cập nhật): không phải lỗi.
+                    is EnqueueResult.AlreadyActive -> alreadyActive++
+                    is EnqueueResult.AlreadyPublished -> Unit
                     else -> failed++
                 }
             }
-            send(
-                when {
-                    failed > 0 -> R.string.publish_status_action_failed
-                    queued == 0 -> R.string.review_publish_already_queued
-                    skippedUnapproved -> R.string.publish_status_queued_some_unapproved
-                    else -> R.string.publish_status_all_queued
-                },
-            )
+            when {
+                // #111: nói rõ bao nhiêu kênh đã nằm trong hàng đợi và bao nhiêu kênh lỗi; kênh lỗi hiện "Thử lại".
+                failed > 0 -> _events.trySend(PublishStatusEvent.PublishAllPartial(queued + alreadyActive, failed))
+                queued == 0 -> send(R.string.review_publish_already_queued)
+                skippedUnapproved -> send(R.string.publish_status_queued_some_unapproved)
+                else -> send(R.string.publish_status_all_queued)
+            }
         }
     }
 
@@ -85,7 +98,7 @@ class PublishStatusViewModel @Inject constructor(
     fun onPublishChannel(draftId: String) {
         viewModelScope.launch {
             send(
-                when (val result = safeEnqueue(draftId)) {
+                when (val result = trackedEnqueue(draftId)) {
                     is EnqueueResult.Queued -> R.string.review_publish_queued
                     is EnqueueResult.AlreadyActive ->
                         if (result.status == PostStatus.QUEUED) {
@@ -101,6 +114,12 @@ class PublishStatusViewModel @Inject constructor(
         }
     }
 
+    /** Hỏi lại trước khi đánh dấu "Bài đã lên" (#111): sau đó hàng đợi không cho đăng lại bài này nữa. */
+    fun onConfirmPublishedRequested(postId: String) {
+        _events.trySend(PublishStatusEvent.ConfirmPublished(postId))
+    }
+
+    /** Người dùng đã đồng ý trong hộp thoại xác nhận. */
     fun onConfirmPublished(postId: String) {
         viewModelScope.launch {
             send(
@@ -129,8 +148,16 @@ class PublishStatusViewModel @Inject constructor(
         }
     }
 
-    /** null khi lỗi lưu trữ; huỷ coroutine vẫn được truyền tiếp. */
-    private suspend fun safeEnqueue(draftId: String): EnqueueResult? = safeCall { publishQueue.enqueue(draftId) }
+    /**
+     * Đưa vào hàng đợi và ghi nhớ kênh không vào được (lỗi lưu trữ hoặc không tìm thấy bản nháp) để hiện "Thử lại".
+     * Trả null khi lỗi lưu trữ; huỷ coroutine vẫn được truyền tiếp.
+     */
+    private suspend fun trackedEnqueue(draftId: String): EnqueueResult? {
+        val result = safeCall { publishQueue.enqueue(draftId) }
+        val failed = result == null || result == EnqueueResult.DraftNotFound
+        enqueueFailedDraftIds.update { if (failed) it + draftId else it - draftId }
+        return result
+    }
 
     private suspend fun <T> safeCall(block: suspend () -> T): T? = try {
         block()
@@ -144,7 +171,7 @@ class PublishStatusViewModel @Inject constructor(
         _events.trySend(PublishStatusEvent.ShowMessage(messageRes))
     }
 
-    private fun TopicPublishState.toItem() = TopicPublishItem(
+    private fun TopicPublishState.toItem(enqueueFailed: Set<String>) = TopicPublishItem(
         topicId = topicId,
         previewText = previewText,
         channels = channels.map {
@@ -153,6 +180,7 @@ class PublishStatusViewModel @Inject constructor(
                 action = actionFor(it),
                 openUrl = openableUrl(it),
                 reasonRes = reasonFor(it),
+                enqueueFailed = it.draftId in enqueueFailed,
             )
         },
     )

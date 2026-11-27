@@ -319,6 +319,22 @@
     <string name="publish_status_open_post">Mở bài gốc</string>
     <string name="publish_status_open_failed">Không có ứng dụng nào trên máy mở được liên kết này.</string>
     <string name="publish_status_retrying">Sẽ tự thử lại. %1$s</string>
+    <!-- #111: xác nhận "Bài đã lên", thông báo theo kênh, TalkBack -->
+    <string name="publish_status_confirm_published_dialog_title">Đánh dấu bài đã lên?</string>
+    <string name="publish_status_confirm_published_dialog_message">Chỉ tiếp tục nếu bạn đã thấy bài trên kênh. Sau bước này, app sẽ không đăng lại bài này nữa.</string>
+    <string name="publish_status_confirm_published_action">Đúng, bài đã lên</string>
+    <string name="publish_status_publish_all_partial">%1$s, %2$s. Bấm Thử lại ở các kênh lỗi.</string>
+    <plurals name="publish_status_channels_queued">
+        <item quantity="other">%d kênh đã vào hàng đợi đăng bài</item>
+    </plurals>
+    <plurals name="publish_status_channels_failed">
+        <item quantity="other">%d kênh bị lỗi</item>
+    </plurals>
+    <string name="publish_status_cd_publish">Đăng lên %1$s</string>
+    <string name="publish_status_cd_retry">Thử đăng lại lên %1$s</string>
+    <string name="publish_status_cd_open_post">Mở bài gốc trên %1$s</string>
+    <string name="publish_status_cd_confirm_published">Bài đã lên %1$s</string>
+    <string name="publish_status_cd_requeue">Bài chưa lên %1$s, đăng lại</string>
     <string name="publish_error_network_unavailable">Không kết nối được mạng.</string>
     <string name="publish_error_rate_limited">Kênh đang giới hạn tần suất đăng bài.</string>
     <string name="publish_error_server_error">Kênh đang gặp sự cố tạm thời.</string>

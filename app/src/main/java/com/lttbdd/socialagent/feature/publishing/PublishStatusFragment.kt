@@ -12,6 +12,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.google.android.material.snackbar.Snackbar
 import com.lttbdd.socialagent.R
 import com.lttbdd.socialagent.core.ui.components.AppDialog
 import com.lttbdd.socialagent.core.ui.components.AppSnackbar
@@ -41,7 +42,7 @@ class PublishStatusFragment : Fragment() {
         adapter = PublishStatusAdapter(
             onPublishAll = viewModel::onPublishAll,
             onPublishChannel = viewModel::onPublishChannel,
-            onConfirmPublished = viewModel::onConfirmPublished,
+            onConfirmPublished = viewModel::onConfirmPublishedRequested,
             onRequeue = viewModel::onRequeueRequested,
             onOpenPost = ::openPost,
         )
@@ -78,8 +79,26 @@ class PublishStatusFragment : Fragment() {
                 negativeActionRes = R.string.action_cancel,
                 onPositiveAction = { viewModel.onRequeueConfirmed(event.postId) },
             )
+            is PublishStatusEvent.ConfirmPublished -> AppDialog.show(
+                context = requireContext(),
+                titleRes = R.string.publish_status_confirm_published_dialog_title,
+                messageRes = R.string.publish_status_confirm_published_dialog_message,
+                positiveActionRes = R.string.publish_status_confirm_published_action,
+                negativeActionRes = R.string.action_cancel,
+                onPositiveAction = { viewModel.onConfirmPublished(event.postId) },
+            )
+            // Câu có số đếm nên dựng sẵn chuỗi; hiện lâu hơn vì người dùng cần đọc kênh nào lỗi.
+            is PublishStatusEvent.PublishAllPartial ->
+                Snackbar.make(binding.root, partialMessage(event), Snackbar.LENGTH_LONG).show()
         }
     }
+
+    /** "Đăng tất cả" có kênh lỗi (#111): nêu số kênh đã vào hàng đợi và số kênh lỗi. */
+    private fun partialMessage(event: PublishStatusEvent.PublishAllPartial): String = getString(
+        R.string.publish_status_publish_all_partial,
+        resources.getQuantityString(R.plurals.publish_status_channels_queued, event.queued, event.queued),
+        resources.getQuantityString(R.plurals.publish_status_channels_failed, event.failed, event.failed),
+    )
 
     /** Mở bài gốc bằng trình duyệt hoặc app mạng xã hội (#40). URL đã được ViewModel kiểm tra là http/https. */
     private fun openPost(url: String) {

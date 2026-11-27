@@ -88,6 +88,118 @@ class PublishStatusViewModelTest {
         assertTrue(item.canPublishAll)
     }
 
+    // ---------- #39: lý do lỗi ----------
+
+    @Test
+    fun `failed and retrying posts show a readable reason`() {
+        assertEquals(
+            R.string.publish_error_permission_denied,
+            PublishStatusViewModel.reasonFor(state(PostStatus.FAILED, postId = "p", error = "permission_denied")),
+        )
+        assertEquals(
+            R.string.publish_error_rate_limited,
+            PublishStatusViewModel.reasonFor(state(PostStatus.QUEUED, postId = "p", error = "rate_limited")),
+        )
+    }
+
+    @Test
+    fun `old reason is not shown once the post is published or in flight`() {
+        listOf(PostStatus.PUBLISHED, PostStatus.PUBLISHING, PostStatus.HANDED_OFF).forEach {
+            val state = state(it, postId = "p", error = "rate_limited")
+            assertEquals(it.name, null, PublishStatusViewModel.reasonFor(state))
+        }
+    }
+
+    @Test
+    fun `ui state marks queued posts with a reason as retrying`() = runTest {
+        collectState()
+        tracker.topics.value = listOf(
+            topic(
+                "t1",
+                state(PostStatus.QUEUED, draftId = "fb", postId = "p1", error = "network_unavailable"),
+                state(PostStatus.FAILED, draftId = "li", postId = "p2", error = "content_rejected"),
+                state(PostStatus.QUEUED, draftId = "x", postId = "p3"),
+            ),
+        )
+        advanceUntilIdle()
+
+        val channels = viewModel.uiState.value.topics.single().channels
+        assertEquals(listOf(true, false, false), channels.map { it.isRetrying })
+        assertEquals(
+            listOf(R.string.publish_error_network_unavailable, R.string.publish_error_content_rejected, null),
+            channels.map { it.reasonRes },
+        )
+    }
+
+    // ---------- #40: mở bài gốc ----------
+
+    @Test
+    fun `published post with web link can be opened`() {
+        val url = "https://www.facebook.com/123_456"
+        assertEquals(url, PublishStatusViewModel.openableUrl(published(url)))
+        val withQuery = "http://example.com/p?id=1#c"
+        assertEquals(withQuery, PublishStatusViewModel.openableUrl(published(withQuery)))
+        assertEquals(
+            "Không phân biệt hoa thường ở scheme",
+            "HTTPS://linkedin.com/feed/update/urn:li:share:1",
+            PublishStatusViewModel.openableUrl(published("HTTPS://linkedin.com/feed/update/urn:li:share:1")),
+        )
+    }
+
+    @Test
+    fun `link is hidden until the post is published`() {
+        listOf(PostStatus.QUEUED, PostStatus.PUBLISHING, PostStatus.FAILED, PostStatus.HANDED_OFF).forEach {
+            val state = state(it, postId = "p", url = "https://x.com/1")
+            assertEquals(it.name, null, PublishStatusViewModel.openableUrl(state))
+        }
+    }
+
+    @Test
+    fun `non web or malformed links are never opened`() {
+        listOf(
+            null,
+            "",
+            "https://",
+            "javascript:alert(1)",
+            "intent://scan/#Intent;scheme=zxing;end",
+            "file:///sdcard/secret.txt",
+            "content://contacts/people/1",
+            "https://example.com/a b",
+            // AC #40: khoảng trắng ở đầu/cuối cũng bị chặn, không tự cắt bỏ.
+            "  https://example.com/post  ",
+            " https://example.com/post",
+            "https://example.com/post\n",
+            // Thiếu host.
+            "https:///post/1",
+            "https://?q=1",
+            "http:example.com",
+            "https:",
+            "ftp://example.com/p",
+        ).forEach { url ->
+            assertEquals(url.toString(), null, PublishStatusViewModel.openableUrl(published(url)))
+        }
+    }
+
+    @Test
+    fun `ui state exposes the open link for published channels only`() = runTest {
+        collectState()
+        tracker.topics.value = listOf(
+            topic(
+                "t1",
+                state(PostStatus.PUBLISHED, draftId = "fb", postId = "p1", url = "https://facebook.com/p1"),
+                state(PostStatus.FAILED, draftId = "li", postId = "p2", url = "https://linkedin.com/p2"),
+            ),
+        )
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf("https://facebook.com/p1", null),
+            viewModel.uiState.value.topics.single().channels.map { it.openUrl },
+        )
+    }
+
+    private fun published(url: String?) = state(PostStatus.PUBLISHED, postId = "p", url = url)
+
     // ---------- Đăng một lúc lên nhiều kênh ----------
 
     @Test
@@ -244,6 +356,8 @@ class PublishStatusViewModelTest {
         approved: Boolean = true,
         postId: String? = null,
         needsConfirmation: Boolean = false,
+        url: String? = null,
+        error: String? = null,
     ) = ChannelPublishState(
         draftId = draftId,
         channel = ChannelType.FACEBOOK,
@@ -251,6 +365,8 @@ class PublishStatusViewModelTest {
         status = status,
         postId = postId,
         needsConfirmation = needsConfirmation,
+        url = url,
+        errorReason = error,
     )
 
     private class FakeTracker : PublishTracker {

@@ -53,4 +53,9 @@ data class PostEntity(
      * đã nhận bài, nên phải kiểm tra trên mạng xã hội trước khi thử lại thay vì đăng lại ngay.
      */
     val outcomeUnknown: Boolean = false,
+    /**
+     * Không gọi API trước thời điểm này (#39): kênh trả `Retry-After` khi giới hạn tần suất. null = được thử ngay.
+     * [com.lttbdd.socialagent.core.database.dao.PostDao.claimForPublishing] bỏ qua bài chưa tới giờ.
+     */
+    val nextAttemptAtMillis: Long? = null,
 )

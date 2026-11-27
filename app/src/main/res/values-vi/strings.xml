@@ -58,6 +58,14 @@
     <string name="channel_error_reconnect_account_mismatch">Hãy đăng nhập lại bằng tài khoản có quyền kết nối kênh này.</string>
     <string name="channel_error_reconnect_unavailable">Bản này chưa cấu hình đăng nhập nên không thể kết nối lại.</string>
     <string name="channel_empty_desc">Kết nối một kênh (Facebook Page hoặc LinkedIn) để xem trạng thái chức năng theo từng nền tảng</string>
+    <string name="channel_disconnect">Ngắt kết nối</string>
+    <string name="channel_disconnect_title">Ngắt kết nối %1$s?</string>
+    <string name="channel_disconnect_message">Thao tác này xóa kết nối của tài khoản trên thiết bị.</string>
+    <string name="channel_disconnect_last_message">Thao tác này ngắt tài khoản cuối cùng của mạng xã hội này và xóa bản nháp, bài đăng, bình luận cùng số liệu lưu trên thiết bị.</string>
+    <string name="channel_disconnected_notice">Đã ngắt kết nối kênh.</string>
+    <string name="channel_disconnect_failed">Không thể hoàn tất việc ngắt kết nối.</string>
+    <string name="channel_facebook_disconnect_sign_out_unverified">Đã xóa dữ liệu kênh. Chưa xác minh được phiên Facebook nên ứng dụng không tự đăng xuất. Bấm Xử lý đăng xuất Facebook để chọn cách xử lý.</string>
+    <string name="channel_facebook_disconnect_sign_out_failed">Đã xóa dữ liệu kênh. Hãy thử hoàn tất ngắt kết nối để đăng xuất Facebook.</string>
     <string name="channel_capabilities_header">Ma trận khả năng hỗ trợ:</string>
     <string name="channel_facebook_login_error">Lỗi đăng nhập Facebook</string>
     <string name="channel_facebook_cancel_title">Đã hủy đăng nhập Facebook</string>
@@ -89,6 +97,12 @@
     <string name="channel_type_linkedin">LinkedIn</string>
     <string name="channel_linkedin_session_expired">Phiên đăng nhập LinkedIn đã hết hạn. Vui lòng bấm Kết nối LinkedIn lại.</string>
     <string name="channel_retry_load">Thử lại</string>
+    <string name="channel_retry_cleanup">Thử hoàn tất ngắt kết nối</string>
+    <string name="channel_unverified_signout_action">Xử lý đăng xuất Facebook</string>
+    <string name="channel_unverified_signout_title">Chưa xác minh được phiên Facebook</string>
+    <string name="channel_unverified_signout_message">Không xác minh được tài khoản Facebook đang đăng nhập trên thiết bị này, có thể đó là tài khoản của người khác. Hãy chọn đăng xuất hoặc giữ nguyên. Ứng dụng sẽ không tự đăng xuất.</string>
+    <string name="channel_unverified_signout_confirm">Đăng xuất Facebook trên thiết bị này</string>
+    <string name="channel_unverified_signout_keep">Giữ phiên Facebook hiện tại</string>
     <string name="channel_error_save_failed">Không lưu được kết nối kênh. Vui lòng thử lại.</string>
     <string name="channel_error_load_failed">Không tải được danh sách kênh đã kết nối. Vui lòng thử lại.</string>
     <string name="channel_not_configured_notice">Chưa cấu hình %1$s trong local.properties nên bản này không đăng nhập thật được.</string>
@@ -316,6 +330,22 @@
     <string name="publish_status_marked_published">Đã đánh dấu là đã đăng.</string>
     <string name="publish_status_requeued">Đã đưa lại vào hàng đợi đăng bài.</string>
     <string name="publish_status_state_changed">Trạng thái bài đã thay đổi. Hãy xem lại danh sách.</string>
+    <string name="publish_status_open_post">Mở bài gốc</string>
+    <string name="publish_status_open_failed">Không có ứng dụng nào trên máy mở được liên kết này.</string>
+    <string name="publish_status_retrying">Sẽ tự thử lại. %1$s</string>
+    <string name="publish_error_network_unavailable">Không kết nối được mạng.</string>
+    <string name="publish_error_rate_limited">Kênh đang giới hạn tần suất đăng bài.</string>
+    <string name="publish_error_server_error">Kênh đang gặp sự cố tạm thời.</string>
+    <string name="publish_error_retry_limit">Đã thử lại nhiều lần nhưng không thành công. Hãy thử lại sau.</string>
+    <string name="publish_error_permission_denied">Ứng dụng chưa có quyền đăng bài trên kênh này. Hãy kết nối lại ở Cài đặt › Kênh của tôi và cho phép đăng bài.</string>
+    <string name="publish_error_auth_expired">Phiên đăng nhập kênh đã hết hạn. Hãy kết nối lại ở Cài đặt › Kênh của tôi.</string>
+    <string name="publish_error_content_rejected">Kênh từ chối nội dung này. Hãy sửa bản nháp, duyệt lại rồi thử lại.</string>
+    <string name="publish_error_duplicate_content">Kênh từ chối vì bài trùng với một bài đã đăng trước đó.</string>
+    <string name="publish_error_draft_missing">Bản nháp của bài này không còn nữa.</string>
+    <string name="publish_error_not_approved">Bản nháp đã bị sửa sau khi duyệt. Hãy duyệt lại trước khi đăng.</string>
+    <string name="publish_error_channel_not_supported">Chưa hỗ trợ đăng bài lên kênh này.</string>
+    <string name="publish_error_storage">Không ghi được vào bộ nhớ máy.</string>
+    <string name="publish_error_unknown">Kênh báo lỗi khi đăng bài.</string>
     <string name="publish_status_action_failed">Không cập nhật được hàng đợi đăng bài. Vui lòng thử lại.</string>
 
     <!-- Token và chi phí LLM theo ngày/tháng (F8, #74) -->

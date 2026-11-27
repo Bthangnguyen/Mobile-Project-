@@ -14,7 +14,7 @@ data class ChannelRunContext(
 )
 
 /**
- * Sub-agent của một kênh (luồng Dàn ý → … → Đóng gói, Issue #27 triển khai).
+ * Sub-agent của một kênh (luồng Dàn ý → … → Đóng gói). Bản thật: [LlmChannelSubAgent] (Issue #27).
  *
  * Quy ước với orchestrator:
  * - Phát tiến độ qua [emit]; kết thúc bằng đúng một [AgentEvent.ChannelDone] hoặc [AgentEvent.ChannelFailed].
@@ -42,6 +42,9 @@ object ChannelFailureReason {
     const val CHANNEL_NOT_IN_BRIEF = "CHANNEL_NOT_IN_BRIEF"
     const val NO_RESULT = "NO_RESULT"
     const val TIMEOUT = "TIMEOUT"
+
+    /** Bài sau bước Tự rà vẫn vi phạm quy tắc cứng của kênh (độ dài, số hashtag, Markdown). */
+    const val CHANNEL_RULES_VIOLATED = "CHANNEL_RULES_VIOLATED"
 
     fun fromLlm(failure: LlmFailure): String = "LLM_${failure.name}"
 }

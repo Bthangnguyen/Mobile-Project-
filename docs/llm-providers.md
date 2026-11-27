@@ -143,6 +143,6 @@ UsageFragment → UsageViewModel → UsageRepository (RoomUsageRepository) → L
   Màn hình xem theo ngày trong tháng này hoặc theo 12 tháng gần nhất, và chi tiết tháng này theo provider/model/task.
 - **Cho #71 (trần ngân sách):** dùng `UsageRepository.summary(UsagePeriod.TODAY | THIS_MONTH)`; tổng tiền là
   `knownCostMicros`, còn `unknownCostCalls` cho biết số lượt chưa rõ giá.
-- **Room:** `AppDatabase` version 2, `AutoMigration(1 → 2)` chỉ thêm bảng `llm_usage`. Schema ở `app/schemas/.../2.json`.
+- **Room:** `AppDatabase` version 4, `AutoMigration(3 → 4)` chỉ thêm bảng `llm_usage` (version 2 và 3 do #107 và #99 nâng trước). Schema ở `app/schemas/.../4.json`.
 - **Ngoài phạm vi:** chi phí sinh ảnh qua API (router chưa hỗ trợ `GENERATE_IMAGE`), hóa đơn hoặc số dư thật
   của provider, giá cache/batch/priority, trần ngân sách (#71) và chế độ Demo (#73).

@@ -6,6 +6,7 @@ import android.database.sqlite.SQLiteDatabase
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.lttbdd.socialagent.core.database.entity.LlmUsageEntity
+import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.LlmProvider
 import com.lttbdd.socialagent.core.model.LlmTask
 import java.io.File
@@ -25,8 +26,9 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Migration 1 → 2 (#74): dựng DB version 1 đúng theo `app/schemas/.../1.json` rồi mở bằng Room version 2.
- * Dữ liệu cũ phải còn nguyên và bảng `llm_usage` dùng được. Thư mục làm việc khi chạy unit test là module `app`.
+ * Migration 3 → 4 (#74): dựng DB version 3 đúng theo `app/schemas/.../3.json` rồi mở bằng Room version 4.
+ * Dữ liệu cũ (kể cả bảng mới có từ version 3) phải còn nguyên và bảng `llm_usage` dùng được.
+ * Chuỗi 1 → 4 đã được [PostRetryAfterMigrationTest] chạy qua vì test đó mở DB version 1 bằng Room hiện tại.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = Application::class)
@@ -47,19 +49,21 @@ class AppDatabaseMigrationTest {
     }
 
     @Test
-    fun `migrating from version 1 keeps existing data and adds usage table`() = runTest {
-        createVersion1Database()
+    fun `migrating from version 3 keeps existing data and adds usage table`() = runTest {
+        createDatabase(version = 3)
 
         val db = Room.databaseBuilder(context, AppDatabase::class.java, name)
             .allowMainThreadQueries()
             .build()
             .also { room = it }
 
-        db.openHelper.writableDatabase.query("SELECT text FROM drafts WHERE id = 'd1'").use { cursor ->
+        db.openHelper.writableDatabase.query("SELECT text, revision FROM drafts WHERE id = 'd1'").use { cursor ->
             assertTrue(cursor.moveToFirst())
             assertEquals("Bản nháp trước khi nâng cấp", cursor.getString(0))
+            assertEquals(3, cursor.getInt(1))
         }
-        assertEquals(2, db.openHelper.writableDatabase.version)
+        assertEquals("op-1", db.channelCleanupDao().getCompletedOperation(ChannelType.FACEBOOK))
+        assertEquals(4, db.openHelper.writableDatabase.version)
 
         val usage = LlmUsageEntity(
             id = "u1",
@@ -76,8 +80,10 @@ class AppDatabaseMigrationTest {
         assertEquals(listOf(usage), db.llmUsageDao().observeBetween(0, 2_000).first())
     }
 
-    private fun createVersion1Database() {
-        val schema = Json.parseToJsonElement(File(SCHEMA_V1).readText()).jsonObject.getValue("database").jsonObject
+    /** Dựng DB đúng schema [version] từ file JSON Room đã commit, kèm dữ liệu của người dùng trước khi nâng cấp. */
+    private fun createDatabase(version: Int) {
+        val schema = Json.parseToJsonElement(schemaFile(version).readText())
+            .jsonObject.getValue("database").jsonObject
         val statements = buildList {
             schema.getValue("entities").jsonArray.forEach { element ->
                 val entity = element.jsonObject
@@ -93,14 +99,18 @@ class AppDatabaseMigrationTest {
         SQLiteDatabase.openOrCreateDatabase(file, null).use { db ->
             statements.forEach(db::execSQL)
             db.execSQL(
-                "INSERT INTO drafts (id, topicId, channel, text, imageUri, imageAltText, approved, updatedAtMillis) " +
-                    "VALUES ('d1', 't1', 'FACEBOOK', 'Bản nháp trước khi nâng cấp', NULL, NULL, 0, 1)",
+                "INSERT INTO drafts (id, topicId, channel, text, imageUri, imageAltText, approved, updatedAtMillis, " +
+                    "revision) VALUES ('d1', 't1', 'FACEBOOK', 'Bản nháp trước khi nâng cấp', NULL, NULL, 0, 1, 3)",
             )
-            db.version = 1
+            db.execSQL("INSERT INTO channel_cleanup_receipts (channel, operationId) VALUES ('FACEBOOK', 'op-1')")
+            db.version = version
         }
     }
 
-    private companion object {
-        const val SCHEMA_V1 = "schemas/com.lttbdd.socialagent.core.database.AppDatabase/1.json"
+    /** Gradle chạy unit test trong thư mục module `app`, còn IDE có thể chạy từ thư mục gốc repo: thử cả hai. */
+    private fun schemaFile(version: Int): File {
+        val relative = "schemas/${AppDatabase::class.java.name}/$version.json"
+        return listOf(File(relative), File("app", relative)).firstOrNull { it.isFile }
+            ?: error("Không tìm thấy $relative (thư mục làm việc: ${File("").absolutePath})")
     }
 }

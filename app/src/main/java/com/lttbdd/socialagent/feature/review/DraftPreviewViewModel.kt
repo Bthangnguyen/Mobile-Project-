@@ -6,8 +6,15 @@ import androidx.lifecycle.viewModelScope
 import com.lttbdd.socialagent.R
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.Draft
+import com.lttbdd.socialagent.feature.review.hook.OpeningLine
+import com.lttbdd.socialagent.feature.review.hook.OpeningLineSuggester
+import com.lttbdd.socialagent.feature.review.hook.OpeningOptionUi
+import com.lttbdd.socialagent.feature.review.hook.OpeningSuggestionUiState
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,19 +26,35 @@ import javax.inject.Inject
 
 /**
  * ViewModel quản lý xem trước theo giao diện từng kênh, chỉnh sửa thủ công và đếm ký tự
- * theo giới hạn [ChannelType.maxChars] (F4, Issue #34).
+ * theo giới hạn [ChannelType.maxChars] (F4, Issue #34), và gợi ý 3 phương án câu mở đầu (F4, Issue #63).
  */
 @HiltViewModel
 class DraftPreviewViewModel @Inject constructor(
     private val repository: DraftEditorRepository,
+    private val openingLineSuggester: OpeningLineSuggester,
     private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DraftPreviewUiState())
     val uiState: StateFlow<DraftPreviewUiState> = _uiState.asStateFlow()
 
+    private val _openingSuggestion = MutableStateFlow<OpeningSuggestionUiState>(OpeningSuggestionUiState.Hidden)
+
+    /** Trạng thái hộp chọn câu mở đầu (#63); giữ trong ViewModel nên xoay màn hình không gọi lại LLM. */
+    val openingSuggestion: StateFlow<OpeningSuggestionUiState> = _openingSuggestion.asStateFlow()
+
     private val _events = Channel<DraftPreviewEvent>(Channel.BUFFERED)
     val events: Flow<DraftPreviewEvent> = _events.receiveAsFlow()
+
+    private var openingJob: Job? = null
+
+    /** Các phương án đã hiển thị, gửi kèm khi sinh lại để LLM đưa ra câu khác. */
+    private var shownOpeningOptions: List<String> = emptyList()
+
+    /** Nội dung trước và sau lần thay câu mở đầu gần nhất, dùng cho nút Hoàn tác. */
+    private var openingUndo: OpeningUndo? = null
+
+    private data class OpeningUndo(val textBefore: String, val textAfter: String)
 
     init {
         loadDraft()
@@ -202,6 +225,91 @@ class DraftPreviewViewModel @Inject constructor(
     }
 
     /**
+     * Sinh 3 phương án câu mở đầu cho nội dung đang soạn (#63). Dùng cho cả nút Gợi ý, Thử lại
+     * và Sinh 3 phương án khác. Mỗi lần gọi đúng một request LLM; đang có request chạy thì bỏ qua.
+     * Prompt theo kênh thật của bản nháp (`draft.channel`), không theo tab xem trước.
+     */
+    fun onSuggestOpeningClicked() {
+        val current = _uiState.value
+        val draft = current.draft ?: return
+        if (!current.canSuggestOpening || openingJob?.isActive == true) return
+
+        val sourceText = current.editedText
+        val currentOpening = OpeningLine.find(sourceText)
+        val avoid = shownOpeningOptions
+        _openingSuggestion.value = OpeningSuggestionUiState.Loading(currentOpening)
+        openingJob = viewModelScope.launch {
+            _openingSuggestion.value = try {
+                val options = openingLineSuggester.suggest(sourceText, draft.channel, avoid)
+                // Đã đóng hộp chọn trong lúc chờ thì không cập nhật state nữa.
+                ensureActive()
+                shownOpeningOptions = options
+                OpeningSuggestionUiState.Ready(
+                    currentOpening = currentOpening,
+                    options = options.map { option -> toOptionUi(sourceText, draft, option) },
+                )
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (e: Exception) {
+                // Không hiển thị chi tiết lỗi: thông điệp có thể chứa dữ liệu nhà cung cấp.
+                OpeningSuggestionUiState.Error(currentOpening)
+            }
+        }
+    }
+
+    /**
+     * Thay câu mở đầu trong ô soạn thảo bằng phương án thứ [index]. KHÔNG ghi DB, không duyệt, không đăng:
+     * người dùng vẫn phải bấm Lưu, và lưu đi qua [DraftEditorRepository.saveEditedDraft] như sửa tay.
+     */
+    fun onOpeningSelected(index: Int) {
+        val ready = _openingSuggestion.value as? OpeningSuggestionUiState.Ready ?: return
+        val option = ready.options.getOrNull(index) ?: return
+        val current = _uiState.value
+        val draft = current.draft ?: return
+        if (current.isEditingLockedByPublishing) return
+
+        val newText = OpeningLine.replace(current.editedText, option.text)
+        if (DraftCharacterCounter.evaluate(newText, draft.channel).isOverLimit) return
+
+        openingUndo = OpeningUndo(textBefore = current.editedText, textAfter = newText)
+        hideOpeningSuggestions()
+        onTextChanged(newText)
+        _events.trySend(DraftPreviewEvent.OpeningReplaced)
+    }
+
+    /**
+     * Hoàn tác lần thay câu mở đầu gần nhất. Nếu người dùng đã sửa tiếp sau khi thay thì bỏ qua,
+     * để không ghi đè phần vừa sửa.
+     */
+    fun onUndoOpeningReplace() {
+        val undo = openingUndo ?: return
+        openingUndo = null
+        if (_uiState.value.editedText != undo.textAfter) return
+        onTextChanged(undo.textBefore)
+    }
+
+    /** Đóng hộp chọn (Giữ nguyên, vuốt xuống, bấm ra ngoài): huỷ request LLM đang chạy nếu có. */
+    fun onOpeningSuggestionDismissed() {
+        openingJob?.cancel()
+        openingJob = null
+        hideOpeningSuggestions()
+    }
+
+    private fun hideOpeningSuggestions() {
+        _openingSuggestion.value = OpeningSuggestionUiState.Hidden
+        shownOpeningOptions = emptyList()
+    }
+
+    private fun toOptionUi(sourceText: String, draft: Draft, option: String): OpeningOptionUi =
+        OpeningOptionUi(
+            text = option,
+            characterCount = DraftCharacterCounter.countCharacters(option),
+            exceedsChannelLimit = DraftCharacterCounter
+                .evaluate(OpeningLine.replace(sourceText, option), draft.channel)
+                .isOverLimit,
+        )
+
+    /**
      * Giới hạn dung lượng lưu vào [SavedStateHandle] để tránh `TransactionTooLargeException`
      * khi người dùng soạn bài Facebook rất dài (tới 63.206 ký tự).
      */
@@ -245,6 +353,7 @@ class DraftPreviewViewModel @Inject constructor(
             hasUnsavedChanges = hasUnsavedChanges,
             canSave = canSave,
             textErrorRes = errorRes,
+            canSuggestOpening = draft != null && !isEditingLockedByPublishing && editedText.isNotBlank(),
         )
     }
 

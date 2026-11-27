@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import com.lttbdd.socialagent.R
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.Draft
+import com.lttbdd.socialagent.feature.review.hook.FakeOpeningLineSuggester
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -49,13 +50,14 @@ class DraftPreviewViewModelTest {
 
     @Test
     fun `missing or unknown draftId sets isDraftNotFound true`() = runTest {
-        val noArgVm = DraftPreviewViewModel(fakeRepository, SavedStateHandle())
+        val noArgVm = DraftPreviewViewModel(fakeRepository, FakeOpeningLineSuggester(), SavedStateHandle())
         advanceUntilIdle()
         assertTrue(noArgVm.uiState.value.isDraftNotFound)
         assertNull(noArgVm.uiState.value.draft)
 
         val unknownVm = DraftPreviewViewModel(
             fakeRepository,
+            FakeOpeningLineSuggester(),
             SavedStateHandle(mapOf(DraftPreviewViewModel.ARG_DRAFT_ID to "unknown-id")),
         )
         advanceUntilIdle()
@@ -65,7 +67,7 @@ class DraftPreviewViewModelTest {
     @Test
     fun `switching preview channel does not change draft channel or block valid Facebook save`() = runTest {
         val handle = SavedStateHandle(mapOf(DraftPreviewViewModel.ARG_DRAFT_ID to "draft-fb"))
-        val viewModel = DraftPreviewViewModel(fakeRepository, handle)
+        val viewModel = DraftPreviewViewModel(fakeRepository, FakeOpeningLineSuggester(), handle)
         advanceUntilIdle()
 
         val longFacebookText = "a".repeat(3_500)
@@ -97,7 +99,7 @@ class DraftPreviewViewModelTest {
     @Test
     fun `manual edit, reset, and save update state and revoke approval`() = runTest {
         val handle = SavedStateHandle(mapOf(DraftPreviewViewModel.ARG_DRAFT_ID to "draft-fb"))
-        val viewModel = DraftPreviewViewModel(fakeRepository, handle)
+        val viewModel = DraftPreviewViewModel(fakeRepository, FakeOpeningLineSuggester(), handle)
         advanceUntilIdle()
 
         viewModel.onTextChanged("Nội dung sửa tay")
@@ -122,7 +124,7 @@ class DraftPreviewViewModelTest {
     fun `storage failure during save emits preview_save_failed without crashing`() = runTest {
         fakeRepository.failNextSaveWithStorageError = true
         val handle = SavedStateHandle(mapOf(DraftPreviewViewModel.ARG_DRAFT_ID to "draft-fb"))
-        val viewModel = DraftPreviewViewModel(fakeRepository, handle)
+        val viewModel = DraftPreviewViewModel(fakeRepository, FakeOpeningLineSuggester(), handle)
         advanceUntilIdle()
 
         viewModel.onTextChanged("Nội dung mới")
@@ -139,7 +141,7 @@ class DraftPreviewViewModelTest {
     fun `draft with active publishing post locks editing`() = runTest {
         fakeRepository.activePublishingDraftIds.add("draft-fb")
         val handle = SavedStateHandle(mapOf(DraftPreviewViewModel.ARG_DRAFT_ID to "draft-fb"))
-        val viewModel = DraftPreviewViewModel(fakeRepository, handle)
+        val viewModel = DraftPreviewViewModel(fakeRepository, FakeOpeningLineSuggester(), handle)
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
@@ -153,13 +155,13 @@ class DraftPreviewViewModelTest {
     @Test
     fun `SavedStateHandle restores normal text but skips oversized text to avoid TransactionTooLargeException`() = runTest {
         val handle = SavedStateHandle(mapOf(DraftPreviewViewModel.ARG_DRAFT_ID to "draft-fb"))
-        val firstVm = DraftPreviewViewModel(fakeRepository, handle)
+        val firstVm = DraftPreviewViewModel(fakeRepository, FakeOpeningLineSuggester(), handle)
         advanceUntilIdle()
 
         firstVm.onTextChanged("Chưa kịp lưu")
         firstVm.onChannelPreviewSelected(ChannelType.LINKEDIN)
 
-        val restoredVm = DraftPreviewViewModel(fakeRepository, handle)
+        val restoredVm = DraftPreviewViewModel(fakeRepository, FakeOpeningLineSuggester(), handle)
         advanceUntilIdle()
         assertEquals("Chưa kịp lưu", restoredVm.uiState.value.editedText)
         assertEquals(ChannelType.LINKEDIN, restoredVm.uiState.value.selectedChannel)
@@ -167,7 +169,7 @@ class DraftPreviewViewModelTest {
         // Nội dung vượt ngưỡng MAX_SAVED_STATE_CHARS không bị đẩy vào SavedStateHandle
         val hugeText = "x".repeat(DraftPreviewViewModel.MAX_SAVED_STATE_CHARS + 500)
         restoredVm.onTextChanged(hugeText)
-        val afterProcessDeathVm = DraftPreviewViewModel(fakeRepository, handle)
+        val afterProcessDeathVm = DraftPreviewViewModel(fakeRepository, FakeOpeningLineSuggester(), handle)
         advanceUntilIdle()
         assertEquals("Bài nháp ban đầu cho Facebook", afterProcessDeathVm.uiState.value.editedText)
     }

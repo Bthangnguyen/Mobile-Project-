@@ -14,11 +14,13 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
+import com.google.android.material.snackbar.Snackbar
 import com.lttbdd.socialagent.R
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.ui.components.AppDialog
 import com.lttbdd.socialagent.core.ui.components.AppSnackbar
 import com.lttbdd.socialagent.databinding.FragmentDraftPreviewBinding
+import com.lttbdd.socialagent.feature.review.hook.OpeningSuggestionUiState
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 
@@ -100,6 +102,10 @@ class DraftPreviewFragment : Fragment() {
         binding.btnSaveEdits.setOnClickListener {
             viewModel.onSaveClicked()
         }
+
+        binding.btnSuggestOpening.setOnClickListener {
+            viewModel.onSuggestOpeningClicked()
+        }
     }
 
     private fun observeViewModel() {
@@ -111,10 +117,20 @@ class DraftPreviewFragment : Fragment() {
                     }
                 }
                 launch {
+                    viewModel.openingSuggestion.collect { state ->
+                        showOpeningSuggestionsIfNeeded(state)
+                    }
+                }
+                launch {
                     viewModel.events.collect { event ->
                         when (event) {
                             is DraftPreviewEvent.ShowMessage -> {
                                 AppSnackbar.show(binding.root, event.messageRes)
+                            }
+                            DraftPreviewEvent.OpeningReplaced -> {
+                                Snackbar.make(binding.root, R.string.preview_opening_replaced, Snackbar.LENGTH_LONG)
+                                    .setAction(R.string.preview_opening_undo) { viewModel.onUndoOpeningReplace() }
+                                    .show()
                             }
                         }
                     }
@@ -160,6 +176,19 @@ class DraftPreviewFragment : Fragment() {
         // Nút Khôi phục và Lưu chỉnh sửa
         binding.btnResetEdits.isEnabled = state.hasUnsavedChanges
         binding.btnSaveEdits.isEnabled = state.canSave && state.hasUnsavedChanges
+
+        // Nút Gợi ý câu mở đầu (#63)
+        binding.btnSuggestOpening.isEnabled = state.canSuggestOpening
+    }
+
+    /**
+     * Mở hộp chọn câu mở đầu khi ViewModel có state gợi ý mà chưa có sheet. Sau khi xoay màn hình,
+     * FragmentManager tự khôi phục sheet nên không mở thêm bản thứ hai; sheet tự đóng khi state về Hidden.
+     */
+    private fun showOpeningSuggestionsIfNeeded(state: OpeningSuggestionUiState) {
+        if (state == OpeningSuggestionUiState.Hidden) return
+        if (childFragmentManager.findFragmentByTag(OpeningSuggestionsBottomSheet.TAG) != null) return
+        OpeningSuggestionsBottomSheet().showNow(childFragmentManager, OpeningSuggestionsBottomSheet.TAG)
     }
 
     private fun renderChannelPreview(channel: ChannelType, text: String) {

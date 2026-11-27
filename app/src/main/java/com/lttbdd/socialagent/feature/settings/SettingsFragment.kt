@@ -19,7 +19,7 @@ import com.lttbdd.socialagent.databinding.FragmentSettingsBinding
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 
-/** Màn Cài đặt (F9) với tùy chọn ngôn ngữ, quản lý API key (F8) và Kênh của tôi (F1). */
+/** Màn Cài đặt (F9) với tùy chọn ngôn ngữ, chế độ Demo và quản lý API key (F8), Kênh của tôi (F1). */
 @AndroidEntryPoint
 class SettingsFragment : Fragment() {
 
@@ -41,6 +41,7 @@ class SettingsFragment : Fragment() {
         // Đánh dấu tiêu đề để TalkBack cho phép nhảy giữa các mục (android:accessibilityHeading cần API 28).
         ViewCompat.setAccessibilityHeading(binding.settingsTitle, true)
         ViewCompat.setAccessibilityHeading(binding.languageTitle, true)
+        ViewCompat.setAccessibilityHeading(binding.demoSectionTitle, true)
         ViewCompat.setAccessibilityHeading(binding.apiKeysSectionTitle, true)
         ViewCompat.setAccessibilityHeading(binding.modelsSectionTitle, true)
         ViewCompat.setAccessibilityHeading(binding.channelsSectionTitle, true)
@@ -66,6 +67,13 @@ class SettingsFragment : Fragment() {
         group.setOnCheckedChangeListener(null)
         group.check(radioIdFor(state.language))
         group.setOnCheckedChangeListener(languageListener)
+
+        val demoSwitch = binding.demoModeSwitch
+        demoSwitch.setOnCheckedChangeListener(null)
+        demoSwitch.isChecked = state.demoMode
+        demoSwitch.setOnCheckedChangeListener { _, checked -> viewModel.onDemoModeToggled(checked) }
+        // #73: nói rõ đang dùng nội dung mẫu để người dùng không nhầm là nội dung AI thật.
+        binding.demoModeActive.visibility = if (state.demoMode) View.VISIBLE else View.GONE
     }
 
     /** Bỏ qua lần bấm lặp khi đã rời màn Cài đặt. */

@@ -333,4 +333,9 @@
     <string name="publish_error_storage">Không ghi được vào bộ nhớ máy.</string>
     <string name="publish_error_unknown">Kênh báo lỗi khi đăng bài.</string>
     <string name="publish_status_action_failed">Không cập nhật được hàng đợi đăng bài. Vui lòng thử lại.</string>
+    <!-- #73: chế độ Demo -->
+    <string name="settings_demo_title">Chế độ Demo</string>
+    <string name="settings_demo_switch">Dùng chế độ Demo</string>
+    <string name="settings_demo_description">Dùng thử app bằng nội dung mẫu. Không cần API key, không gọi nhà cung cấp LLM và không tốn phí. Bản nháp vẫn cần bạn duyệt trước khi đăng.</string>
+    <string name="settings_demo_active">Đang bật chế độ Demo: nội dung AI là văn bản mẫu, không do model thật viết.</string>
 </resources>

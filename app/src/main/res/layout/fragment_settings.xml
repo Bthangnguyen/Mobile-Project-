@@ -59,6 +59,40 @@
                 android:text="@string/settings_language_english" />
         </RadioGroup>
 
+        <!-- Chế độ Demo (#73) -->
+        <TextView
+            android:id="@+id/demo_section_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="@string/settings_demo_title"
+            android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/demo_mode_switch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:minHeight="48dp"
+            android:text="@string/settings_demo_switch" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_demo_description"
+            android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+        <TextView
+            android:id="@+id/demo_mode_active"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:accessibilityLiveRegion="polite"
+            android:text="@string/settings_demo_active"
+            android:textAppearance="?attr/textAppearanceLabelLarge"
+            android:textColor="@color/brand_warning"
+            android:visibility="gone" />
+
         <TextView
             android:id="@+id/api_keys_section_title"
             android:layout_width="wrap_content"

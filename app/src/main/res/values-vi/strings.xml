@@ -383,4 +383,25 @@
     <string name="publish_error_storage">Không ghi được vào bộ nhớ máy.</string>
     <string name="publish_error_unknown">Kênh báo lỗi khi đăng bài.</string>
     <string name="publish_status_action_failed">Không cập nhật được hàng đợi đăng bài. Vui lòng thử lại.</string>
+
+    <!-- Hộp thư bình luận (F6, #41) -->
+    <string name="comment_inbox_filter_channel">Kênh</string>
+    <string name="comment_inbox_filter_post">Bài viết</string>
+    <string name="comment_inbox_filter_status">Trạng thái</string>
+    <string name="comment_inbox_all_channels">Tất cả kênh</string>
+    <string name="comment_inbox_all_posts">Tất cả bài viết</string>
+    <string name="comment_inbox_all_statuses">Tất cả trạng thái</string>
+    <string name="comment_inbox_channel_post">%1$s · Bài %2$s</string>
+    <string name="comment_inbox_channel_post_excerpt">%1$s · %2$s</string>
+    <string name="comment_inbox_status_new">Mới</string>
+    <string name="comment_inbox_status_replied">Đã trả lời</string>
+    <string name="comment_inbox_status_ignored">Đã bỏ qua</string>
+    <string name="comment_inbox_unknown_author">Không rõ tác giả</string>
+    <string name="comment_inbox_clear_filters">Xóa bộ lọc</string>
+    <string name="comment_inbox_previous_page">Trang trước</string>
+    <string name="comment_inbox_next_page">Trang sau</string>
+    <string name="comment_inbox_retry">Thử lại</string>
+    <string name="comment_inbox_empty">Chưa có bình luận.</string>
+    <string name="comment_inbox_no_results">Không có bình luận khớp với bộ lọc.</string>
+    <string name="comment_inbox_load_failed">Không thể tải bình luận.</string>
 </resources>

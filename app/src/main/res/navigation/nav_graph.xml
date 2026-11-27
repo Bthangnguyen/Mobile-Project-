@@ -39,13 +39,8 @@
 
     <fragment
         android:id="@+id/commentsFragment"
-        android:name="com.lttbdd.socialagent.core.ui.PlaceholderFragment"
-        android:label="@string/nav_comments">
-        <argument
-            android:name="titleRes"
-            android:defaultValue="@string/nav_comments"
-            app:argType="reference" />
-    </fragment>
+        android:name="com.lttbdd.socialagent.feature.comments.CommentInboxFragment"
+        android:label="@string/nav_comments" />
 
     <fragment
         android:id="@+id/analyticsFragment"

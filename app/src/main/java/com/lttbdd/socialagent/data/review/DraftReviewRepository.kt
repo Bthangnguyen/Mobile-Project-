@@ -20,6 +20,15 @@ sealed interface DraftApprovalResult {
     data class StorageError(val cause: Throwable) : DraftApprovalResult
 }
 
+/**
+ * Ngoại lệ báo hiệu bản nháp đã được lưu vào Room (với `approved = false`),
+ * nhưng ghi mục lịch sử phiên bản tương ứng thất bại để bên gọi không âm thầm bỏ qua (#62).
+ */
+class DraftHistoryWriteException(
+    val savedDraft: Draft,
+    cause: Throwable,
+) : Exception("Bản nháp đã lưu nhưng không ghi được lịch sử phiên bản", cause)
+
 /** Kết quả cập nhật nội dung bản nháp (luôn tự động thu hồi trạng thái duyệt). */
 sealed interface DraftContentUpdateResult {
     data class Updated(val draft: Draft) : DraftContentUpdateResult
@@ -112,13 +121,21 @@ class RoomDraftReviewRepository @Inject constructor(
         val now = System.currentTimeMillis()
         val unapprovedDraft = DraftApprovalGuard.sanitizeAgentDraft(draft)
         draftDao.upsert(unapprovedDraft.toEntity(updatedAtMillis = now))
-        recordVersionBestEffort(
-            draftId = unapprovedDraft.id,
-            text = unapprovedDraft.text,
-            source = DraftVersionSource.AI_GENERATED,
-            createdAtMillis = now,
-        )
-        Result.success(unapprovedDraft)
+        try {
+            if (unapprovedDraft.text.isNotBlank()) {
+                draftVersionStore.recordVersion(
+                    draftId = unapprovedDraft.id,
+                    text = unapprovedDraft.text,
+                    source = DraftVersionSource.AI_GENERATED,
+                    createdAtMillis = now,
+                )
+            }
+            Result.success(unapprovedDraft)
+        } catch (ce: CancellationException) {
+            throw ce
+        } catch (historyError: Exception) {
+            Result.failure(DraftHistoryWriteException(unapprovedDraft, historyError))
+        }
     } catch (ce: CancellationException) {
         throw ce
     } catch (e: Exception) {
@@ -132,7 +149,6 @@ class RoomDraftReviewRepository @Inject constructor(
         draftId = draftId,
         newText = newText,
         source = DraftVersionSource.MANUAL_EDIT,
-        reportHistoryFailure = false,
     )
 
     override suspend fun restoreDraftContent(
@@ -142,14 +158,12 @@ class RoomDraftReviewRepository @Inject constructor(
         draftId = draftId,
         newText = newText,
         source = DraftVersionSource.RESTORED,
-        reportHistoryFailure = true,
     )
 
     private suspend fun updateDraftContentInternal(
         draftId: String,
         newText: String,
         source: DraftVersionSource,
-        reportHistoryFailure: Boolean,
     ): DraftContentUpdateResult = try {
         if (newText.isBlank()) {
             DraftContentUpdateResult.EmptyContent
@@ -158,8 +172,6 @@ class RoomDraftReviewRepository @Inject constructor(
             if (freshEntity == null) {
                 DraftContentUpdateResult.NotFound
             } else {
-                // Nếu bản nháp tồn tại từ trước khi có lịch sử phiên bản, lưu bản chụp gốc trước khi ghi đè.
-                ensureInitialSnapshotBestEffort(freshEntity.id, freshEntity.text, freshEntity.updatedAtMillis)
                 val now = System.currentTimeMillis()
                 val editedModel = DraftApprovalGuard.onDraftContentEdited(
                     freshEntity.toModel().copy(text = newText),
@@ -171,28 +183,27 @@ class RoomDraftReviewRepository @Inject constructor(
                 )
                 draftDao.upsert(updatedEntity)
                 val savedDraft = updatedEntity.toModel()
-                if (reportHistoryFailure) {
-                    try {
+                try {
+                    // Nếu bản nháp tồn tại từ trước khi có lịch sử phiên bản, lưu bản chụp gốc trước bản mới.
+                    if (freshEntity.text.isNotBlank() && draftVersionStore.getVersions(draftId).isEmpty()) {
                         draftVersionStore.recordVersion(
                             draftId = draftId,
-                            text = editedModel.text,
-                            source = source,
-                            createdAtMillis = now,
+                            text = freshEntity.text,
+                            source = DraftVersionSource.INITIAL,
+                            createdAtMillis = freshEntity.updatedAtMillis,
                         )
-                        DraftContentUpdateResult.Updated(savedDraft)
-                    } catch (ce: CancellationException) {
-                        throw ce
-                    } catch (historyError: Exception) {
-                        DraftContentUpdateResult.UpdatedWithoutHistory(savedDraft, historyError)
                     }
-                } else {
-                    recordVersionBestEffort(
+                    draftVersionStore.recordVersion(
                         draftId = draftId,
                         text = editedModel.text,
                         source = source,
                         createdAtMillis = now,
                     )
                     DraftContentUpdateResult.Updated(savedDraft)
+                } catch (ce: CancellationException) {
+                    throw ce
+                } catch (historyError: Exception) {
+                    DraftContentUpdateResult.UpdatedWithoutHistory(savedDraft, historyError)
                 }
             }
         }
@@ -200,49 +211,6 @@ class RoomDraftReviewRepository @Inject constructor(
         throw ce
     } catch (e: Exception) {
         DraftContentUpdateResult.StorageError(e)
-    }
-
-    private suspend fun ensureInitialSnapshotBestEffort(
-        draftId: String,
-        existingText: String,
-        existingUpdatedAtMillis: Long,
-    ) {
-        if (existingText.isBlank()) return
-        try {
-            if (draftVersionStore.getVersions(draftId).isEmpty()) {
-                draftVersionStore.recordVersion(
-                    draftId = draftId,
-                    text = existingText,
-                    source = DraftVersionSource.INITIAL,
-                    createdAtMillis = existingUpdatedAtMillis,
-                )
-            }
-        } catch (ce: CancellationException) {
-            throw ce
-        } catch (_: Exception) {
-            // Lỗi lưu lịch sử không được làm hỏng thao tác lưu bản nháp chính.
-        }
-    }
-
-    private suspend fun recordVersionBestEffort(
-        draftId: String,
-        text: String,
-        source: DraftVersionSource,
-        createdAtMillis: Long,
-    ) {
-        if (text.isBlank()) return
-        try {
-            draftVersionStore.recordVersion(
-                draftId = draftId,
-                text = text,
-                source = source,
-                createdAtMillis = createdAtMillis,
-            )
-        } catch (ce: CancellationException) {
-            throw ce
-        } catch (_: Exception) {
-            // Lỗi lưu lịch sử không được làm hỏng thao tác lưu bản nháp chính.
-        }
     }
 
     override suspend fun approveDraft(

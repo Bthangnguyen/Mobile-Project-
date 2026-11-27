@@ -286,6 +286,7 @@
     <string name="preview_action_reset">Khôi phục</string>
     <string name="preview_action_save">Lưu chỉnh sửa</string>
     <string name="preview_save_success">Đã lưu chỉnh sửa. Cần duyệt lại trước khi đăng bài.</string>
+    <string name="preview_save_success_without_history">Đã lưu chỉnh sửa và thu hồi duyệt, nhưng không ghi được mục lịch sử phiên bản.</string>
     <string name="preview_save_failed">Không thể lưu bản nháp. Vui lòng kiểm tra lại nội dung.</string>
     <string name="preview_not_found_title">Không tìm thấy bản nháp</string>
     <string name="preview_not_found_message">Bản nháp được yêu cầu không tồn tại hoặc đã bị xóa.</string>

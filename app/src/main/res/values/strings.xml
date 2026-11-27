@@ -288,6 +288,7 @@
     <string name="preview_action_reset">Reset</string>
     <string name="preview_action_save">Save changes</string>
     <string name="preview_save_success">Draft changes saved. Re-approval is required before publishing.</string>
+    <string name="preview_save_success_without_history">Draft changes saved and approval revoked, but the version history entry could not be recorded.</string>
     <string name="preview_save_failed">Could not save draft changes. Check content and try again.</string>
     <string name="preview_not_found_title">Draft not found</string>
     <string name="preview_not_found_message">The requested draft does not exist or has been removed.</string>

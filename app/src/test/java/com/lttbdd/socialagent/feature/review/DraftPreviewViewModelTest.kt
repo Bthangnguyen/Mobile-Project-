@@ -136,6 +136,25 @@ class DraftPreviewViewModelTest {
     }
 
     @Test
+    fun `history failure during save still updates draft and emits preview_save_success_without_history`() = runTest {
+        fakeRepository.failNextSaveHistoryOnly = true
+        val handle = SavedStateHandle(mapOf(DraftPreviewViewModel.ARG_DRAFT_ID to "draft-fb"))
+        val viewModel = DraftPreviewViewModel(fakeRepository, handle)
+        advanceUntilIdle()
+
+        viewModel.onTextChanged("Nội dung đã sửa nhưng lỗi lịch sử")
+        viewModel.onSaveClicked()
+        advanceUntilIdle()
+
+        assertEquals("Nội dung đã sửa nhưng lỗi lịch sử", viewModel.uiState.value.draft?.text)
+        assertFalse(viewModel.uiState.value.draft?.approved ?: true)
+        assertEquals(
+            DraftPreviewEvent.ShowMessage(R.string.preview_save_success_without_history),
+            viewModel.events.first(),
+        )
+    }
+
+    @Test
     fun `draft with active publishing post locks editing`() = runTest {
         fakeRepository.activePublishingDraftIds.add("draft-fb")
         val handle = SavedStateHandle(mapOf(DraftPreviewViewModel.ARG_DRAFT_ID to "draft-fb"))
@@ -178,6 +197,7 @@ class DraftPreviewViewModelTest {
         private val store = initialDrafts.associateBy { it.id }.toMutableMap()
         val activePublishingDraftIds = mutableSetOf<String>()
         var failNextSaveWithStorageError = false
+        var failNextSaveHistoryOnly = false
 
         override suspend fun getDraft(draftId: String): Draft? = store[draftId]
 
@@ -197,6 +217,10 @@ class DraftPreviewViewModelTest {
             }
             val updated = current.copy(text = newText, approved = false)
             store[draftId] = updated
+            if (failNextSaveHistoryOnly) {
+                failNextSaveHistoryOnly = false
+                return DraftSaveResult.SavedWithoutHistory(updated, IllegalStateException("Simulated history error"))
+            }
             return DraftSaveResult.Saved(updated)
         }
     }

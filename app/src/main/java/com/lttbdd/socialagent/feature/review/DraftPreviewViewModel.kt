@@ -178,6 +178,19 @@ class DraftPreviewViewModel @Inject constructor(
                     )
                     _events.trySend(DraftPreviewEvent.ShowMessage(R.string.preview_save_success))
                 }
+                is DraftSaveResult.SavedWithoutHistory -> {
+                    val saved = result.draft
+                    persistEditedTextSafely(saved.text)
+                    _uiState.value = buildState(
+                        isLoading = false,
+                        isEditingLockedByPublishing = false,
+                        draft = saved,
+                        selectedChannel = current.selectedChannel,
+                        editedText = saved.text,
+                        showBlankError = false,
+                    )
+                    _events.trySend(DraftPreviewEvent.ShowMessage(R.string.preview_save_success_without_history))
+                }
                 DraftSaveResult.BlockedByActivePublish -> {
                     _uiState.update {
                         buildState(

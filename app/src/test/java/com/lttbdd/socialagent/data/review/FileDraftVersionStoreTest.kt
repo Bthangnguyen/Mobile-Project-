@@ -133,4 +133,28 @@ class FileDraftVersionStoreTest {
         val recovered = store.getVersions("draft-atomic")
         assertEquals(listOf("Bản 2", "Bản 1"), recovered.map { it.text })
     }
+
+    @Test
+    fun `repairs corrupt primary from valid backup before recording next version`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val dir = tempFolder.newFolder("repair-corrupt")
+        val store = FileDraftVersionStore(baseDir = dir, ioDispatcher = dispatcher)
+
+        store.recordVersion("draft-repair", "Bản 1", DraftVersionSource.AI_GENERATED, 1_000L)
+        store.recordVersion("draft-repair", "Bản 2", DraftVersionSource.MANUAL_EDIT, 2_000L)
+
+        val primary = dir.listFiles().orEmpty().single()
+        val backup = File(dir, "${primary.name}.bak")
+        // Tạo bản sao lưu hợp lệ và làm hỏng tệp chính
+        backup.writeBytes(primary.readBytes())
+        primary.writeText("{corrupt-json", Charsets.UTF_8)
+
+        // Ghi phiên bản mới phải phục hồi từ backup hợp lệ trước, không làm mất Bản 1 và Bản 2
+        store.recordVersion("draft-repair", "Bản 3", DraftVersionSource.MANUAL_EDIT, 3_000L)
+
+        val reopened = FileDraftVersionStore(baseDir = dir, ioDispatcher = dispatcher)
+        val versions = reopened.getVersions("draft-repair")
+        assertEquals(listOf("Bản 3", "Bản 2", "Bản 1"), versions.map { it.text })
+        assertEquals(1, dir.listFiles().orEmpty().size)
+    }
 }

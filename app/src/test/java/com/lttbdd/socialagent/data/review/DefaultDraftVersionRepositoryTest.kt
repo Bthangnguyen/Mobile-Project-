@@ -56,7 +56,6 @@ class DefaultDraftVersionRepositoryTest {
             database = db,
             draftDao = db.draftDao(),
             postDao = db.postDao(),
-            draftReviewRepository = reviewRepository,
             draftVersionStore = versionStore,
         )
     }
@@ -200,17 +199,18 @@ class DefaultDraftVersionRepositoryTest {
             override suspend fun update(draft: DraftEntity): Int = 0
         }
 
-        val failingReviewRepo = RoomDraftReviewRepository(failingDao, versionStore)
         val failingVersionRepo = DefaultDraftVersionRepository(
             database = db,
             draftDao = failingDao,
             postDao = db.postDao(),
-            draftReviewRepository = failingReviewRepo,
             draftVersionStore = versionStore,
         )
-        val existingVersionId = versionStore.getVersions("d-exists").first().id
+        val versionsBeforeFailure = versionStore.getVersions("d-exists")
+        val existingVersionId = versionsBeforeFailure.first().id
         val errorResult = failingVersionRepo.restoreVersion("d-exists", existingVersionId)
         assertTrue(errorResult is DraftRestoreResult.StorageError)
+        // Room thất bại → không được tạo mục RESTORED giả trong tệp lịch sử
+        assertEquals(versionsBeforeFailure, versionStore.getVersions("d-exists"))
     }
 
     @Test
@@ -236,12 +236,10 @@ class DefaultDraftVersionRepositoryTest {
                 throw java.io.IOException("Simulated disk full")
             }
         }
-        val reviewRepoWithFailingStore = RoomDraftReviewRepository(db.draftDao(), failingWriteStore)
         val repoWithFailingStore = DefaultDraftVersionRepository(
             database = db,
             draftDao = db.draftDao(),
             postDao = db.postDao(),
-            draftReviewRepository = reviewRepoWithFailingStore,
             draftVersionStore = failingWriteStore,
         )
 
@@ -250,5 +248,48 @@ class DefaultDraftVersionRepositoryTest {
         val restored = (result as DraftRestoreResult.RestoredWithoutHistory).draft
         assertEquals("Bản v1", restored.text)
         assertFalse(restored.approved)
+    }
+
+    @Test
+    fun `saveAgentDraft and manual updateDraftContent surface history write failure instead of hiding it`() = runTest {
+        val failingWriteStore = object : DraftVersionStore by NoOpDraftVersionStore {
+            override suspend fun recordVersion(
+                draftId: String,
+                text: String,
+                source: DraftVersionSource,
+                createdAtMillis: Long,
+            ): DraftVersion {
+                throw java.io.IOException("Simulated disk error")
+            }
+        }
+        val reviewRepoWithFailingStore = RoomDraftReviewRepository(db.draftDao(), failingWriteStore)
+
+        // Luồng AI tạo bản nháp: Room vẫn lưu approved = false nhưng báo DraftHistoryWriteException
+        val aiResult = reviewRepoWithFailingStore.saveAgentDraft(
+            Draft(
+                id = "d-ai-fail",
+                topicId = "t-ai",
+                channel = ChannelType.FACEBOOK,
+                text = "Nội dung AI",
+                approved = true,
+            ),
+        )
+        assertTrue(aiResult.isFailure)
+        val historyException = aiResult.exceptionOrNull() as DraftHistoryWriteException
+        assertEquals("d-ai-fail", historyException.savedDraft.id)
+        assertFalse(historyException.savedDraft.approved)
+        assertEquals("Nội dung AI", db.draftDao().getById("d-ai-fail")?.text)
+
+        // Luồng sửa thủ công: trả UpdatedWithoutHistory và RoomDraftEditorRepository ánh xạ SavedWithoutHistory
+        val editorRepo = com.lttbdd.socialagent.feature.review.RoomDraftEditorRepository(
+            draftDao = db.draftDao(),
+            postDao = db.postDao(),
+            draftReviewRepository = reviewRepoWithFailingStore,
+        )
+        val saveResult = editorRepo.saveEditedDraft("d-ai-fail", "Nội dung sửa tay")
+        assertTrue(saveResult is com.lttbdd.socialagent.feature.review.DraftSaveResult.SavedWithoutHistory)
+        val savedDraft = (saveResult as com.lttbdd.socialagent.feature.review.DraftSaveResult.SavedWithoutHistory).draft
+        assertEquals("Nội dung sửa tay", savedDraft.text)
+        assertFalse(savedDraft.approved)
     }
 }

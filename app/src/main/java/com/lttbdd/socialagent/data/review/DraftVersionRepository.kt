@@ -37,10 +37,11 @@ interface DraftVersionRepository {
     suspend fun hasActivePublishingPosts(draftId: String): Boolean
 
     /**
-     * Khôi phục nội dung của [draftId] về phiên bản [versionId] trong một giao dịch Room để
-     * tuần tự hóa với luồng `enqueue` của hàng đợi F5, tránh race condition giữa kiểm tra bài đang đăng
-     * và cập nhật bản nháp. Luôn đi qua [DraftReviewRepository.restoreDraftContent] để thu hồi
-     * `approved = false` qua [DraftApprovalGuard].
+     * Khôi phục nội dung của [draftId] về phiên bản [versionId] theo cơ chế đồng bộ 2 bước:
+     * 1. Trong một giao dịch Room (`database.withTransaction`): kiểm tra bài đang đăng hoạt động và
+     *    cập nhật bản nháp qua [DraftApprovalGuard.onDraftContentEdited] (thu hồi `approved = false`),
+     *    không thực hiện ghi tệp bên trong transaction để tránh lịch sử bị lệch khi Room rollback.
+     * 2. Sau khi Room transaction đã commit thành công mới ghi mục `RESTORED` vào [DraftVersionStore].
      */
     suspend fun restoreVersion(draftId: String, versionId: String): DraftRestoreResult
 }
@@ -50,7 +51,6 @@ class DefaultDraftVersionRepository @Inject constructor(
     private val database: AppDatabase,
     private val draftDao: DraftDao,
     private val postDao: PostDao,
-    private val draftReviewRepository: DraftReviewRepository,
     private val draftVersionStore: DraftVersionStore,
 ) : DraftVersionRepository {
 
@@ -72,38 +72,66 @@ class DefaultDraftVersionRepository @Inject constructor(
             val targetVersion = draftVersionStore.getVersions(draftId)
                 .firstOrNull { it.id == versionId }
                 ?: run {
-                    // Trả DraftNotFound nếu bản nháp không tồn tại, ngược lại VersionNotFound.
                     return if (draftDao.getById(draftId) == null) {
                         DraftRestoreResult.DraftNotFound
                     } else {
                         DraftRestoreResult.VersionNotFound
                     }
                 }
+            if (targetVersion.text.isBlank()) {
+                return DraftRestoreResult.VersionNotFound
+            }
 
-            // Bọc kiểm tra bài đăng hoạt động và cập nhật bản nháp trong cùng giao dịch SQLite
-            // để tuần tự hóa với PublishQueueRepository.enqueue.
-            database.withTransaction {
-                draftDao.getById(draftId) ?: return@withTransaction DraftRestoreResult.DraftNotFound
+            // Bước 1: Chỉ chạy thao tác Room trong transaction (tuần tự hóa với PublishQueueRepository.enqueue).
+            // Tuyệt đối không ghi tệp JSON trong transaction để tránh tạo bản RESTORED giả nếu Room rollback.
+            val now = System.currentTimeMillis()
+            val dbPhaseResult = database.withTransaction {
+                val freshEntity = draftDao.getById(draftId) ?: return@withTransaction DbRestorePhase.DraftNotFound
                 if (hasActivePublishingPosts(draftId)) {
-                    return@withTransaction DraftRestoreResult.BlockedByActivePublish
+                    return@withTransaction DbRestorePhase.BlockedByActivePublish
                 }
-                when (val updateResult = draftReviewRepository.restoreDraftContent(draftId, targetVersion.text)) {
-                    is DraftContentUpdateResult.Updated -> {
-                        val latestVersion = draftVersionStore.getVersions(draftId).firstOrNull() ?: targetVersion
-                        DraftRestoreResult.Restored(updateResult.draft, latestVersion)
-                    }
-                    is DraftContentUpdateResult.UpdatedWithoutHistory -> {
-                        DraftRestoreResult.RestoredWithoutHistory(updateResult.draft, updateResult.cause)
-                    }
-                    DraftContentUpdateResult.NotFound -> DraftRestoreResult.DraftNotFound
-                    DraftContentUpdateResult.EmptyContent -> DraftRestoreResult.VersionNotFound
-                    is DraftContentUpdateResult.StorageError -> DraftRestoreResult.StorageError(updateResult.cause)
-                }
+                val editedModel = DraftApprovalGuard.onDraftContentEdited(
+                    freshEntity.toModel().copy(text = targetVersion.text),
+                )
+                val updatedEntity = freshEntity.copy(
+                    text = editedModel.text,
+                    approved = editedModel.approved,
+                    updatedAtMillis = now,
+                )
+                draftDao.upsert(updatedEntity)
+                DbRestorePhase.Committed(updatedEntity.toModel())
+            }
+
+            val committedDraft = when (dbPhaseResult) {
+                DbRestorePhase.DraftNotFound -> return DraftRestoreResult.DraftNotFound
+                DbRestorePhase.BlockedByActivePublish -> return DraftRestoreResult.BlockedByActivePublish
+                is DbRestorePhase.Committed -> dbPhaseResult.draft
+            }
+
+            // Bước 2: Room transaction đã commit chắc chắn → mới ghi phiên bản RESTORED vào tệp lịch sử.
+            try {
+                val recorded = draftVersionStore.recordVersion(
+                    draftId = draftId,
+                    text = committedDraft.text,
+                    source = DraftVersionSource.RESTORED,
+                    createdAtMillis = now,
+                )
+                DraftRestoreResult.Restored(committedDraft, recorded)
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (historyError: Exception) {
+                DraftRestoreResult.RestoredWithoutHistory(committedDraft, historyError)
             }
         } catch (ce: CancellationException) {
             throw ce
         } catch (e: Exception) {
             DraftRestoreResult.StorageError(e)
         }
+    }
+
+    private sealed interface DbRestorePhase {
+        data class Committed(val draft: Draft) : DbRestorePhase
+        data object DraftNotFound : DbRestorePhase
+        data object BlockedByActivePublish : DbRestorePhase
     }
 }

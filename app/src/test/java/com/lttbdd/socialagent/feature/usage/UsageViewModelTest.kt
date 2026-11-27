@@ -144,6 +144,24 @@ class UsageViewModelTest {
     }
 
     @Test
+    fun `message is shown only once`() = runTest(dispatcher) {
+        val viewModel = UsageViewModel(repository)
+        viewModel.refresh()
+        advanceUntilIdle()
+        viewModel.clear()
+        advanceUntilIdle()
+        assertEquals(UsageMessage.CLEARED, viewModel.uiState.value.message)
+
+        viewModel.onMessageShown()
+
+        // Fragment dựng lại sau khi xoay màn hình nhận state này: không còn thông báo để hiện lại.
+        val state = viewModel.uiState.value
+        assertNull(state.message)
+        assertTrue(state.dashboard?.isEmpty == true)
+        assertFalse(state.clearing)
+    }
+
+    @Test
     fun `second clear while clearing is ignored`() = runTest(dispatcher) {
         val gate = CompletableDeferred<Unit>()
         repository.clearGate = gate

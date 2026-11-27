@@ -29,6 +29,7 @@ data class UsageUiState(
     val dashboard: UsageDashboard? = null,
     val mode: UsageHistoryMode = UsageHistoryMode.DAY,
     val clearing: Boolean = false,
+    /** Thông báo hiện một lần; Fragment gọi [UsageViewModel.onMessageShown] ngay sau khi hiện. */
     val message: UsageMessage? = null,
 )
 
@@ -77,5 +78,10 @@ class UsageViewModel @Inject constructor(
             }
             _uiState.update { it.copy(clearing = false, message = message) }
         }
+    }
+
+    /** Thông báo đã hiện: bỏ khỏi state để xoay màn hình hay quay lại màn không hiện lại lần nữa. */
+    fun onMessageShown() {
+        _uiState.update { it.copy(message = null) }
     }
 }

@@ -16,6 +16,7 @@ import com.lttbdd.socialagent.R
 import com.lttbdd.socialagent.core.model.LlmProvider
 import com.lttbdd.socialagent.core.model.LlmTask
 import com.lttbdd.socialagent.core.ui.components.AppDialog
+import com.lttbdd.socialagent.core.ui.components.AppSnackbar
 import com.lttbdd.socialagent.data.usage.UsageDashboard
 import com.lttbdd.socialagent.data.usage.UsageTotals
 import com.lttbdd.socialagent.databinding.FragmentUsageBinding
@@ -86,12 +87,17 @@ class UsageFragment : Fragment() {
         binding.content.visibility = visibleIf(dashboard != null)
         binding.usageDescription.text = getString(R.string.usage_description, pricingDate(state.pricingVersion))
         binding.clearButton.isEnabled = !state.clearing && dashboard?.isEmpty == false
-        binding.message.text = when (state.message) {
-            UsageMessage.CLEARED -> getString(R.string.usage_cleared)
-            UsageMessage.CLEAR_FAILED -> getString(R.string.usage_clear_failed)
-            null -> ""
-        }
         if (dashboard != null) renderDashboard(dashboard, state.mode)
+        state.message?.let { message ->
+            AppSnackbar.show(binding.root, messageRes(message))
+            viewModel.onMessageShown()
+        }
+    }
+
+    @StringRes
+    private fun messageRes(message: UsageMessage): Int = when (message) {
+        UsageMessage.CLEARED -> R.string.usage_cleared
+        UsageMessage.CLEAR_FAILED -> R.string.usage_clear_failed
     }
 
     private fun renderDashboard(dashboard: UsageDashboard, mode: UsageHistoryMode) {

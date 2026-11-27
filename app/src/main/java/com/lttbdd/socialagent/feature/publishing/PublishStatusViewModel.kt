@@ -20,6 +20,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.net.URI
+import java.net.URISyntaxException
 import javax.inject.Inject
 
 /**
@@ -145,11 +147,47 @@ class PublishStatusViewModel @Inject constructor(
     private fun TopicPublishState.toItem() = TopicPublishItem(
         topicId = topicId,
         previewText = previewText,
-        channels = channels.map { ChannelPublishItem(state = it, action = actionFor(it)) },
+        channels = channels.map {
+            ChannelPublishItem(
+                state = it,
+                action = actionFor(it),
+                openUrl = openableUrl(it),
+                reasonRes = reasonFor(it),
+            )
+        },
     )
 
     companion object {
         private const val STOP_TIMEOUT_MILLIS = 5_000L
+
+        /**
+         * Link bài gốc mở được (#40): chỉ bài [PostStatus.PUBLISHED] và chỉ `http`/`https`. Link do API mạng xã hội
+         * trả về hoặc người dùng nhập, nên chặn scheme khác (`intent:`, `javascript:`, `file:`…) để không mở nhầm
+         * ứng dụng hay tệp trên máy.
+         */
+        fun openableUrl(state: ChannelPublishState): String? {
+            if (state.status != PostStatus.PUBLISHED) return null
+            // Không trim: AC #40 chặn link có khoảng trắng ở bất kỳ đâu, kể cả đầu/cuối (review của Minh ở #106).
+            val url = state.url ?: return null
+            if (url.isEmpty() || url.any(Char::isWhitespace)) return null
+            // Parse thay vì chỉ so tiền tố, để chặn link thiếu host như `https:///post/1` hay `https://?q=1`.
+            val uri = try {
+                URI(url)
+            } catch (_: URISyntaxException) {
+                return null
+            }
+            val scheme = uri.scheme?.lowercase()
+            return url.takeIf { scheme in WEB_SCHEMES && !uri.host.isNullOrEmpty() }
+        }
+
+        private val WEB_SCHEMES = setOf("https", "http")
+
+        /** Lý do hiển thị (#39): chỉ cho bài lỗi và bài đang chờ thử lại; bài đã đăng có thể còn lý do cũ. */
+        @StringRes
+        fun reasonFor(state: ChannelPublishState): Int? = when (state.status) {
+            PostStatus.FAILED, PostStatus.QUEUED -> PublishErrorMessages.messageFor(state.errorReason)
+            else -> null
+        }
 
         /** Thao tác cho một kênh; tách hàm thuần để test. */
         fun actionFor(state: ChannelPublishState): ChannelAction = when {

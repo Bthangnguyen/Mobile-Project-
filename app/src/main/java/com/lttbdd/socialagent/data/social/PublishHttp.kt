@@ -115,7 +115,7 @@ internal fun httpRetry(status: Int, header: String?, now: Long): PublishResult.R
  * 506 là bài trùng, 100/1609005 là lỗi nội dung, 4/17/32/341/613/80001 là giới hạn, 1/2 là lỗi dịch vụ.
  * 368 là chặn tạm thời do chính sách, cần chờ rồi thử lại theo Retry-After nếu có.
  * LinkedIn: 401 là phiên lỗi, 403 là lỗi quyền, 400/422 là lỗi nội dung.
- * Chỉ báo bài trùng nếu LinkedIn trả mã hoặc thông báo trùng rõ ràng; 409 có thể là xung đột ghi.
+ * 409 là xung đột ghi có thể thử lại, trừ khi LinkedIn trả mã hoặc thông báo trùng rõ ràng.
  */
 internal fun publishError(
     channel: ChannelType,
@@ -144,6 +144,7 @@ internal fun publishError(
             status == 403 -> PERMISSION_DENIED
             body?.get("code").text() == "DUPLICATE_CONTENT" ||
                 duplicatePost.containsMatchIn(body?.get("message").text().orEmpty()) -> DUPLICATE_CONTENT
+            status == 409 -> return PublishResult.RetryableError(SERVER_ERROR, retryAfterMillis(header, now))
             else -> CONTENT_REJECTED
         }
     }

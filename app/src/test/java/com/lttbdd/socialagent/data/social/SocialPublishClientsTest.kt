@@ -6,6 +6,9 @@ import com.lttbdd.socialagent.core.model.PublishResult
 import com.lttbdd.socialagent.core.publishing.PublishErrorReason
 import com.lttbdd.socialagent.data.model.OAuthToken
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
@@ -106,6 +109,23 @@ class SocialPublishClientsTest {
     }
 
     @Test
+    fun linkedInEncodesHashtagsAndEscapesPlainText() = runTest {
+        val fixture = FakeHttp(201, headers = mapOf("x-restli-id" to "urn:li:ugcPost:123"))
+        val client = linkedIn(fixture)
+        val text = "#Kotlin #Tiếng_Việt\nC# (#Android), #1, url#anchor và {x|y}."
+
+        client.publish(draft(client.type).copy(text = text), client.requirePublishKey())
+
+        val commentary = Json.parseToJsonElement(fixture.requests.single().bodyText())
+            .jsonObject.getValue("commentary").jsonPrimitive.content
+        assertEquals(
+            """{hashtag|\#|Kotlin} {hashtag|\#|Tiếng\_Việt}""" + "\n" +
+                """C\# \({hashtag|\#|Android}\), \#1, url\#anchor và \{x\|y\}.""",
+            commentary,
+        )
+    }
+
+    @Test
     fun linkedInWithoutPublishingScopeDoesNotSendRequest() = runTest {
         val fixture = FakeHttp()
         val client = linkedIn(fixture)
@@ -133,6 +153,42 @@ class SocialPublishClientsTest {
                 assertEquals(expected, client.publish(draft(client.type), client.requirePublishKey()))
             }
             assertEquals(2, fixture.requests.size)
+        }
+    }
+
+    @Test
+    fun linkedInWriteConflictIsRetryableAndPreservesRetryAfter() = runTest {
+        val cases = listOf(
+            Triple(emptyMap(), """{"code":"CONFLICT","message":"Write conflict"}""", null),
+            Triple(mapOf("Retry-After" to "7"), """{"code":"CONFLICT"}""", 7_000L),
+            Triple(mapOf("Retry-After" to "Sun, 06 Nov 1994 08:49:42 GMT"), "", 5_000L),
+        )
+        for ((headers, body, retryAfter) in cases) {
+            val fixture = FakeHttp(409, body, headers)
+            val client = linkedIn(fixture)
+
+            assertEquals(
+                PublishResult.RetryableError(PublishErrorReason.SERVER_ERROR, retryAfter),
+                client.publish(draft(client.type), client.requirePublishKey()),
+            )
+            assertEquals(1, fixture.requests.size)
+        }
+    }
+
+    @Test
+    fun linkedInDuplicateConflictRemainsPermanentDespiteRetryAfter() = runTest {
+        for (body in listOf(
+            """{"code":"DUPLICATE_CONTENT"}""",
+            """{"message":"Content is a duplicate of urn:li:share:42"}""",
+        )) {
+            val fixture = FakeHttp(409, body, mapOf("Retry-After" to "7"))
+            val client = linkedIn(fixture)
+
+            assertEquals(
+                PublishResult.PermanentError(PublishErrorReason.DUPLICATE_CONTENT),
+                client.publish(draft(client.type), client.requirePublishKey()),
+            )
+            assertEquals(1, fixture.requests.size)
         }
     }
 

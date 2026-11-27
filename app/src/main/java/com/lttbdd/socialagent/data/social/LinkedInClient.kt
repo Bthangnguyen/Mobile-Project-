@@ -36,7 +36,7 @@ internal class LinkedInClient(
 
         val body = buildJsonObject {
             put("author", author)
-            put("commentary", escapeLittleText(draft.text))
+            put("commentary", formatLinkedInCommentary(draft.text))
             put("visibility", "PUBLIC")
             putJsonObject("distribution") {
                 put("feedDistribution", "MAIN_FEED")
@@ -70,7 +70,22 @@ internal class LinkedInClient(
     }
 }
 
-internal fun escapeLittleText(text: String): String = buildString {
+// Nhận hashtag có ít nhất một chữ cái theo quy tắc viết bài của #27.
+private val hashtagPattern = Regex("""(?<![\p{L}\p{M}\p{N}_&/#\\])#(?=[\p{N}_]*\p{L})([\p{L}\p{M}\p{N}_]+)""")
+
+private fun formatLinkedInCommentary(text: String): String = buildString {
+    var start = 0
+    for (hashtag in hashtagPattern.findAll(text)) {
+        appendEscapedLittleText(text.substring(start, hashtag.range.first))
+        append("{hashtag|\\#|")
+        appendEscapedLittleText(hashtag.groupValues[1])
+        append('}')
+        start = hashtag.range.last + 1
+    }
+    appendEscapedLittleText(text.substring(start))
+}
+
+private fun StringBuilder.appendEscapedLittleText(text: String) {
     for (character in text) {
         if (character in "|{}@[]()<>#\\*_~") append('\\')
         append(character)

@@ -88,6 +88,49 @@ class PublishStatusViewModelTest {
         assertTrue(item.canPublishAll)
     }
 
+    // ---------- #39: lý do lỗi ----------
+
+    @Test
+    fun `failed and retrying posts show a readable reason`() {
+        assertEquals(
+            R.string.publish_error_permission_denied,
+            PublishStatusViewModel.reasonFor(state(PostStatus.FAILED, postId = "p", error = "permission_denied")),
+        )
+        assertEquals(
+            R.string.publish_error_rate_limited,
+            PublishStatusViewModel.reasonFor(state(PostStatus.QUEUED, postId = "p", error = "rate_limited")),
+        )
+    }
+
+    @Test
+    fun `old reason is not shown once the post is published or in flight`() {
+        listOf(PostStatus.PUBLISHED, PostStatus.PUBLISHING, PostStatus.HANDED_OFF).forEach {
+            val state = state(it, postId = "p", error = "rate_limited")
+            assertEquals(it.name, null, PublishStatusViewModel.reasonFor(state))
+        }
+    }
+
+    @Test
+    fun `ui state marks queued posts with a reason as retrying`() = runTest {
+        collectState()
+        tracker.topics.value = listOf(
+            topic(
+                "t1",
+                state(PostStatus.QUEUED, draftId = "fb", postId = "p1", error = "network_unavailable"),
+                state(PostStatus.FAILED, draftId = "li", postId = "p2", error = "content_rejected"),
+                state(PostStatus.QUEUED, draftId = "x", postId = "p3"),
+            ),
+        )
+        advanceUntilIdle()
+
+        val channels = viewModel.uiState.value.topics.single().channels
+        assertEquals(listOf(true, false, false), channels.map { it.isRetrying })
+        assertEquals(
+            listOf(R.string.publish_error_network_unavailable, R.string.publish_error_content_rejected, null),
+            channels.map { it.reasonRes },
+        )
+    }
+
     // ---------- #40: mở bài gốc ----------
 
     @Test
@@ -314,6 +357,7 @@ class PublishStatusViewModelTest {
         postId: String? = null,
         needsConfirmation: Boolean = false,
         url: String? = null,
+        error: String? = null,
     ) = ChannelPublishState(
         draftId = draftId,
         channel = ChannelType.FACEBOOK,
@@ -322,6 +366,7 @@ class PublishStatusViewModelTest {
         postId = postId,
         needsConfirmation = needsConfirmation,
         url = url,
+        errorReason = error,
     )
 
     private class FakeTracker : PublishTracker {

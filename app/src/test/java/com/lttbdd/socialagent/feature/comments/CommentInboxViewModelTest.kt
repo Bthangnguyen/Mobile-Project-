@@ -60,6 +60,10 @@ class CommentInboxViewModelTest {
         advanceUntilIdle()
         assertEquals(Query(ChannelType.FACEBOOK, "shared", CommentStatus.REPLIED, 31, null), dao.lastQuery)
 
+        inbox.selectChannel(ChannelType.FACEBOOK)
+        advanceUntilIdle()
+        assertEquals(facebookPost, inbox.uiState.value.filter.post)
+
         inbox.selectChannel(ChannelType.LINKEDIN)
         advanceUntilIdle()
 
@@ -214,6 +218,40 @@ class CommentInboxViewModelTest {
         assertEquals(30, inbox.uiState.value.comments.size)
     }
 
+    @Test
+    fun changingFiltersRecoversAfterCommentOrPostReadFails() = runTest {
+        val dao = FakeCommentDao().apply { fail = true }
+        val inbox = openInbox(dao)
+        assertEquals(CommentInboxEmptyState.ERROR, inbox.uiState.value.emptyState)
+
+        dao.fail = false
+        inbox.selectChannel(ChannelType.FACEBOOK)
+        advanceUntilIdle()
+        assertEquals(facebookPost, inbox.uiState.value.posts.single().key)
+        assertFalse(inbox.uiState.value.hasError)
+
+        dao.failPosts = true
+        inbox.selectChannel(ChannelType.LINKEDIN)
+        advanceUntilIdle()
+        assertEquals(CommentInboxEmptyState.ERROR, inbox.uiState.value.emptyState)
+
+        dao.failPosts = false
+        inbox.selectStatus(CommentStatus.REPLIED)
+        advanceUntilIdle()
+        assertEquals(linkedinPost, inbox.uiState.value.posts.single().key)
+        assertEquals(CommentInboxEmptyState.NO_RESULTS, inbox.uiState.value.emptyState)
+    }
+
+    @Test
+    fun emptyInboxDistinguishesUnfilteredAndFilteredResults() = runTest {
+        val inbox = openInbox(FakeCommentDao(commentCount = 0))
+        assertEquals(CommentInboxEmptyState.NO_COMMENTS, inbox.uiState.value.emptyState)
+
+        inbox.selectStatus(CommentStatus.REPLIED)
+        advanceUntilIdle()
+        assertEquals(CommentInboxEmptyState.NO_RESULTS, inbox.uiState.value.emptyState)
+    }
+
     private fun TestScope.openInbox(dao: FakeCommentDao): CommentInboxViewModel {
         val inbox = CommentInboxViewModel(CommentInboxRepository(dao))
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { inbox.uiState.collect {} }
@@ -249,6 +287,7 @@ class CommentInboxViewModelTest {
         val queries = mutableListOf<Query>()
         val lastQuery get() = queries.lastOrNull()
         var fail = false
+        var failPosts = false
         var postReads = 0
 
         override fun observePageAfter(
@@ -278,22 +317,12 @@ class CommentInboxViewModelTest {
             })
         }
 
-        override fun observePageAtOffset(
-            channel: ChannelType?,
-            remotePostId: String?,
-            status: CommentStatus?,
-            limit: Int,
-            offset: Long,
-        ): Flow<List<CommentEntity>> = error("Hộp thư phải phân trang theo khóa")
-
-        override fun observePostKeys(channel: ChannelType?): Flow<List<CommentPostKey>> =
-            error("Hộp thư phải đọc cả nhãn bài viết")
-
         override fun observePostPreviews(
             channel: ChannelType?,
             published: PostStatus,
         ): Flow<List<CommentPostPreview>> = flow {
             postReads++
+            if (failPosts) throw IOException("test")
             val posts = listOf(facebookPost, linkedinPost).filter {
                 channel == null || it.channel == channel
             }
@@ -303,6 +332,7 @@ class CommentInboxViewModelTest {
         override fun observe(channel: ChannelType?, remotePostId: String?, status: CommentStatus?): Flow<List<CommentEntity>> =
             error("Hộp thư phải đọc có giới hạn")
 
+        override suspend fun deleteByChannel(channel: ChannelType) = error("Không ghi trong hộp thư")
         override suspend fun upsertAll(comments: List<CommentEntity>) = error("Không ghi trong hộp thư")
         override suspend fun updateStatus(channel: ChannelType, id: String, status: CommentStatus) = error("Không ghi trong hộp thư")
         override suspend fun updateCategory(channel: ChannelType, id: String, category: CommentCategory) = error("Không ghi trong hộp thư")

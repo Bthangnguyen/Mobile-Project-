@@ -130,6 +130,39 @@ class CommentInboxRepositoryTest {
         ), posts)
     }
 
+    @Test
+    fun postPreviewsNormalizeLongUnicodeWhitespaceBeforeLimitingExcerpt() = runTest {
+        val dao = db.commentDao()
+        val whitespace = "\u00A0\u2003\t".repeat(60)
+        val longText = "🔔".repeat(125)
+        savePublishedPost(facebook, "prefix", "\u00A0".repeat(150) + "Nội dung Facebook")
+        savePublishedPost(facebook, "middle", "Đầu" + whitespace.repeat(1_000) + "cuối")
+        savePublishedPost(facebook, "repeated", "word  ".repeat(35_000))
+        savePublishedPost(facebook, "long", "A" + whitespace + longText.repeat(1600))
+        savePublishedPost(facebook, "boundary", "🔔".repeat(120) + whitespace + "suffix")
+        savePublishedPost(facebook, "trailing", "🔔".repeat(120) + whitespace)
+        savePublishedPost(facebook, "blank", whitespace)
+        dao.upsertAll(listOf(
+            comment("prefix", facebook, "prefix", 4),
+            comment("middle", facebook, "middle", 3),
+            comment("long", facebook, "long", 2),
+            comment("boundary", facebook, "boundary", 1),
+            comment("trailing", facebook, "trailing", 0),
+            comment("blank", facebook, "blank", -1),
+            comment("repeated", facebook, "repeated", -2),
+        ))
+
+        val previews = dao.observePostPreviews(facebook).first()
+
+        assertEquals(
+            listOf(
+                "Nội dung Facebook", "Đầu cuối", "A " + "🔔".repeat(119),
+                "🔔".repeat(120) + " ", "🔔".repeat(120), null, "word ".repeat(24) + "w",
+            ),
+            previews.map { it.excerpt },
+        )
+    }
+
     private suspend fun savePublishedPost(channel: ChannelType, remoteId: String, text: String) {
         val id = "${channel.name}-$remoteId"
         db.draftDao().upsert(

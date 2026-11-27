@@ -85,17 +85,18 @@ class CommentInboxFragment : Fragment() {
             filter.post?.let { postLabel(it, excerpts[it]) } ?: getString(R.string.comment_inbox_all_posts),
             false,
         )
-        val hasFilters = filter.channel != null || filter.post != null || filter.status != null
         binding.postFilter.isEnabled = filter.post != null || state.posts.isNotEmpty()
-        binding.clearFilters.isEnabled = hasFilters
+        binding.clearFilters.isEnabled = state.hasFilters
         binding.loading.isVisible = state.isLoading
         binding.retry.isVisible = state.hasError
-        binding.message.isVisible = !state.isLoading && state.comments.isEmpty()
-        binding.message.setText(when {
-            state.hasError -> R.string.comment_inbox_load_failed
-            hasFilters -> R.string.comment_inbox_no_results
-            else -> R.string.comment_inbox_empty
-        })
+        val message = when (state.emptyState) {
+            CommentInboxEmptyState.ERROR -> R.string.comment_inbox_load_failed
+            CommentInboxEmptyState.NO_RESULTS -> R.string.comment_inbox_no_results
+            CommentInboxEmptyState.NO_COMMENTS -> R.string.comment_inbox_empty
+            null -> null
+        }
+        binding.message.isVisible = message != null
+        if (message != null) binding.message.setText(message)
         binding.previousPage.isVisible = state.hasPrevious && !state.isLoading && !state.hasError
         binding.nextPage.isVisible = state.hasMore
         binding.comments.isVisible = state.comments.isNotEmpty()

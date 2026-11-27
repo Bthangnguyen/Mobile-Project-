@@ -8,6 +8,7 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.lttbdd.socialagent.R
 import com.lttbdd.socialagent.core.database.dao.CommentPostKey
+import com.lttbdd.socialagent.core.database.dao.POST_EXCERPT_LENGTH
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.Comment
 import com.lttbdd.socialagent.core.model.CommentStatus
@@ -52,16 +53,16 @@ internal class CommentInboxAdapter : ListAdapter<CommentInboxItem, CommentInboxA
     }
 }
 
-private val postWhitespace = Regex("""[\s\p{Z}]+""")
-private const val POST_EXCERPT_LENGTH = 120
-
 internal fun Context.inboxPostLabel(post: CommentPostKey, excerpt: String?): String {
     val channel = getString(post.channel.inboxLabel())
     val text = excerpt.orEmpty()
     val truncated = text.codePointCount(0, text.length) > POST_EXCERPT_LENGTH
-    val excerptText = if (truncated) text.substring(0, text.offsetByCodePoints(0, POST_EXCERPT_LENGTH)) else text
-    val preview = postWhitespace.replace(excerptText, " ").trim()
-    if (preview.isEmpty()) return getString(R.string.comment_inbox_channel_post, channel, post.remotePostId)
+    if (text.isEmpty()) return getString(R.string.comment_inbox_channel_post, channel, post.remotePostId)
+    val preview = if (truncated) {
+        text.substring(0, text.offsetByCodePoints(0, POST_EXCERPT_LENGTH)).trimEnd()
+    } else {
+        text
+    }
     val label = if (truncated) "$preview…" else preview
     return getString(R.string.comment_inbox_channel_post_excerpt, channel, label)
 }

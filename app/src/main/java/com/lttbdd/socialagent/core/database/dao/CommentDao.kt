@@ -19,6 +19,10 @@ data class CommentPostKey(val channel: ChannelType, val remotePostId: String)
 
 data class CommentPostPreview(@Embedded val key: CommentPostKey, val excerpt: String?)
 
+internal const val POST_EXCERPT_LENGTH = 120
+private const val POST_EXCERPT_LOOKAHEAD = POST_EXCERPT_LENGTH + 1
+private const val WHITESPACE_SCAN_SIZE = 128
+
 @Dao
 abstract class CommentDao {
 
@@ -36,32 +40,6 @@ abstract class CommentDao {
         channel: ChannelType? = null,
         remotePostId: String? = null,
         status: CommentStatus? = null,
-    ): Flow<List<CommentEntity>>
-
-    /** Đọc tối đa số dòng cần hiển thị theo thứ tự ổn định khi thời gian trùng nhau. */
-    open fun observePage(
-        channel: ChannelType?,
-        remotePostId: String?,
-        status: CommentStatus?,
-        limit: Int,
-    ): Flow<List<CommentEntity>> = observePageAtOffset(channel, remotePostId, status, limit, offset = 0)
-
-    @Query(
-        """
-        SELECT * FROM comments
-        WHERE (:channel IS NULL OR channel = :channel)
-          AND (:remotePostId IS NULL OR (:channel IS NOT NULL AND remotePostId = :remotePostId))
-          AND (:status IS NULL OR status = :status)
-        ORDER BY createdAtMillis DESC, channel ASC, id ASC
-        LIMIT :limit OFFSET :offset
-        """,
-    )
-    abstract fun observePageAtOffset(
-        channel: ChannelType?,
-        remotePostId: String?,
-        status: CommentStatus?,
-        limit: Int,
-        offset: Long,
     ): Flow<List<CommentEntity>>
 
     /** Đọc các bình luận đứng sau khóa theo thứ tự hiển thị, kể cả khi dòng làm mốc đã bị xóa. */
@@ -92,28 +70,58 @@ abstract class CommentDao {
         afterId: String?,
     ): Flow<List<CommentEntity>>
 
+    /**
+     * Lấy tối đa 121 code point đã chuẩn hóa từ bản nháp của lần đăng thành công.
+     * Ký tự thứ 121 giúp UI biết có cần thêm dấu ba chấm.
+     */
     @Query(
         """
-        SELECT channel, remotePostId FROM comments
-        WHERE (:channel IS NULL OR channel = :channel)
-        GROUP BY channel, remotePostId
-        ORDER BY MAX(createdAtMillis) DESC, channel ASC, remotePostId ASC
-        """,
-    )
-    abstract fun observePostKeys(channel: ChannelType?): Flow<List<CommentPostKey>>
-
-    /** Lấy một mô tả cho mỗi bài từ bản nháp còn lưu của lần đăng thành công. */
-    @Query(
-        """
+        WITH whitespace(chars) AS (
+            VALUES (char(9, 10, 11, 12, 13, 32, 133, 160, 5760, 8192, 8193, 8194, 8195, 8196,
+                         8197, 8198, 8199, 8200, 8201, 8202, 8232, 8233, 8239, 8287, 12288))
+        )
         SELECT related.channel, related.remotePostId,
                (
-                   SELECT substr(trim(draft.text, char(9, 10, 13, 32)), 1, 121)
+                   SELECT (
+                       WITH RECURSIVE preview(position, text, scanSize) AS (
+                           SELECT 1, '', $WHITESPACE_SCAN_SIZE
+                           UNION ALL
+                           SELECT CASE
+                                      WHEN instr(chars, substr(draft.text, position, 1)) > 0
+                                       AND instr(chars, substr(draft.text, position + 1, 1)) > 0
+                                      THEN position + length(substr(draft.text, position, scanSize))
+                                           - length(ltrim(substr(draft.text, position, scanSize), chars))
+                                      ELSE position + 1
+                                  END,
+                                  CASE
+                                      WHEN instr(chars, substr(draft.text, position, 1)) = 0
+                                      THEN text || substr(draft.text, position, 1)
+                                      WHEN text = '' OR substr(text, -1) = ' ' THEN text
+                                      ELSE text || ' '
+                                  END,
+                                  -- Chỉ tăng kích thước khi cả khối vẫn là khoảng trắng.
+                                  CASE
+                                      WHEN instr(chars, substr(draft.text, position, 1)) > 0
+                                       AND ltrim(substr(draft.text, position, scanSize), chars) = ''
+                                      THEN scanSize * 2
+                                      ELSE $WHITESPACE_SCAN_SIZE
+                                  END
+                           FROM preview
+                           WHERE substr(draft.text, position, 1) <> ''
+                             AND (length(text) < $POST_EXCERPT_LOOKAHEAD OR substr(text, -1) = ' ')
+                       )
+                       SELECT nullif(substr(rtrim(text), 1, $POST_EXCERPT_LOOKAHEAD), '')
+                       FROM preview
+                       ORDER BY position DESC
+                       LIMIT 1
+                   )
                    FROM posts AS post
                    JOIN drafts AS draft ON draft.id = post.draftId AND draft.channel = post.channel
+                   CROSS JOIN whitespace
                    WHERE post.channel = related.channel
                      AND post.remotePostId = related.remotePostId
                      AND post.status = :published
-                     AND trim(draft.text, char(9, 10, 13, 32)) <> ''
+                     AND ltrim(draft.text, chars) <> ''
                    ORDER BY post.updatedAtMillis DESC, post.id ASC
                    LIMIT 1
                ) AS excerpt

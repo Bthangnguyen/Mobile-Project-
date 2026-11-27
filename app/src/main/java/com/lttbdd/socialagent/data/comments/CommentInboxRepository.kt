@@ -43,8 +43,6 @@ class CommentInboxRepository @Inject constructor(private val dao: CommentDao) {
         ).distinctUntilChanged().map { entries -> entries.map { it.toModel() } }
     }
 
-    fun observePosts(channel: ChannelType?): Flow<List<CommentPostKey>> = dao.observePostKeys(channel)
-
     fun observePostPreviews(channel: ChannelType?): Flow<List<CommentPostPreview>> =
         dao.observePostPreviews(channel).distinctUntilChanged()
 }

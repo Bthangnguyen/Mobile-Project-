@@ -19,9 +19,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.flow.update
@@ -35,8 +39,20 @@ data class CommentInboxState(
     val hasMore: Boolean = false,
     val hasError: Boolean = false,
 ) {
+    val hasFilters: Boolean get() = filter.channel != null || filter.post != null || filter.status != null
+
+    val emptyState: CommentInboxEmptyState?
+        get() = when {
+            isLoading || comments.isNotEmpty() -> null
+            hasError -> CommentInboxEmptyState.ERROR
+            hasFilters -> CommentInboxEmptyState.NO_RESULTS
+            else -> CommentInboxEmptyState.NO_COMMENTS
+        }
+
     val hasPrevious: Boolean get() = after != null
 }
+
+enum class CommentInboxEmptyState { NO_COMMENTS, NO_RESULTS, ERROR }
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -47,10 +63,18 @@ class CommentInboxViewModel @Inject constructor(repository: CommentInboxReposito
 
     val uiState: StateFlow<CommentInboxState> = retry.flatMapLatest {
         val posts = request.map { it.filter.channel }.distinctUntilChanged().flatMapLatest { channel ->
-            repository.observePostPreviews(channel).map { channel to it }
+            flow<List<CommentPostPreview>?> {
+                emitAll(repository.observePostPreviews(channel))
+            }.retryWhen { _, _ ->
+                val failedRequest = request.value
+                emit(null)
+                // Đổi bộ lọc sẽ đọc lại danh sách bài sau lỗi, kể cả khi vẫn ở cùng kênh.
+                request.first { it != failedRequest }
+                true
+            }.map { channel to it }
         }
         val pages = request.flatMapLatest { query ->
-            repository.observeComments(query.filter, PAGE_SIZE + 1, query.after)
+            flow { emitAll(repository.observeComments(query.filter, PAGE_SIZE + 1, query.after)) }
                 .transform { comments ->
                     if (query.after != null && comments.isEmpty()) {
                         // Về trang đầu nếu dữ liệu thay đổi và trang hiện tại biến mất.
@@ -66,16 +90,20 @@ class CommentInboxViewModel @Inject constructor(repository: CommentInboxReposito
                     }
                 }.onStart {
                     emit(CommentInboxState(filter = query.filter, after = query.after))
+                }.catch {
+                    emit(CommentInboxState(filter = query.filter, after = query.after, isLoading = false, hasError = true))
                 }
         }
         combine(posts, pages) { (postChannel, previews), page ->
-            if (postChannel == page.filter.channel) page.copy(posts = previews)
-            else CommentInboxState(filter = page.filter, after = page.after)
+            when {
+                postChannel != page.filter.channel -> CommentInboxState(filter = page.filter, after = page.after)
+                previews == null -> CommentInboxState(
+                    filter = page.filter, after = page.after, isLoading = false, hasError = true,
+                )
+                else -> page.copy(posts = previews)
+            }
         }.onStart {
             emit(CommentInboxState(filter = request.value.filter, after = request.value.after))
-        }.catch {
-            val query = request.value
-            emit(CommentInboxState(filter = query.filter, after = query.after, isLoading = false, hasError = true))
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CommentInboxState())
 

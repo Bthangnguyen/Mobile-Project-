@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingTop="@dimen/component_spacing_small"
+    android:paddingBottom="@dimen/component_spacing_small">
+
+    <com.lttbdd.socialagent.core.ui.components.AppDivider
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="@dimen/component_spacing_small" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/tvStepName"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textAppearance="@style/TextAppearance.SocialAgent.Title" />
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/tvStepStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textAppearance="@style/TextAppearance.SocialAgent.Caption" />
+    </LinearLayout>
+
+    <com.google.android.material.textview.MaterialTextView
+        android:id="@+id/tvStepMetrics"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/component_spacing_xsmall"
+        android:textAppearance="@style/TextAppearance.SocialAgent.Caption" />
+
+    <com.google.android.material.textview.MaterialTextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/component_spacing_small"
+        android:text="@string/agent_log_label_prompt"
+        android:textAppearance="@style/TextAppearance.SocialAgent.Caption" />
+
+    <com.google.android.material.textview.MaterialTextView
+        android:id="@+id/tvStepPrompt"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/component_spacing_xsmall"
+        android:textAppearance="@style/TextAppearance.SocialAgent.Body" />
+
+    <com.google.android.material.textview.MaterialTextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/component_spacing_small"
+        android:text="@string/agent_log_label_output"
+        android:textAppearance="@style/TextAppearance.SocialAgent.Caption" />
+
+    <com.google.android.material.textview.MaterialTextView
+        android:id="@+id/tvStepOutput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/component_spacing_xsmall"
+        android:textAppearance="@style/TextAppearance.SocialAgent.Body" />
+
+    <com.google.android.material.textview.MaterialTextView
+        android:id="@+id/tvStepError"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/component_spacing_xsmall"
+        android:textAppearance="@style/TextAppearance.SocialAgent.Caption"
+        android:textColor="@color/brand_error"
+        android:visibility="gone" />
+</LinearLayout>

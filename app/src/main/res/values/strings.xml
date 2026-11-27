@@ -335,4 +335,46 @@
     <string name="publish_error_storage">Could not save to the device storage.</string>
     <string name="publish_error_unknown">The channel returned an error.</string>
     <string name="publish_status_action_failed">Could not update the publishing queue. Please try again.</string>
+
+    <!-- Feature F2: Agent execution logs (Issue #31) -->
+    <string name="agent_log_title">Agent logs</string>
+    <string name="agent_log_subtitle">Inspect each sub-agent step, prompt, output, token count, and estimated cost.</string>
+    <string name="agent_log_settings_description">View recorded agent steps, prompts, outputs, tokens, and estimated costs stored on this device.</string>
+    <string name="agent_log_settings_manage">View agent logs</string>
+    <string name="agent_log_filter_all">All</string>
+    <string name="agent_log_action_clear">Clear logs</string>
+    <string name="agent_log_empty_title">No agent logs yet</string>
+    <string name="agent_log_empty_message">Runs from the AI agent will appear here with per-step prompts, outputs, tokens, and estimated costs.</string>
+    <string name="agent_log_load_error_title">Could not load agent logs</string>
+    <string name="agent_log_load_error_message">Something went wrong while reading saved agent logs. Please reopen and try again.</string>
+    <string name="agent_log_load_failed">Could not load agent logs. Please try again.</string>
+    <string name="agent_log_clear_dialog_title">Clear all agent logs?</string>
+    <string name="agent_log_clear_dialog_message">This removes all saved agent run logs from this device. Your drafts and posts are not affected.</string>
+    <string name="agent_log_clear_confirm">Clear logs</string>
+    <string name="agent_log_cleared">Agent logs cleared.</string>
+    <string name="agent_log_clear_failed">Could not clear agent logs. Please try again.</string>
+    <string name="agent_log_untitled_topic">Untitled topic</string>
+    <string name="agent_log_status_success">Completed</string>
+    <string name="agent_log_status_failed">Failed</string>
+    <string name="agent_log_tokens_summary_format">%1$s tokens (%2$s in / %3$s out)</string>
+    <string name="agent_log_run_meta_format">%1$s · %2$s · %3$s</string>
+    <string name="agent_log_show_steps">Show steps</string>
+    <string name="agent_log_hide_steps">Hide steps</string>
+    <string name="agent_log_step_outline">1. Outline</string>
+    <string name="agent_log_step_draft">2. Draft</string>
+    <string name="agent_log_step_self_review">3. Self-review</string>
+    <string name="agent_log_step_image_prompt">4. Image description</string>
+    <string name="agent_log_step_image">5. Image generation</string>
+    <string name="agent_log_step_package">6. Package</string>
+    <string name="agent_log_step_status_running">Running</string>
+    <string name="agent_log_step_status_succeeded">Done</string>
+    <string name="agent_log_step_status_failed">Failed</string>
+    <string name="agent_log_step_status_cancelled">Cancelled</string>
+    <string name="agent_log_step_metrics_format">Tokens: %1$s in / %2$s out · Cost: %3$s</string>
+    <string name="agent_log_label_prompt">Prompt / Brief</string>
+    <string name="agent_log_label_output">Output</string>
+    <string name="agent_log_empty_field">(None)</string>
+    <string name="agent_log_error_code_format">Error code: %1$s</string>
+    <string name="agent_log_cost_unknown">Unknown</string>
+    <string name="agent_log_cost_partial_format">%1$s + unknown</string>
 </resources>

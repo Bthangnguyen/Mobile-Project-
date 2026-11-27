@@ -333,4 +333,46 @@
     <string name="publish_error_storage">Không ghi được vào bộ nhớ máy.</string>
     <string name="publish_error_unknown">Kênh báo lỗi khi đăng bài.</string>
     <string name="publish_status_action_failed">Không cập nhật được hàng đợi đăng bài. Vui lòng thử lại.</string>
+
+    <!-- Feature F2: Nhật ký agent (Issue #31) -->
+    <string name="agent_log_title">Nhật ký agent</string>
+    <string name="agent_log_subtitle">Xem từng bước chạy của sub-agent, prompt, kết quả, số token và chi phí ước tính.</string>
+    <string name="agent_log_settings_description">Xem nhật ký các bước chạy agent, prompt, kết quả, số token và chi phí lưu trên thiết bị.</string>
+    <string name="agent_log_settings_manage">Xem nhật ký agent</string>
+    <string name="agent_log_filter_all">Tất cả</string>
+    <string name="agent_log_action_clear">Xóa nhật ký</string>
+    <string name="agent_log_empty_title">Chưa có nhật ký agent</string>
+    <string name="agent_log_empty_message">Các lượt chạy của AI agent sẽ hiện tại đây kèm prompt, kết quả, token và chi phí từng bước.</string>
+    <string name="agent_log_load_error_title">Không thể tải nhật ký agent</string>
+    <string name="agent_log_load_error_message">Đã xảy ra lỗi khi đọc nhật ký agent đã lưu. Vui lòng mở lại và thử lại.</string>
+    <string name="agent_log_load_failed">Không thể tải nhật ký agent. Vui lòng thử lại.</string>
+    <string name="agent_log_clear_dialog_title">Xóa toàn bộ nhật ký agent?</string>
+    <string name="agent_log_clear_dialog_message">Thao tác này xóa toàn bộ nhật ký chạy agent trên thiết bị. Bản nháp và bài đăng của bạn không bị ảnh hưởng.</string>
+    <string name="agent_log_clear_confirm">Xóa nhật ký</string>
+    <string name="agent_log_cleared">Đã xóa nhật ký agent.</string>
+    <string name="agent_log_clear_failed">Không thể xóa nhật ký agent. Vui lòng thử lại.</string>
+    <string name="agent_log_untitled_topic">Chủ đề chưa đặt tên</string>
+    <string name="agent_log_status_success">Hoàn tất</string>
+    <string name="agent_log_status_failed">Có lỗi</string>
+    <string name="agent_log_tokens_summary_format">%1$s token (%2$s vào / %3$s ra)</string>
+    <string name="agent_log_run_meta_format">%1$s · %2$s · %3$s</string>
+    <string name="agent_log_show_steps">Xem chi tiết bước</string>
+    <string name="agent_log_hide_steps">Thu gọn</string>
+    <string name="agent_log_step_outline">1. Dàn ý</string>
+    <string name="agent_log_step_draft">2. Bản nháp</string>
+    <string name="agent_log_step_self_review">3. Tự rà quy tắc kênh</string>
+    <string name="agent_log_step_image_prompt">4. Mô tả ảnh</string>
+    <string name="agent_log_step_image">5. Sinh ảnh</string>
+    <string name="agent_log_step_package">6. Đóng gói</string>
+    <string name="agent_log_step_status_running">Đang chạy</string>
+    <string name="agent_log_step_status_succeeded">Xong</string>
+    <string name="agent_log_step_status_failed">Lỗi</string>
+    <string name="agent_log_step_status_cancelled">Đã hủy</string>
+    <string name="agent_log_step_metrics_format">Token: %1$s vào / %2$s ra · Chi phí: %3$s</string>
+    <string name="agent_log_label_prompt">Prompt / Brief</string>
+    <string name="agent_log_label_output">Kết quả</string>
+    <string name="agent_log_empty_field">(Không có)</string>
+    <string name="agent_log_error_code_format">Mã lỗi: %1$s</string>
+    <string name="agent_log_cost_unknown">Chưa rõ</string>
+    <string name="agent_log_cost_partial_format">%1$s + chưa rõ</string>
 </resources>

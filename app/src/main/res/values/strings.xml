@@ -234,7 +234,11 @@
     <string name="compose_channel_facebook">Facebook Page</string>
     <string name="compose_channel_linkedin">LinkedIn</string>
     <string name="action_continue">Continue</string>
-    <string name="compose_submit_success">Brief created successfully</string>
+    <string name="compose_submit_success">Creating drafts for the selected channels…</string>
+    <string name="compose_generating">Creating drafts…</string>
+    <string name="compose_generation_saved">Drafts saved. Open Posts to preview them.</string>
+    <string name="compose_generation_partial">Some drafts could not be created. Saved drafts are available in Posts.</string>
+    <string name="compose_generation_failed">Could not create any drafts. Try again.</string>
 
     <!-- Tone options -->
     <string name="tone_professional">Professional</string>
@@ -279,6 +283,8 @@
     <string name="preview_linkedin_see_more">…see more</string>
     <string name="preview_linkedin_actions">Like · Comment · Repost · Send</string>
     <string name="preview_placeholder_body">Start typing to preview your post…</string>
+    <string name="preview_draft_image">Draft image</string>
+    <string name="preview_draft_image_unavailable">No image is available for this draft.</string>
     <string name="preview_editor_hint">Edit post content</string>
     <string name="preview_char_count_format">%1$d / %2$d characters</string>
     <string name="preview_char_excess_format">Exceeds limit by %1$d characters</string>

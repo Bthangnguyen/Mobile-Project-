@@ -4,10 +4,19 @@ import androidx.lifecycle.SavedStateHandle
 import com.lttbdd.socialagent.R
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.ContentLanguage
+import com.lttbdd.socialagent.data.fake.FakeContentAgent
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -17,15 +26,24 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class ComposeViewModelTest {
+
+    private val agent = FakeContentAgent(stepDelayMillis = 0)
 
     private lateinit var savedStateHandle: SavedStateHandle
     private lateinit var viewModel: ComposeViewModel
 
     @Before
     fun setUp() {
+        Dispatchers.setMain(StandardTestDispatcher())
         savedStateHandle = SavedStateHandle()
-        viewModel = ComposeViewModel(savedStateHandle)
+        viewModel = ComposeViewModel(savedStateHandle, agent)
+    }
+
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
     }
 
     @Test
@@ -193,6 +211,13 @@ class ComposeViewModelTest {
         val submittedEvent = event as ComposeEvent.BriefSubmitted
         assertEquals(brief, submittedEvent.brief)
         assertEquals(R.string.compose_submit_success, submittedEvent.messageRes)
+        assertTrue(viewModel.uiState.value.isGenerating)
+        advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.isGenerating)
+        assertEquals(
+            ComposeEvent.GenerationFinished(R.string.compose_generation_saved),
+            viewModel.events.first(),
+        )
     }
 
     @Test
@@ -222,9 +247,10 @@ class ComposeViewModelTest {
         viewModel.onChannelToggled(ChannelType.FACEBOOK, true)
 
         viewModel.onSubmit()
+        advanceUntilIdle()
         viewModel.onSubmit()
 
-        val emittedEvents = viewModel.events.take(2).toList()
+        val emittedEvents = viewModel.events.filterIsInstance<ComposeEvent.BriefSubmitted>().take(2).toList()
         assertEquals(2, emittedEvents.size)
         val firstBrief = (emittedEvents[0] as ComposeEvent.BriefSubmitted).brief
         val secondBrief = (emittedEvents[1] as ComposeEvent.BriefSubmitted).brief
@@ -243,7 +269,7 @@ class ComposeViewModelTest {
         viewModel.onChannelToggled(ChannelType.FACEBOOK, true)
         viewModel.onChannelToggled(ChannelType.LINKEDIN, true)
 
-        val restoredViewModel = ComposeViewModel(savedStateHandle)
+        val restoredViewModel = ComposeViewModel(savedStateHandle, agent)
         val restoredForm = restoredViewModel.uiState.value.formState
 
         assertEquals("Saved Topic", restoredForm.topic)

@@ -127,5 +127,28 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:text="@string/channel_settings_manage" />
+
+        <TextView
+            android:id="@+id/agent_logs_section_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="@string/agent_log_title"
+            android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="@string/agent_log_settings_description"
+            android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/manage_agent_logs"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/agent_log_settings_manage" />
     </LinearLayout>
 </ScrollView>

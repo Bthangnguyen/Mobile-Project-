@@ -70,6 +70,9 @@
         <action
             android:id="@+id/action_settings_to_model_selection"
             app:destination="@id/modelSelectionFragment" />
+        <action
+            android:id="@+id/action_settings_to_agent_logs"
+            app:destination="@id/agentLogFragment" />
     </fragment>
 
     <fragment
@@ -104,5 +107,11 @@
             app:argType="string"
             app:nullable="true" />
     </fragment>
+
+    <!-- Nhật ký agent (F2 — Issue #31) mở từ Cài đặt. -->
+    <fragment
+        android:id="@+id/agentLogFragment"
+        android:name="com.lttbdd.socialagent.feature.agentlog.AgentLogFragment"
+        android:label="@string/agent_log_title" />
 
 </navigation>

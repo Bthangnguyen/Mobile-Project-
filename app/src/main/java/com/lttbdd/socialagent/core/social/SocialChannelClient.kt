@@ -5,6 +5,7 @@ import com.lttbdd.socialagent.core.model.Comment
 import com.lttbdd.socialagent.core.model.Draft
 import com.lttbdd.socialagent.core.model.PostMetrics
 import com.lttbdd.socialagent.core.model.PublishResult
+import com.lttbdd.socialagent.core.model.ReconcileResult
 
 /**
  * HỢP ĐỒNG gọi API một mạng xã hội. Chủ sở hữu: B (mảng Mạng xã hội).
@@ -31,4 +32,19 @@ interface SocialChannelClient {
 
     /** Số follower hiện tại của tài khoản/Page, dùng cho dashboard F7. */
     suspend fun fetchFollowerCount(): Int
+
+    /**
+     * Đối soát (#94): tìm bài đã đăng từ [draft] sau thời điểm [sinceMillis] (so khớp nội dung + thời gian tạo),
+     * dùng cho bài không rõ kết quả trước khi hàng đợi quyết định đăng lại. KHÔNG được tạo bài mới.
+     *
+     * Chỉ trả [ReconcileResult.NotFound] khi đã kiểm tra đủ và chắc chắn chưa có bài, vì hàng đợi sẽ đăng lại.
+     * Mặc định trả [ReconcileResult.Unavailable] để Fake và client cũ không phải sửa.
+     */
+    suspend fun findPublishedPost(draft: Draft, sinceMillis: Long): ReconcileResult =
+        ReconcileResult.Unavailable(RECONCILE_NOT_SUPPORTED)
+
+    companion object {
+        /** Lý do mặc định của [findPublishedPost] khi kênh chưa hỗ trợ đối soát. */
+        const val RECONCILE_NOT_SUPPORTED = "not_supported"
+    }
 }

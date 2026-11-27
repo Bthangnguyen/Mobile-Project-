@@ -2,31 +2,40 @@ package com.lttbdd.socialagent.data.fake
 
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.Draft
+import com.lttbdd.socialagent.core.model.PublishResult
+import com.lttbdd.socialagent.core.model.ReconcileResult
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
+/** Kênh giả phải đối soát đúng để test hàng đợi và dựng UI (#94). */
 class FakeSocialChannelClientTest {
 
     private val client = FakeSocialChannelClient(ChannelType.FACEBOOK, latencyMillis = 0)
-    private val draft = Draft(id = "d1", topicId = "t1", channel = ChannelType.FACEBOOK, text = "Hello")
+
+    private fun draft(id: String) = Draft(id = id, topicId = "t", channel = ChannelType.FACEBOOK, text = "Nội dung $id")
 
     @Test
-    fun `publish twice with same key does not create duplicate post`() = runTest {
-        val first = client.publish(draft, idempotencyKey = "key-1")
-        val second = client.publish(draft, idempotencyKey = "key-1")
+    fun `published draft is found with the same remote id and link`() = runTest {
+        val published = client.publish(draft("d1"), idempotencyKey = "k1") as PublishResult.Success
 
-        assertEquals(first, second)
-        assertEquals(1, client.publishedCount)
+        assertEquals(
+            ReconcileResult.Found(published.remotePostId, published.url),
+            client.findPublishedPost(draft("d1"), sinceMillis = 0),
+        )
     }
 
     @Test
-    fun `publish with different keys creates separate posts`() = runTest {
-        val first = client.publish(draft, idempotencyKey = "key-1")
-        val second = client.publish(draft, idempotencyKey = "key-2")
+    fun `draft that was never published is not found`() = runTest {
+        client.publish(draft("d1"), idempotencyKey = "k1")
 
-        assertNotEquals(first, second)
-        assertEquals(2, client.publishedCount)
+        assertEquals(ReconcileResult.NotFound, client.findPublishedPost(draft("d2"), sinceMillis = 0))
+    }
+
+    @Test
+    fun `reconcile never creates a post`() = runTest {
+        client.findPublishedPost(draft("d1"), sinceMillis = 0)
+
+        assertEquals(0, client.publishedCount)
     }
 }

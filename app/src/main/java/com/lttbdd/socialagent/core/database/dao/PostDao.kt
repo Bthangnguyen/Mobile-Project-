@@ -141,6 +141,37 @@ interface PostDao {
         published: PostStatus = PostStatus.PUBLISHED,
     ): Int
 
+    /**
+     * Đối soát tự động (#94) tìm thấy bài không rõ kết quả trên kênh: chuyển sang [PostStatus.PUBLISHED] và lưu
+     * `remotePostId`/link. Cùng điều kiện với [resolveUnknownAsPublished] nên không ghi đè thao tác của người dùng.
+     */
+    @Query(
+        """
+        UPDATE posts
+        SET status = :published, remotePostId = :remotePostId, url = :url, outcomeUnknown = 0, errorMessage = NULL,
+            updatedAtMillis = :nowMillis
+        WHERE id = :id AND status = :publishing AND outcomeUnknown = 1 AND remotePostId IS NULL
+        """,
+    )
+    suspend fun resolveUnknownByReconcile(
+        id: String,
+        remotePostId: String,
+        url: String,
+        nowMillis: Long,
+        publishing: PostStatus = PostStatus.PUBLISHING,
+        published: PostStatus = PostStatus.PUBLISHED,
+    ): Int
+
+    /** Bài không rõ kết quả đang chờ đối soát hoặc người dùng xác nhận (#94). */
+    @Query(
+        """
+        SELECT * FROM posts
+        WHERE status = :publishing AND outcomeUnknown = 1 AND remotePostId IS NULL
+        ORDER BY createdAtMillis
+        """,
+    )
+    suspend fun getUnknownOutcome(publishing: PostStatus = PostStatus.PUBLISHING): List<PostEntity>
+
     /** Người dùng xác nhận bài CHƯA được đăng: đưa lại hàng đợi. Cùng điều kiện với [resolveUnknownAsPublished]. */
     @Query(
         """

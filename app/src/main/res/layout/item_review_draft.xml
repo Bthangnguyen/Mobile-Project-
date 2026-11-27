@@ -45,6 +45,15 @@
             android:text="@string/review_approval_required_hint"
             android:textAppearance="@style/TextAppearance.SocialAgent.Caption" />
 
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/tvPrePublishWarnings"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing_small"
+            android:textAppearance="@style/TextAppearance.SocialAgent.Caption"
+            android:textColor="@color/brand_warning"
+            android:visibility="gone" />
+
         <com.lttbdd.socialagent.core.ui.components.OutlinedButton
             android:id="@+id/btnPreviewEdit"
             android:layout_width="match_parent"

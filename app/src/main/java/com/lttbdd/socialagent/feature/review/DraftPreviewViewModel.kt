@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.lttbdd.socialagent.R
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.Draft
+import com.lttbdd.socialagent.data.review.PrePublishWarning
+import com.lttbdd.socialagent.data.review.PrePublishWarningAnalyzer
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -111,6 +113,7 @@ class DraftPreviewViewModel @Inject constructor(
                 selectedChannel = channel,
                 editedText = current.editedText,
                 showBlankError = current.textErrorRes == R.string.preview_error_empty,
+                cachedWarnings = current.prePublishWarnings,
             )
         }
         if (didUpdate) {
@@ -220,6 +223,7 @@ class DraftPreviewViewModel @Inject constructor(
         selectedChannel: ChannelType,
         editedText: String,
         showBlankError: Boolean,
+        cachedWarnings: List<PrePublishWarning>? = null,
     ): DraftPreviewUiState {
         val previewCount = DraftCharacterCounter.evaluate(editedText, selectedChannel)
         val draftChannelOverLimit = draft != null &&
@@ -245,6 +249,7 @@ class DraftPreviewViewModel @Inject constructor(
             hasUnsavedChanges = hasUnsavedChanges,
             canSave = canSave,
             textErrorRes = errorRes,
+            prePublishWarnings = cachedWarnings ?: PrePublishWarningAnalyzer.analyze(editedText),
         )
     }
 

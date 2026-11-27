@@ -309,6 +309,16 @@
     <string name="preview_discard_action">Bỏ thay đổi</string>
     <string name="preview_stay_action">Ở lại</string>
 
+    <!-- Feature F4: Cảnh báo nội dung trước khi đăng (Issue #65) -->
+    <string name="warning_banner_title">Cảnh báo trước khi đăng</string>
+    <string name="warning_bullet_item">• %1$s</string>
+    <string name="warning_unsourced_statistic_item">Phát hiện số liệu chưa có nguồn (%1$s). Nên bổ sung nguồn trích dẫn hoặc đường link.</string>
+    <string name="warning_personal_info_item">Có dấu hiệu chứa thông tin cá nhân (%1$s). Hãy kiểm tra và xóa nếu không cố ý công khai.</string>
+    <string name="warning_sensitive_language_item">Phát hiện từ ngữ nhạy cảm hoặc cam kết rủi ro (%1$s). Hãy rà soát lại giọng văn trước khi đăng.</string>
+    <string name="warning_publish_dialog_title">Xem lại cảnh báo trước khi đăng?</string>
+    <string name="warning_publish_dialog_message">Bài viết có một số điểm cần lưu ý:\n\n%1$s\n\nBạn vẫn muốn đưa bài vào hàng đợi đăng chứ?</string>
+    <string name="warning_publish_anyway_action">Vẫn đăng bài</string>
+
     <!-- F5 Trạng thái đăng (#36) -->
     <string name="publish_status_title">Trạng thái đăng bài</string>
     <string name="publish_status_subtitle">Mỗi kênh được đăng riêng. Một kênh bị lỗi không ảnh hưởng các kênh khác.</string>

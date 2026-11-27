@@ -335,4 +335,25 @@
     <string name="publish_error_storage">Could not save to the device storage.</string>
     <string name="publish_error_unknown">The channel returned an error.</string>
     <string name="publish_status_action_failed">Could not update the publishing queue. Please try again.</string>
+
+    <!-- Hộp thư bình luận (F6, #41) -->
+    <string name="comment_inbox_filter_channel">Channel</string>
+    <string name="comment_inbox_filter_post">Post</string>
+    <string name="comment_inbox_filter_status">Status</string>
+    <string name="comment_inbox_all_channels">All channels</string>
+    <string name="comment_inbox_all_posts">All posts</string>
+    <string name="comment_inbox_all_statuses">All statuses</string>
+    <string name="comment_inbox_channel_post">%1$s · Post %2$s</string>
+    <string name="comment_inbox_channel_post_excerpt">%1$s · %2$s</string>
+    <string name="comment_inbox_status_new">New</string>
+    <string name="comment_inbox_status_replied">Replied</string>
+    <string name="comment_inbox_status_ignored">Ignored</string>
+    <string name="comment_inbox_unknown_author">Unknown author</string>
+    <string name="comment_inbox_clear_filters">Clear filters</string>
+    <string name="comment_inbox_previous_page">Previous page</string>
+    <string name="comment_inbox_next_page">Next page</string>
+    <string name="comment_inbox_retry">Retry</string>
+    <string name="comment_inbox_empty">No comments yet.</string>
+    <string name="comment_inbox_no_results">No comments match these filters.</string>
+    <string name="comment_inbox_load_failed">Could not load comments.</string>
 </resources>

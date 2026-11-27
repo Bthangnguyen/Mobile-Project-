@@ -7,6 +7,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
 import com.lttbdd.socialagent.core.database.entity.DraftEntity
+import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.PostStatus
 import kotlinx.coroutines.flow.Flow
 
@@ -39,7 +40,12 @@ abstract class DraftDao {
      */
     @Transaction
     open suspend fun upsert(draft: DraftEntity) {
-        if (update(draft) == 0) insert(draft)
+        val previous = getById(draft.id)
+        if (previous == null) {
+            insert(draft.copy(revision = 0))
+        } else {
+            update(draft.copy(revision = previous.revision + 1))
+        }
     }
 
     @Transaction
@@ -109,4 +115,14 @@ abstract class DraftDao {
 
     @Update
     protected abstract suspend fun update(draft: DraftEntity): Int
+
+    /** Giữ nội dung bản nháp nếu bài đăng còn tham chiếu đến nó sau khi dọn theo kênh. */
+    @Query(
+        """
+        DELETE FROM drafts WHERE channel = :channel AND NOT EXISTS (
+            SELECT 1 FROM posts WHERE posts.draftId = drafts.id
+        )
+        """,
+    )
+    abstract suspend fun deleteByChannel(channel: ChannelType)
 }

@@ -58,6 +58,14 @@
     <string name="channel_error_reconnect_account_mismatch">Hãy đăng nhập lại bằng tài khoản có quyền kết nối kênh này.</string>
     <string name="channel_error_reconnect_unavailable">Bản này chưa cấu hình đăng nhập nên không thể kết nối lại.</string>
     <string name="channel_empty_desc">Kết nối một kênh (Facebook Page hoặc LinkedIn) để xem trạng thái chức năng theo từng nền tảng</string>
+    <string name="channel_disconnect">Ngắt kết nối</string>
+    <string name="channel_disconnect_title">Ngắt kết nối %1$s?</string>
+    <string name="channel_disconnect_message">Thao tác này xóa kết nối của tài khoản trên thiết bị.</string>
+    <string name="channel_disconnect_last_message">Thao tác này ngắt tài khoản cuối cùng của mạng xã hội này và xóa bản nháp, bài đăng, bình luận cùng số liệu lưu trên thiết bị.</string>
+    <string name="channel_disconnected_notice">Đã ngắt kết nối kênh.</string>
+    <string name="channel_disconnect_failed">Không thể hoàn tất việc ngắt kết nối.</string>
+    <string name="channel_facebook_disconnect_sign_out_unverified">Đã xóa dữ liệu kênh. Chưa xác minh được phiên Facebook nên ứng dụng không tự đăng xuất. Bấm Xử lý đăng xuất Facebook để chọn cách xử lý.</string>
+    <string name="channel_facebook_disconnect_sign_out_failed">Đã xóa dữ liệu kênh. Hãy thử hoàn tất ngắt kết nối để đăng xuất Facebook.</string>
     <string name="channel_capabilities_header">Ma trận khả năng hỗ trợ:</string>
     <string name="channel_facebook_login_error">Lỗi đăng nhập Facebook</string>
     <string name="channel_facebook_cancel_title">Đã hủy đăng nhập Facebook</string>
@@ -89,6 +97,12 @@
     <string name="channel_type_linkedin">LinkedIn</string>
     <string name="channel_linkedin_session_expired">Phiên đăng nhập LinkedIn đã hết hạn. Vui lòng bấm Kết nối LinkedIn lại.</string>
     <string name="channel_retry_load">Thử lại</string>
+    <string name="channel_retry_cleanup">Thử hoàn tất ngắt kết nối</string>
+    <string name="channel_unverified_signout_action">Xử lý đăng xuất Facebook</string>
+    <string name="channel_unverified_signout_title">Chưa xác minh được phiên Facebook</string>
+    <string name="channel_unverified_signout_message">Không xác minh được tài khoản Facebook đang đăng nhập trên thiết bị này, có thể đó là tài khoản của người khác. Hãy chọn đăng xuất hoặc giữ nguyên. Ứng dụng sẽ không tự đăng xuất.</string>
+    <string name="channel_unverified_signout_confirm">Đăng xuất Facebook trên thiết bị này</string>
+    <string name="channel_unverified_signout_keep">Giữ phiên Facebook hiện tại</string>
     <string name="channel_error_save_failed">Không lưu được kết nối kênh. Vui lòng thử lại.</string>
     <string name="channel_error_load_failed">Không tải được danh sách kênh đã kết nối. Vui lòng thử lại.</string>
     <string name="channel_not_configured_notice">Chưa cấu hình %1$s trong local.properties nên bản này không đăng nhập thật được.</string>
@@ -320,6 +334,16 @@
     <string name="history_load_error_message">Đã xảy ra lỗi khi tải lịch sử bản nháp. Vui lòng mở lại và thử lại.</string>
     <string name="history_load_failed">Không thể tải lịch sử phiên bản bản nháp. Vui lòng thử lại.</string>
     <string name="history_publishing_locked_warning">Bản nháp đang có bài chờ đăng hoặc đang đăng nên tạm khóa khôi phục phiên bản.</string>
+
+    <!-- Feature F4: Cảnh báo nội dung trước khi đăng (Issue #65) -->
+    <string name="warning_banner_title">Cảnh báo trước khi đăng</string>
+    <string name="warning_bullet_item">• %1$s</string>
+    <string name="warning_unsourced_statistic_item">Phát hiện số liệu chưa có nguồn (%1$s). Nên bổ sung nguồn trích dẫn hoặc đường link.</string>
+    <string name="warning_personal_info_item">Có dấu hiệu chứa thông tin cá nhân (%1$s). Hãy kiểm tra và xóa nếu không cố ý công khai.</string>
+    <string name="warning_sensitive_language_item">Phát hiện từ ngữ nhạy cảm hoặc cam kết rủi ro (%1$s). Hãy rà soát lại giọng văn trước khi đăng.</string>
+    <string name="warning_publish_dialog_title">Xem lại cảnh báo trước khi đăng?</string>
+    <string name="warning_publish_dialog_message">Bài viết có một số điểm cần lưu ý:\n\n%1$s\n\nBạn vẫn muốn đưa bài vào hàng đợi đăng chứ?</string>
+    <string name="warning_publish_anyway_action">Vẫn đăng bài</string>
 
     <!-- F5 Trạng thái đăng (#36) -->
     <string name="publish_status_title">Trạng thái đăng bài</string>

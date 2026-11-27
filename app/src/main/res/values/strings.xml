@@ -59,6 +59,14 @@
     <string name="channel_error_reconnect_account_mismatch">Sign in again with the account that owns this connection.</string>
     <string name="channel_error_reconnect_unavailable">Reconnect is unavailable because sign-in is not configured in this build.</string>
     <string name="channel_empty_desc">Connect a channel (Facebook Page or LinkedIn) to view platform capability statuses</string>
+    <string name="channel_disconnect">Disconnect</string>
+    <string name="channel_disconnect_title">Disconnect %1$s?</string>
+    <string name="channel_disconnect_message">This removes the account connection from this device.</string>
+    <string name="channel_disconnect_last_message">This removes the last account for this network from this device and deletes its local drafts, posts, comments, and metrics.</string>
+    <string name="channel_disconnected_notice">Channel disconnected.</string>
+    <string name="channel_disconnect_failed">Could not finish disconnect cleanup.</string>
+    <string name="channel_facebook_disconnect_sign_out_unverified">Channel data was removed. The Facebook session could not be verified, so the app did not sign out. Tap Resolve Facebook sign-out to choose what to do.</string>
+    <string name="channel_facebook_disconnect_sign_out_failed">Channel data was removed. Retry disconnect cleanup to finish signing out of Facebook.</string>
     <string name="channel_capabilities_header">Platform Capabilities Matrix:</string>
     <string name="channel_facebook_login_error">Facebook login error</string>
     <string name="channel_facebook_cancel_title">Facebook login cancelled</string>
@@ -90,6 +98,12 @@
     <string name="channel_type_linkedin">LinkedIn</string>
     <string name="channel_linkedin_session_expired">The LinkedIn sign-in session has expired. Please tap Connect LinkedIn again.</string>
     <string name="channel_retry_load">Try again</string>
+    <string name="channel_retry_cleanup">Retry disconnect cleanup</string>
+    <string name="channel_unverified_signout_action">Resolve Facebook sign-out</string>
+    <string name="channel_unverified_signout_title">Facebook session not verified</string>
+    <string name="channel_unverified_signout_message">The Facebook account signed in on this device could not be verified and may belong to someone else. Choose whether to sign out of it or keep it. The app will not sign out automatically.</string>
+    <string name="channel_unverified_signout_confirm">Sign out of Facebook on this device</string>
+    <string name="channel_unverified_signout_keep">Keep the current Facebook session</string>
     <string name="channel_error_save_failed">Could not save the channel connection. Please try again.</string>
     <string name="channel_error_load_failed">Could not load connected channels. Please try again.</string>
     <string name="channel_not_configured_notice">%1$s is not configured in local.properties, so real sign-in is unavailable in this build.</string>
@@ -322,6 +336,16 @@
     <string name="history_load_error_message">Something went wrong while loading this draft history. Please reopen and try again.</string>
     <string name="history_load_failed">Could not load draft version history. Please try again.</string>
     <string name="history_publishing_locked_warning">This draft has active publishing posts, so restoring versions is temporarily locked.</string>
+
+    <!-- Feature F4: Pre-publish content warnings (Issue #65) -->
+    <string name="warning_banner_title">Pre-publish warnings</string>
+    <string name="warning_bullet_item">• %1$s</string>
+    <string name="warning_unsourced_statistic_item">Unsourced statistic detected (%1$s). Add a source or link before publishing.</string>
+    <string name="warning_personal_info_item">Possible personal information detected (%1$s). Remove sensitive details if unintended.</string>
+    <string name="warning_sensitive_language_item">Potentially sensitive or risky phrasing detected (%1$s). Review tone before publishing.</string>
+    <string name="warning_publish_dialog_title">Review warnings before publishing?</string>
+    <string name="warning_publish_dialog_message">We found potential issues in this draft:\n\n%1$s\n\nDo you still want to add it to the publishing queue?</string>
+    <string name="warning_publish_anyway_action">Publish anyway</string>
 
     <!-- F5 Trạng thái đăng (#36) -->
     <string name="publish_status_title">Publishing status</string>

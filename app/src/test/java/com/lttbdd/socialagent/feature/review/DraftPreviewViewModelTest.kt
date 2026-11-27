@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import com.lttbdd.socialagent.R
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.Draft
+import com.lttbdd.socialagent.data.review.PrePublishWarningType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -189,6 +190,23 @@ class DraftPreviewViewModelTest {
         val afterProcessDeathVm = DraftPreviewViewModel(fakeRepository, handle)
         advanceUntilIdle()
         assertEquals("Bài nháp ban đầu cho Facebook", afterProcessDeathVm.uiState.value.editedText)
+    }
+
+    @Test
+    fun `prePublishWarnings updates in real time as user edits draft text`() = runTest {
+        val handle = SavedStateHandle(mapOf(DraftPreviewViewModel.ARG_DRAFT_ID to "draft-fb"))
+        val viewModel = DraftPreviewViewModel(fakeRepository, handle)
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.prePublishWarnings.isEmpty())
+
+        viewModel.onTextChanged("Tăng 60% lượt xem, nhắn 0912345678")
+        assertEquals(
+            setOf(PrePublishWarningType.PERSONAL_INFO, PrePublishWarningType.UNSOURCED_STATISTIC),
+            viewModel.uiState.value.prePublishWarnings.map { it.type }.toSet(),
+        )
+
+        viewModel.onTextChanged("Theo báo cáo Q3, lượt xem tăng 60%.")
+        assertTrue(viewModel.uiState.value.prePublishWarnings.isEmpty())
     }
 
     private class FakeDraftEditorRepository(

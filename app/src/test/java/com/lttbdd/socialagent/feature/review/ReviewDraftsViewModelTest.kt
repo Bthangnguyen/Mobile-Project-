@@ -11,6 +11,7 @@ import com.lttbdd.socialagent.data.review.DraftApprovalResult
 import com.lttbdd.socialagent.data.review.DraftContentUpdateResult
 import com.lttbdd.socialagent.data.review.DraftReviewRepository
 import com.lttbdd.socialagent.data.review.DraftRevokeResult
+import com.lttbdd.socialagent.data.review.PrePublishWarningType
 import com.lttbdd.socialagent.data.review.PublishEligibility
 import com.lttbdd.socialagent.data.review.PublishGateResult
 import kotlinx.coroutines.Dispatchers
@@ -292,6 +293,49 @@ class ReviewDraftsViewModelTest {
             ReviewDraftsEvent.ShowMessage(R.string.review_draft_action_failed),
             viewModel.events.first(),
         )
+    }
+
+    @Test
+    fun `approved draft with pre-publish warnings requires confirmation before enqueue`() = runTest {
+        val collector = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.uiState.collect {}
+        }
+        fakeRepository.putDraft(
+            Draft(
+                id = "d-warn",
+                topicId = "t-warn",
+                channel = ChannelType.FACEBOOK,
+                text = "Tăng 75% doanh thu, liên hệ user@example.com!",
+                approved = true,
+            ),
+        )
+        advanceUntilIdle()
+
+        val item = viewModel.uiState.value.drafts.single()
+        assertEquals(
+            setOf(PrePublishWarningType.PERSONAL_INFO, PrePublishWarningType.UNSOURCED_STATISTIC),
+            item.warnings.map { it.type }.toSet(),
+        )
+
+        // Bấm Đăng bài lần đầu → phát sự kiện xác nhận cảnh báo, chưa đưa vào hàng đợi
+        viewModel.onPublishRequested("d-warn")
+        advanceUntilIdle()
+
+        val event = viewModel.events.first()
+        assertTrue(event is ReviewDraftsEvent.ConfirmPublishWithWarnings)
+        assertEquals("d-warn", (event as ReviewDraftsEvent.ConfirmPublishWithWarnings).draftId)
+        assertTrue(fakeQueue.enqueuedDraftIds.isEmpty())
+
+        // Người dùng xác nhận Vẫn đăng bài → mới đưa vào hàng đợi
+        viewModel.onPublishConfirmedAfterWarnings("d-warn")
+        advanceUntilIdle()
+
+        assertEquals(
+            ReviewDraftsEvent.ShowMessage(R.string.review_publish_queued),
+            viewModel.events.first(),
+        )
+        assertEquals(listOf("d-warn"), fakeQueue.enqueuedDraftIds)
+        collector.cancel()
     }
 
     private fun approvedDraft(id: String) {

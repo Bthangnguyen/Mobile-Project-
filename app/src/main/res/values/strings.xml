@@ -182,7 +182,7 @@
 
     <!-- Chọn model theo loại việc, Issue #54. -->
     <string name="models_title">Models by task</string>
-    <string name="models_description">Choose the provider and model for each kind of work. Only providers with a saved API key can be selected, and the app never switches provider on its own.</string>
+    <string name="models_description">Choose the provider and model for each kind of work. Only providers with a saved API key can be selected, and the app only switches provider when you turn on Backup provider.</string>
     <string name="models_manage_keys">Manage API keys</string>
     <string name="models_loading">Loading model settings…</string>
     <string name="models_load_failed">Could not load model settings. Reopen this screen to retry.</string>

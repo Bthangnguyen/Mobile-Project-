@@ -180,7 +180,7 @@
 
     <!-- Chọn model theo loại việc, Issue #54. -->
     <string name="models_title">Model theo loại việc</string>
-    <string name="models_description">Chọn nhà cung cấp và model cho từng loại việc. Chỉ chọn được nhà cung cấp đã lưu API key, và ứng dụng không tự chuyển sang nhà cung cấp khác.</string>
+    <string name="models_description">Chọn nhà cung cấp và model cho từng loại việc. Chỉ chọn được nhà cung cấp đã lưu API key, và ứng dụng chỉ chuyển sang nhà cung cấp khác khi bạn bật Nhà cung cấp phụ.</string>
     <string name="models_manage_keys">Quản lý API key</string>
     <string name="models_loading">Đang tải cấu hình model…</string>
     <string name="models_load_failed">Không thể tải cấu hình model. Mở lại màn hình này để thử lại.</string>

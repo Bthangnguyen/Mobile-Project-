@@ -315,7 +315,11 @@
     <string name="history_restore_dialog_title">Restore this version?</string>
     <string name="history_restore_dialog_message">This replaces the current draft content and revokes approval so you can review before publishing.</string>
     <string name="history_restore_success">Version restored. Re-approval is required before publishing.</string>
+    <string name="history_restore_saved_without_history">Version restored and approval revoked, but the new history entry could not be saved.</string>
     <string name="history_restore_failed">Could not restore this version. Please try again.</string>
+    <string name="history_load_error_title">Could not load version history</string>
+    <string name="history_load_error_message">Something went wrong while loading this draft history. Please reopen and try again.</string>
+    <string name="history_load_failed">Could not load draft version history. Please try again.</string>
     <string name="history_publishing_locked_warning">This draft has active publishing posts, so restoring versions is temporarily locked.</string>
 
     <!-- F5 Trạng thái đăng (#36) -->

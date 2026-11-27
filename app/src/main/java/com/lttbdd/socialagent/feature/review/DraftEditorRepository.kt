@@ -69,6 +69,7 @@ class RoomDraftEditorRepository @Inject constructor(
             }
             when (val updateResult = draftReviewRepository.updateDraftContent(draftId, newText)) {
                 is DraftContentUpdateResult.Updated -> DraftSaveResult.Saved(updateResult.draft)
+                is DraftContentUpdateResult.UpdatedWithoutHistory -> DraftSaveResult.Saved(updateResult.draft)
                 DraftContentUpdateResult.EmptyContent -> DraftSaveResult.BlockedBlankContent
                 DraftContentUpdateResult.NotFound -> DraftSaveResult.NotFound
                 is DraftContentUpdateResult.StorageError -> DraftSaveResult.StorageError(updateResult.cause)

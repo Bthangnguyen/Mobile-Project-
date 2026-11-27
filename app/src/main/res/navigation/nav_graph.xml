@@ -115,9 +115,7 @@
         android:label="@string/history_header_title">
         <argument
             android:name="draftId"
-            android:defaultValue="@null"
-            app:argType="string"
-            app:nullable="true" />
+            app:argType="string" />
     </fragment>
 
 </navigation>

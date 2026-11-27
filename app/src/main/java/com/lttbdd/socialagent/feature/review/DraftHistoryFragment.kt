@@ -72,12 +72,22 @@ class DraftHistoryFragment : Fragment() {
     }
 
     private fun renderUiState(state: DraftHistoryUiState) {
-        binding.loadingIndicator.isVisible = state.isLoading
+        binding.loadingIndicator.isVisible = state.isLoading || state.isRestoring
         binding.tvPublishingLockedWarning.isVisible =
-            !state.isLoading && !state.isDraftNotFound && state.isRestoreLockedByPublishing
+            !state.isLoading && !state.isDraftNotFound && !state.isLoadError && state.isRestoreLockedByPublishing
 
         if (state.isLoading) {
             binding.emptyState.isVisible = false
+            binding.rvVersions.isVisible = false
+            return
+        }
+
+        if (state.isLoadError) {
+            binding.emptyState.setContent(
+                title = getString(R.string.history_load_error_title),
+                message = getString(R.string.history_load_error_message),
+            )
+            binding.emptyState.isVisible = true
             binding.rvVersions.isVisible = false
             return
         }

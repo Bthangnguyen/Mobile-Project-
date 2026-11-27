@@ -4,16 +4,19 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.io.FileOutputStream
+import java.io.IOException
 import java.security.MessageDigest
 import java.util.UUID
 
@@ -70,8 +73,11 @@ object NoOpDraftVersionStore : DraftVersionStore {
  * Lưu lịch sử phiên bản mỗi bản nháp thành một tệp JSON riêng trên bộ nhớ trong (`filesDir/draft_versions/`).
  *
  * - Tên tệp dùng SHA-256 của `draftId` để tránh ký tự đặc biệt / path traversal.
- * - Ghi nguyên tử (ghi tệp `.tmp` rồi thay thế tệp đích) và đồng bộ bằng [Mutex].
- * - Giới hạn tối đa [maxVersionsPerDraft] phiên bản gần nhất cho mỗi bản nháp để tránh phình dung lượng.
+ * - Ghi an toàn theo cơ chế backup-trước-khi-thay-thế (tương tự `AtomicFile`): ghi và `fsync` ra tệp `.new`,
+ *   sao lưu tệp cũ sang `.bak`, đổi tên `.new` → tệp chính rồi mới xóa `.bak`; khi đọc có thể phục hồi từ `.bak`
+ *   nếu quá trình ghi trước bị ngắt giữa chừng. Không bao giờ xóa tệp chính trước khi sao lưu hoặc ghi đè trực tiếp.
+ * - Quan sát thay đổi qua [MutableStateFlow] đơn điệu (`revision`) + `distinctUntilChanged()` để không bỏ lỡ
+ *   bản ghi xảy ra giữa lúc đọc ban đầu và lúc đăng ký lắng nghe.
  */
 class FileDraftVersionStore(
     private val baseDir: File,
@@ -84,16 +90,12 @@ class FileDraftVersionStore(
         ignoreUnknownKeys = true
         encodeDefaults = true
     }
-    private val changeNotifications = MutableSharedFlow<String>(extraBufferCapacity = 32)
+    private val revision = MutableStateFlow(0L)
 
-    override fun observeVersions(draftId: String): Flow<List<DraftVersion>> = flow {
-        emit(getVersions(draftId))
-        changeNotifications
-            .filter { changedId -> changedId == draftId }
-            .collect {
-                emit(getVersions(draftId))
-            }
-    }
+    override fun observeVersions(draftId: String): Flow<List<DraftVersion>> =
+        revision
+            .map { getVersions(draftId) }
+            .distinctUntilChanged()
 
     override suspend fun getVersions(draftId: String): List<DraftVersion> = withContext(ioDispatcher) {
         mutex.withLock {
@@ -107,7 +109,7 @@ class FileDraftVersionStore(
         source: DraftVersionSource,
         createdAtMillis: Long,
     ): DraftVersion = withContext(ioDispatcher) {
-        val recorded = mutex.withLock {
+        mutex.withLock {
             val current = readVersionsLocked(draftId)
             val latest = current.firstOrNull()
             if (source != DraftVersionSource.RESTORED && latest != null && latest.text == text) {
@@ -124,27 +126,40 @@ class FileDraftVersionStore(
                 createdAtMillis = createdAtMillis,
             )
             val updated = (listOf(newVersion) + current).take(maxVersionsPerDraft)
-            writeVersionsLocked(draftId, updated)
+            writeVersionsAtomicallyLocked(draftId, updated)
+            revision.update { it + 1 }
             newVersion
         }
-        changeNotifications.tryEmit(draftId)
-        recorded
     }
 
     override suspend fun clearVersions(draftId: String) = withContext(ioDispatcher) {
         mutex.withLock {
             val target = versionFile(draftId)
-            if (target.exists()) {
-                target.delete()
-            }
+            val backup = backupFile(target)
+            if (target.exists()) target.delete()
+            if (backup.exists()) backup.delete()
+            revision.update { it + 1 }
         }
-        changeNotifications.tryEmit(draftId)
-        Unit
     }
 
     private fun readVersionsLocked(draftId: String): List<DraftVersion> {
-        val file = versionFile(draftId)
-        if (!file.exists()) return emptyList()
+        val target = versionFile(draftId)
+        val backup = backupFile(target)
+        // Phục hồi từ bản sao lưu nếu lần ghi trước bị ngắt sau khi đã chuyển tệp chính sang .bak
+        if (!target.exists() && backup.exists()) {
+            backup.renameTo(target)
+        }
+        val primary = parseVersionsFile(target)
+        if (primary != null) return primary
+        if (backup.exists()) {
+            val recovered = parseVersionsFile(backup)
+            if (recovered != null) return recovered
+        }
+        return emptyList()
+    }
+
+    private fun parseVersionsFile(file: File): List<DraftVersion>? {
+        if (!file.exists()) return null
         return try {
             val raw = file.readText(Charsets.UTF_8)
             if (raw.isBlank()) {
@@ -156,26 +171,46 @@ class FileDraftVersionStore(
         } catch (ce: CancellationException) {
             throw ce
         } catch (_: Exception) {
-            emptyList()
+            null
         }
     }
 
-    private fun writeVersionsLocked(draftId: String, versions: List<DraftVersion>) {
-        if (!baseDir.exists()) {
-            baseDir.mkdirs()
+    private fun writeVersionsAtomicallyLocked(draftId: String, versions: List<DraftVersion>) {
+        if (!baseDir.exists() && !baseDir.mkdirs()) {
+            throw IOException("Không thể tạo thư mục lưu lịch sử phiên bản: ${baseDir.name}")
         }
         val target = versionFile(draftId)
-        val temp = File(baseDir, "${target.name}.tmp")
-        temp.writeText(json.encodeToString(versions), Charsets.UTF_8)
-        if (target.exists() && !target.delete()) {
-            // Trên một số hệ thống tệp, thử ghi đè trực tiếp nếu rename/delete bị chặn tạm thời.
-            target.writeText(json.encodeToString(versions), Charsets.UTF_8)
-            temp.delete()
-            return
-        }
-        if (!temp.renameTo(target)) {
-            target.writeText(json.encodeToString(versions), Charsets.UTF_8)
-            temp.delete()
+        val backup = backupFile(target)
+        val temp = File(baseDir, "${target.name}.new")
+        val payload = json.encodeToString(versions).toByteArray(Charsets.UTF_8)
+
+        try {
+            FileOutputStream(temp).use { out ->
+                out.write(payload)
+                out.flush()
+                out.fd.sync()
+            }
+            if (target.exists()) {
+                if (backup.exists() && !backup.delete()) {
+                    throw IOException("Không thể dọn tệp sao lưu cũ")
+                }
+                if (!target.renameTo(backup)) {
+                    throw IOException("Không thể sao lưu tệp lịch sử trước khi thay thế")
+                }
+            }
+            if (!temp.renameTo(target)) {
+                // Khôi phục lại bản sao lưu nếu bước đổi tên tệp mới thất bại
+                if (backup.exists() && !target.exists()) {
+                    backup.renameTo(target)
+                }
+                throw IOException("Không thể thay thế tệp lịch sử một cách nguyên tử")
+            }
+            if (backup.exists()) {
+                backup.delete()
+            }
+        } catch (e: Exception) {
+            if (temp.exists()) temp.delete()
+            throw e
         }
     }
 
@@ -185,6 +220,8 @@ class FileDraftVersionStore(
         val hash = digest.joinToString("") { byte -> "%02x".format(byte) }
         return File(baseDir, "$hash.json")
     }
+
+    private fun backupFile(target: File): File = File(baseDir, "${target.name}.bak")
 
     companion object {
         const val DIRECTORY_NAME = "draft_versions"

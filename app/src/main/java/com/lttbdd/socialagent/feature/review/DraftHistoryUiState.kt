@@ -15,7 +15,9 @@ data class DraftHistoryItemUiState(
 /** Trạng thái UI của màn hình Lịch sử phiên bản bản nháp (F4, Issue #62). */
 data class DraftHistoryUiState(
     val isLoading: Boolean = true,
+    val isRestoring: Boolean = false,
     val isDraftNotFound: Boolean = false,
+    val isLoadError: Boolean = false,
     val isRestoreLockedByPublishing: Boolean = false,
     val draftChannel: ChannelType? = null,
     val versions: List<DraftHistoryItemUiState> = emptyList(),

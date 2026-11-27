@@ -111,4 +111,26 @@ class FileDraftVersionStoreTest {
         assertEquals(listOf("Bản 1"), emissions[1].map { it.text })
         assertTrue(emissions[2].isEmpty())
     }
+
+    @Test
+    fun `recovers from backup file if primary file was interrupted and leaves no temp files`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val dir = tempFolder.newFolder("atomic")
+        val store = FileDraftVersionStore(baseDir = dir, ioDispatcher = dispatcher)
+
+        store.recordVersion("draft-atomic", "Bản 1", DraftVersionSource.AI_GENERATED, 1_000L)
+        store.recordVersion("draft-atomic", "Bản 2", DraftVersionSource.MANUAL_EDIT, 2_000L)
+
+        // Sau khi ghi nguyên tử hoàn tất chỉ còn đúng 1 tệp .json (không còn .new hay .bak)
+        val files = dir.listFiles().orEmpty()
+        assertEquals(1, files.size)
+        val primary = files.single()
+        assertTrue(primary.name.endsWith(".json"))
+
+        // Giả lập ngắt giữa chừng: chỉ còn tệp .bak, tệp chính bị mất
+        val backup = File(dir, "${primary.name}.bak")
+        assertTrue(primary.renameTo(backup))
+        val recovered = store.getVersions("draft-atomic")
+        assertEquals(listOf("Bản 2", "Bản 1"), recovered.map { it.text })
+    }
 }

@@ -313,7 +313,11 @@
     <string name="history_restore_dialog_title">Khôi phục phiên bản này?</string>
     <string name="history_restore_dialog_message">Thao tác này sẽ thay thế nội dung bản nháp hiện tại và thu hồi trạng thái duyệt để bạn kiểm tra lại trước khi đăng.</string>
     <string name="history_restore_success">Đã khôi phục phiên bản. Cần duyệt lại trước khi đăng bài.</string>
+    <string name="history_restore_saved_without_history">Đã khôi phục nội dung và thu hồi duyệt, nhưng không ghi được mục lịch sử mới.</string>
     <string name="history_restore_failed">Không thể khôi phục phiên bản này. Vui lòng thử lại.</string>
+    <string name="history_load_error_title">Không thể tải lịch sử phiên bản</string>
+    <string name="history_load_error_message">Đã xảy ra lỗi khi tải lịch sử bản nháp. Vui lòng mở lại và thử lại.</string>
+    <string name="history_load_failed">Không thể tải lịch sử phiên bản bản nháp. Vui lòng thử lại.</string>
     <string name="history_publishing_locked_warning">Bản nháp đang có bài chờ đăng hoặc đang đăng nên tạm khóa khôi phục phiên bản.</string>
 
     <!-- F5 Trạng thái đăng (#36) -->

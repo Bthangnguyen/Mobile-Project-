@@ -23,6 +23,8 @@ sealed interface DraftApprovalResult {
 /** Kết quả cập nhật nội dung bản nháp (luôn tự động thu hồi trạng thái duyệt). */
 sealed interface DraftContentUpdateResult {
     data class Updated(val draft: Draft) : DraftContentUpdateResult
+    /** Nội dung bản nháp đã lưu vào Room và thu hồi duyệt, nhưng ghi mục lịch sử phiên bản thất bại. */
+    data class UpdatedWithoutHistory(val draft: Draft, val cause: Throwable) : DraftContentUpdateResult
     data object EmptyContent : DraftContentUpdateResult
     data object NotFound : DraftContentUpdateResult
     data class StorageError(val cause: Throwable) : DraftContentUpdateResult
@@ -130,6 +132,7 @@ class RoomDraftReviewRepository @Inject constructor(
         draftId = draftId,
         newText = newText,
         source = DraftVersionSource.MANUAL_EDIT,
+        reportHistoryFailure = false,
     )
 
     override suspend fun restoreDraftContent(
@@ -139,12 +142,14 @@ class RoomDraftReviewRepository @Inject constructor(
         draftId = draftId,
         newText = newText,
         source = DraftVersionSource.RESTORED,
+        reportHistoryFailure = true,
     )
 
     private suspend fun updateDraftContentInternal(
         draftId: String,
         newText: String,
         source: DraftVersionSource,
+        reportHistoryFailure: Boolean,
     ): DraftContentUpdateResult = try {
         if (newText.isBlank()) {
             DraftContentUpdateResult.EmptyContent
@@ -165,13 +170,30 @@ class RoomDraftReviewRepository @Inject constructor(
                     updatedAtMillis = now,
                 )
                 draftDao.upsert(updatedEntity)
-                recordVersionBestEffort(
-                    draftId = draftId,
-                    text = editedModel.text,
-                    source = source,
-                    createdAtMillis = now,
-                )
-                DraftContentUpdateResult.Updated(updatedEntity.toModel())
+                val savedDraft = updatedEntity.toModel()
+                if (reportHistoryFailure) {
+                    try {
+                        draftVersionStore.recordVersion(
+                            draftId = draftId,
+                            text = editedModel.text,
+                            source = source,
+                            createdAtMillis = now,
+                        )
+                        DraftContentUpdateResult.Updated(savedDraft)
+                    } catch (ce: CancellationException) {
+                        throw ce
+                    } catch (historyError: Exception) {
+                        DraftContentUpdateResult.UpdatedWithoutHistory(savedDraft, historyError)
+                    }
+                } else {
+                    recordVersionBestEffort(
+                        draftId = draftId,
+                        text = editedModel.text,
+                        source = source,
+                        createdAtMillis = now,
+                    )
+                    DraftContentUpdateResult.Updated(savedDraft)
+                }
             }
         }
     } catch (ce: CancellationException) {

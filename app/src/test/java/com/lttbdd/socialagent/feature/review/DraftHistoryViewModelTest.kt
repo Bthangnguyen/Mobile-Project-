@@ -8,6 +8,7 @@ import com.lttbdd.socialagent.data.review.DraftRestoreResult
 import com.lttbdd.socialagent.data.review.DraftVersion
 import com.lttbdd.socialagent.data.review.DraftVersionRepository
 import com.lttbdd.socialagent.data.review.DraftVersionSource
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -18,6 +19,7 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -155,6 +157,72 @@ class DraftHistoryViewModelTest {
             DraftHistoryEvent.ShowMessage(R.string.history_restore_failed),
             vm.events.first(),
         )
+        assertFalse(vm.uiState.value.isRestoring)
+    }
+
+    @Test
+    fun `initial load failure sets isLoadError and emits history_load_failed`() = runTest {
+        fakeRepository.failOnLoad = true
+        val vm = DraftHistoryViewModel(
+            fakeRepository,
+            SavedStateHandle(mapOf(DraftHistoryViewModel.ARG_DRAFT_ID to "draft-1")),
+        )
+        advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.isLoading)
+        assertTrue(vm.uiState.value.isLoadError)
+        assertEquals(
+            DraftHistoryEvent.ShowMessage(R.string.history_load_failed),
+            vm.events.first(),
+        )
+    }
+
+    @Test
+    fun `isRestoring disables buttons and ignores duplicate restore calls while in progress`() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        fakeRepository.restoreGate = gate
+        val vm = DraftHistoryViewModel(
+            fakeRepository,
+            SavedStateHandle(mapOf(DraftHistoryViewModel.ARG_DRAFT_ID to "draft-1")),
+        )
+        advanceUntilIdle()
+
+        vm.onRestoreConfirmed("v-1")
+        runCurrent()
+
+        assertTrue(vm.uiState.value.isRestoring)
+        assertTrue(vm.uiState.value.versions.none { it.canRestore })
+
+        // Gửi thêm yêu cầu trùng khi đang khôi phục sẽ bị bỏ qua
+        vm.onRestoreConfirmed("v-1")
+        runCurrent()
+        assertEquals(1, fakeRepository.restoreCalls)
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.isRestoring)
+    }
+
+    @Test
+    fun `restore without history still signals restored and shows partial warning`() = runTest {
+        fakeRepository.returnWithoutHistory = true
+        val vm = DraftHistoryViewModel(
+            fakeRepository,
+            SavedStateHandle(mapOf(DraftHistoryViewModel.ARG_DRAFT_ID to "draft-1")),
+        )
+        advanceUntilIdle()
+
+        vm.onRestoreConfirmed("v-1")
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(
+                DraftHistoryEvent.RestoredSuccessfully,
+                DraftHistoryEvent.ShowMessage(R.string.history_restore_saved_without_history),
+            ),
+            vm.events.take(2).toList(),
+        )
+        assertFalse(vm.uiState.value.isRestoring)
     }
 
     private class FakeDraftVersionRepository(
@@ -164,16 +232,24 @@ class DraftHistoryViewModelTest {
         var currentDraft: Draft? = draft
         var isLocked: Boolean = false
         var failNextRestore: Boolean = false
+        var failOnLoad: Boolean = false
+        var returnWithoutHistory: Boolean = false
+        var restoreGate: CompletableDeferred<Unit>? = null
+        var restoreCalls: Int = 0
         private val versionsFlow = MutableStateFlow(initialVersions)
 
         override fun observeVersions(draftId: String): Flow<List<DraftVersion>> = versionsFlow
 
-        override suspend fun getDraft(draftId: String): Draft? =
-            currentDraft?.takeIf { it.id == draftId }
+        override suspend fun getDraft(draftId: String): Draft? {
+            if (failOnLoad) throw IllegalStateException("Simulated load error")
+            return currentDraft?.takeIf { it.id == draftId }
+        }
 
         override suspend fun hasActivePublishingPosts(draftId: String): Boolean = isLocked
 
         override suspend fun restoreVersion(draftId: String, versionId: String): DraftRestoreResult {
+            restoreCalls++
+            restoreGate?.await()
             if (failNextRestore) {
                 failNextRestore = false
                 return DraftRestoreResult.StorageError(IllegalStateException("Simulated error"))
@@ -184,6 +260,13 @@ class DraftHistoryViewModelTest {
                 ?: return DraftRestoreResult.VersionNotFound
             val updatedDraft = draft.copy(text = target.text, approved = false)
             currentDraft = updatedDraft
+            if (returnWithoutHistory) {
+                returnWithoutHistory = false
+                return DraftRestoreResult.RestoredWithoutHistory(
+                    updatedDraft,
+                    IllegalStateException("Simulated history write error"),
+                )
+            }
             val newVersion = DraftVersion(
                 id = "v-restored",
                 draftId = draftId,

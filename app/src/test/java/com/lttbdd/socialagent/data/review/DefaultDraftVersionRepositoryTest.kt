@@ -53,6 +53,7 @@ class DefaultDraftVersionRepositoryTest {
         )
         reviewRepository = RoomDraftReviewRepository(db.draftDao(), versionStore)
         versionRepository = DefaultDraftVersionRepository(
+            database = db,
             draftDao = db.draftDao(),
             postDao = db.postDao(),
             draftReviewRepository = reviewRepository,
@@ -201,6 +202,7 @@ class DefaultDraftVersionRepositoryTest {
 
         val failingReviewRepo = RoomDraftReviewRepository(failingDao, versionStore)
         val failingVersionRepo = DefaultDraftVersionRepository(
+            database = db,
             draftDao = failingDao,
             postDao = db.postDao(),
             draftReviewRepository = failingReviewRepo,
@@ -209,5 +211,44 @@ class DefaultDraftVersionRepositoryTest {
         val existingVersionId = versionStore.getVersions("d-exists").first().id
         val errorResult = failingVersionRepo.restoreVersion("d-exists", existingVersionId)
         assertTrue(errorResult is DraftRestoreResult.StorageError)
+    }
+
+    @Test
+    fun `restoreVersion returns RestoredWithoutHistory when Room update succeeds but history write fails`() = runTest {
+        val draft = Draft(
+            id = "d-hist-fail",
+            topicId = "topic-hf",
+            channel = ChannelType.FACEBOOK,
+            text = "Bản v1",
+            approved = true,
+        )
+        reviewRepository.saveAgentDraft(draft)
+        reviewRepository.updateDraftContent("d-hist-fail", "Bản v2")
+        val v1Id = versionStore.getVersions("d-hist-fail").last().id
+
+        val failingWriteStore = object : DraftVersionStore by versionStore {
+            override suspend fun recordVersion(
+                draftId: String,
+                text: String,
+                source: DraftVersionSource,
+                createdAtMillis: Long,
+            ): DraftVersion {
+                throw java.io.IOException("Simulated disk full")
+            }
+        }
+        val reviewRepoWithFailingStore = RoomDraftReviewRepository(db.draftDao(), failingWriteStore)
+        val repoWithFailingStore = DefaultDraftVersionRepository(
+            database = db,
+            draftDao = db.draftDao(),
+            postDao = db.postDao(),
+            draftReviewRepository = reviewRepoWithFailingStore,
+            draftVersionStore = failingWriteStore,
+        )
+
+        val result = repoWithFailingStore.restoreVersion("d-hist-fail", v1Id)
+        assertTrue(result is DraftRestoreResult.RestoredWithoutHistory)
+        val restored = (result as DraftRestoreResult.RestoredWithoutHistory).draft
+        assertEquals("Bản v1", restored.text)
+        assertFalse(restored.approved)
     }
 }

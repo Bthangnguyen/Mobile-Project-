@@ -9,6 +9,7 @@ import com.lttbdd.socialagent.data.review.DraftRestoreResult
 import com.lttbdd.socialagent.data.review.DraftVersion
 import com.lttbdd.socialagent.data.review.DraftVersionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -54,27 +55,39 @@ class DraftHistoryViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            val draft = repository.getDraft(targetId)
-            if (draft == null) {
+            try {
+                val draft = repository.getDraft(targetId)
+                if (draft == null) {
+                    _uiState.value = DraftHistoryUiState(
+                        isLoading = false,
+                        isDraftNotFound = true,
+                    )
+                    return@launch
+                }
+                currentDraft = draft
+                val isLocked = repository.hasActivePublishingPosts(targetId)
+
+                repository.observeVersions(targetId).collect { versions ->
+                    latestVersions = versions
+                    val activeDraft = repository.getDraft(targetId) ?: currentDraft
+                    currentDraft = activeDraft
+                    val lockedNow = repository.hasActivePublishingPosts(targetId)
+                    val restoringNow = _uiState.value.isRestoring
+                    _uiState.value = buildUiState(
+                        draft = activeDraft,
+                        versions = versions,
+                        isLocked = lockedNow || (isLocked && activeDraft == null),
+                        isRestoring = restoringNow,
+                    )
+                }
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (_: Exception) {
                 _uiState.value = DraftHistoryUiState(
                     isLoading = false,
-                    isDraftNotFound = true,
+                    isLoadError = true,
                 )
-                return@launch
-            }
-            currentDraft = draft
-            val isLocked = repository.hasActivePublishingPosts(targetId)
-
-            repository.observeVersions(targetId).collect { versions ->
-                latestVersions = versions
-                val activeDraft = repository.getDraft(targetId) ?: currentDraft
-                currentDraft = activeDraft
-                val lockedNow = repository.hasActivePublishingPosts(targetId)
-                _uiState.value = buildUiState(
-                    draft = activeDraft,
-                    versions = versions,
-                    isLocked = lockedNow || isLocked && activeDraft == null,
-                )
+                _events.trySend(DraftHistoryEvent.ShowMessage(R.string.history_load_failed))
             }
         }
     }
@@ -82,6 +95,7 @@ class DraftHistoryViewModel @Inject constructor(
     /** Người dùng bấm Khôi phục trên một phiên bản cũ → yêu cầu xác nhận trước khi ghi đè. */
     fun onRestoreRequested(version: DraftVersion) {
         val state = _uiState.value
+        if (state.isRestoring) return
         if (state.isRestoreLockedByPublishing) {
             _events.trySend(DraftHistoryEvent.ShowMessage(R.string.history_publishing_locked_warning))
             return
@@ -94,41 +108,92 @@ class DraftHistoryViewModel @Inject constructor(
     /** Xác nhận khôi phục phiên bản [versionId] (luôn thu hồi trạng thái duyệt qua repository). */
     fun onRestoreConfirmed(versionId: String) {
         val targetId = draftId ?: return
+        if (_uiState.value.isRestoring) return
+
+        _uiState.update { state ->
+            buildUiState(
+                draft = currentDraft,
+                versions = latestVersions,
+                isLocked = state.isRestoreLockedByPublishing,
+                isRestoring = true,
+            )
+        }
+
         viewModelScope.launch {
-            when (val result = repository.restoreVersion(targetId, versionId)) {
-                is DraftRestoreResult.Restored -> {
-                    currentDraft = result.draft
-                    _uiState.update {
-                        buildUiState(
-                            draft = result.draft,
-                            versions = latestVersions,
-                            isLocked = false,
+            try {
+                when (val result = repository.restoreVersion(targetId, versionId)) {
+                    is DraftRestoreResult.Restored -> {
+                        currentDraft = result.draft
+                        _uiState.update {
+                            buildUiState(
+                                draft = result.draft,
+                                versions = latestVersions,
+                                isLocked = false,
+                                isRestoring = false,
+                            )
+                        }
+                        _events.trySend(DraftHistoryEvent.RestoredSuccessfully)
+                        _events.trySend(DraftHistoryEvent.ShowMessage(R.string.history_restore_success))
+                    }
+                    is DraftRestoreResult.RestoredWithoutHistory -> {
+                        currentDraft = result.draft
+                        _uiState.update {
+                            buildUiState(
+                                draft = result.draft,
+                                versions = latestVersions,
+                                isLocked = false,
+                                isRestoring = false,
+                            )
+                        }
+                        _events.trySend(DraftHistoryEvent.RestoredSuccessfully)
+                        _events.trySend(
+                            DraftHistoryEvent.ShowMessage(R.string.history_restore_saved_without_history),
                         )
                     }
-                    _events.trySend(DraftHistoryEvent.RestoredSuccessfully)
-                    _events.trySend(DraftHistoryEvent.ShowMessage(R.string.history_restore_success))
-                }
-                DraftRestoreResult.BlockedByActivePublish -> {
-                    _uiState.update {
-                        buildUiState(
-                            draft = currentDraft,
-                            versions = latestVersions,
-                            isLocked = true,
+                    DraftRestoreResult.BlockedByActivePublish -> {
+                        _uiState.update {
+                            buildUiState(
+                                draft = currentDraft,
+                                versions = latestVersions,
+                                isLocked = true,
+                                isRestoring = false,
+                            )
+                        }
+                        _events.trySend(DraftHistoryEvent.ShowMessage(R.string.history_publishing_locked_warning))
+                    }
+                    DraftRestoreResult.DraftNotFound -> {
+                        _uiState.value = DraftHistoryUiState(
+                            isLoading = false,
+                            isRestoring = false,
+                            isDraftNotFound = true,
                         )
                     }
-                    _events.trySend(DraftHistoryEvent.ShowMessage(R.string.history_publishing_locked_warning))
+                    DraftRestoreResult.VersionNotFound,
+                    is DraftRestoreResult.StorageError,
+                    -> {
+                        _uiState.update { state ->
+                            buildUiState(
+                                draft = currentDraft,
+                                versions = latestVersions,
+                                isLocked = state.isRestoreLockedByPublishing,
+                                isRestoring = false,
+                            )
+                        }
+                        _events.trySend(DraftHistoryEvent.ShowMessage(R.string.history_restore_failed))
+                    }
                 }
-                DraftRestoreResult.DraftNotFound -> {
-                    _uiState.value = DraftHistoryUiState(
-                        isLoading = false,
-                        isDraftNotFound = true,
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (_: Exception) {
+                _uiState.update { state ->
+                    buildUiState(
+                        draft = currentDraft,
+                        versions = latestVersions,
+                        isLocked = state.isRestoreLockedByPublishing,
+                        isRestoring = false,
                     )
                 }
-                DraftRestoreResult.VersionNotFound,
-                is DraftRestoreResult.StorageError,
-                -> {
-                    _events.trySend(DraftHistoryEvent.ShowMessage(R.string.history_restore_failed))
-                }
+                _events.trySend(DraftHistoryEvent.ShowMessage(R.string.history_restore_failed))
             }
         }
     }
@@ -137,10 +202,12 @@ class DraftHistoryViewModel @Inject constructor(
         draft: Draft?,
         versions: List<DraftVersion>,
         isLocked: Boolean,
+        isRestoring: Boolean,
     ): DraftHistoryUiState {
         if (draft == null) {
             return DraftHistoryUiState(
                 isLoading = false,
+                isRestoring = false,
                 isDraftNotFound = true,
             )
         }
@@ -151,12 +218,14 @@ class DraftHistoryViewModel @Inject constructor(
                 version = version,
                 isCurrent = isCurrent,
                 characterCount = DraftCharacterCounter.countCharacters(version.text),
-                canRestore = !isCurrent && !isLocked,
+                canRestore = !isCurrent && !isLocked && !isRestoring,
             )
         }
         return DraftHistoryUiState(
             isLoading = false,
+            isRestoring = isRestoring,
             isDraftNotFound = false,
+            isLoadError = false,
             isRestoreLockedByPublishing = isLocked,
             draftChannel = draft.channel,
             versions = items,

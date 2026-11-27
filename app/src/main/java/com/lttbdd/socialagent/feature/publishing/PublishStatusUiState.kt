@@ -1,6 +1,7 @@
 package com.lttbdd.socialagent.feature.publishing
 
 import androidx.annotation.StringRes
+import com.lttbdd.socialagent.core.model.PostStatus
 import com.lttbdd.socialagent.core.publishing.ChannelPublishState
 
 /** Việc người dùng làm được với một kênh trên màn Trạng thái đăng. */
@@ -21,7 +22,14 @@ enum class ChannelAction {
 data class ChannelPublishItem(
     val state: ChannelPublishState,
     val action: ChannelAction,
-)
+    /** Link bài gốc đã kiểm tra là http/https, chỉ có khi bài đã đăng (#40); null thì ẩn nút Mở bài. */
+    val openUrl: String? = null,
+    /** Lý do lỗi dễ hiểu (#39): bài lỗi, hoặc bài đang chờ tự thử lại sau lỗi tạm thời. */
+    @param:StringRes val reasonRes: Int? = null,
+) {
+    /** Bài vẫn ở hàng đợi sau lỗi tạm thời: hàng đợi sẽ tự thử lại. */
+    val isRetrying: Boolean get() = state.status == PostStatus.QUEUED && reasonRes != null
+}
 
 data class TopicPublishItem(
     val topicId: String,

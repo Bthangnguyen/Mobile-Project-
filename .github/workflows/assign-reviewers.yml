@@ -1,6 +1,7 @@
 name: Assign reviewers
 
-# Tự gắn 2 reviewer theo vòng xoay và gán tác giả làm assignee khi PR sẵn sàng review.
+# Đặt đúng 2 reviewer theo vòng xoay (gỡ người thừa, thêm người thiếu) và gán tác giả làm assignee
+# khi PR sẵn sàng review.
 # Bảng xoay vòng: mỗi người review đúng 2 người khác. Đổi thành viên thì sửa ROTATION bên dưới
 # và bảng trong docs/git-workflow.md.
 
@@ -35,12 +36,29 @@ jobs:
               return;
             }
             const reviewers = ROTATION[author];
-
             const { owner, repo } = context.repo;
-            await github.rest.pulls.requestReviewers({
-              owner, repo, pull_number: pr.number, reviewers,
-            });
+            const pull_number = pr.number;
+
+            // Đặt lại ĐÚNG 2 reviewer theo bảng (#108): người hoặc AI agent mở PR kèm sẵn danh sách reviewer
+            // (gh pr create --reviewer, ô Reviewers) thì gỡ người thừa, thêm người còn thiếu. Chỉ chạy lúc
+            // mở/mở lại/Ready nên vẫn nhờ người khác review thay được bằng cách gắn thêm sau đó.
+            const { data: requested } = await github.rest.pulls.listRequestedReviewers({ owner, repo, pull_number });
+            const current = requested.users.map((u) => u.login);
+            const wanted = new Set(reviewers.map((r) => r.toLowerCase()));
+            const currentSet = new Set(current.map((r) => r.toLowerCase()));
+            const extra = current.filter((r) => !wanted.has(r.toLowerCase()));
+            const missing = reviewers.filter((r) => !currentSet.has(r.toLowerCase()));
+
+            if (extra.length > 0) {
+              await github.rest.pulls.removeRequestedReviewers({ owner, repo, pull_number, reviewers: extra });
+            }
+            if (missing.length > 0) {
+              await github.rest.pulls.requestReviewers({ owner, repo, pull_number, reviewers: missing });
+            }
             await github.rest.issues.addAssignees({
-              owner, repo, issue_number: pr.number, assignees: [author],
+              owner, repo, issue_number: pull_number, assignees: [author],
             });
-            core.info(`PR #${pr.number} của ${author}: reviewer ${reviewers.join(', ')}`);
+            core.info(
+              `PR #${pull_number} của ${author}: reviewer ${reviewers.join(', ')}` +
+                ` (gỡ: ${extra.join(', ') || 'không'}; thêm: ${missing.join(', ') || 'không'})`,
+            );

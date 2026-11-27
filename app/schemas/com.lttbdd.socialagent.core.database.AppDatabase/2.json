@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 2,
-    "identityHash": "53afcacf25af55764f684934cba8f3b7",
+    "identityHash": "08e825d32ddbabe2e58516717cf66df0",
     "entities": [
       {
         "tableName": "drafts",
@@ -358,35 +358,11 @@
             "createSql": "CREATE INDEX IF NOT EXISTS `index_metrics_snapshots_channel_remotePostId_capturedAtMillis` ON `${TABLE_NAME}` (`channel`, `remotePostId`, `capturedAtMillis`)"
           }
         ]
-      },
-      {
-        "tableName": "channel_cleanup_receipts",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`channel` TEXT NOT NULL, `operationId` TEXT NOT NULL, PRIMARY KEY(`channel`))",
-        "fields": [
-          {
-            "fieldPath": "channel",
-            "columnName": "channel",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "operationId",
-            "columnName": "operationId",
-            "affinity": "TEXT",
-            "notNull": true
-          }
-        ],
-        "primaryKey": {
-          "autoGenerate": false,
-          "columnNames": [
-            "channel"
-          ]
-        }
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '53afcacf25af55764f684934cba8f3b7')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '08e825d32ddbabe2e58516717cf66df0')"
     ]
   }
 }

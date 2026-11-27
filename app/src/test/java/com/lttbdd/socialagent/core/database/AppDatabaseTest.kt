@@ -24,6 +24,7 @@ import kotlinx.coroutines.test.runTest
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
@@ -146,11 +147,12 @@ class AppDatabaseTest {
     }
 
     @Test
-    fun migrationFromVersionThreeDoesNotTrustTimestampForDeferredDraftDeletion() = runTest {
+    fun migrationFromMainVersionTwoPreservesDraftAndPostAndAddsCleanupTables() = runTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        val name = "deferred-cleanup-v3.db"
-        val oldSchema = JSONObject(File("schemas/${AppDatabase::class.java.name}/3.json").readText())
+        val name = "channel-cleanup-v2.db"
+        val oldSchema = JSONObject(File("schemas/${AppDatabase::class.java.name}/2.json").readText())
             .getJSONObject("database")
+        assertEquals("08e825d32ddbabe2e58516717cf66df0", oldSchema.getString("identityHash"))
         val path = context.getDatabasePath(name)
         path.parentFile?.mkdirs()
         try {
@@ -158,24 +160,42 @@ class AppDatabaseTest {
                 installSchema(oldDb, oldSchema)
                 oldDb.execSQL(
                     "INSERT INTO drafts (id, topicId, channel, text, approved, updatedAtMillis) " +
-                        "VALUES ('existing', 't1', 'FACEBOOK', 'Saved draft', 0, 1)",
+                    "VALUES ('d1', 't1', 'FACEBOOK', 'Saved draft', 0, 1)",
                 )
                 oldDb.execSQL(
                     "INSERT INTO posts (id, draftId, channel, status, idempotencyKey, attemptCount, " +
-                        "createdAtMillis, updatedAtMillis, outcomeUnknown) " +
-                        "VALUES ('resolved', 'existing', 'FACEBOOK', 'FAILED', 'key', 0, 1, 1, 0)",
+                        "createdAtMillis, updatedAtMillis, outcomeUnknown, nextAttemptAtMillis) " +
+                        "VALUES ('p1', 'd1', 'FACEBOOK', 'FAILED', 'key', 1, 2, 3, 1, 4)",
                 )
-                oldDb.execSQL(
-                    "INSERT INTO deferred_channel_post_cleanup (postId, draftUpdatedAtMillis) VALUES ('resolved', 1)",
-                )
-                oldDb.version = 3
+                oldDb.version = 2
             }
 
             val migrated = Room.databaseBuilder(context, AppDatabase::class.java, name).build()
             try {
-                migrated.channelCleanupDao().finishDeferredCleanup()
-                assertEquals("Saved draft", migrated.draftDao().getById("existing")?.text)
-                assertNull(migrated.postDao().getById("resolved"))
+                val migratedDraft = migrated.draftDao().getById("d1")
+                assertEquals(draft("d1", 1, text = "Saved draft"), migratedDraft)
+                assertEquals(0L, migratedDraft?.revision)
+                val expectedPost = post("p1", "key").copy(
+                    status = PostStatus.FAILED,
+                    attemptCount = 1,
+                    createdAtMillis = 2,
+                    updatedAtMillis = 3,
+                    outcomeUnknown = true,
+                    nextAttemptAtMillis = 4,
+                )
+                assertEquals(expectedPost, migrated.postDao().getById("p1"))
+                assertEquals(3, migrated.openHelper.readableDatabase.version)
+                assertNull(migrated.channelCleanupDao().getCompletedOperation(ChannelType.FACEBOOK))
+                migrated.channelCleanupDao().deferProtectedPosts(ChannelType.FACEBOOK)
+                migrated.openHelper.readableDatabase.query(
+                    "SELECT postId, draftRevision FROM deferred_channel_post_cleanup",
+                ).use { cursor ->
+                    assertEquals(1, cursor.count)
+                    assertTrue(cursor.moveToFirst())
+                    assertEquals("p1", cursor.getString(0))
+                    assertFalse(cursor.isNull(1))
+                    assertEquals(0L, cursor.getLong(1))
+                }
             } finally {
                 migrated.close()
             }

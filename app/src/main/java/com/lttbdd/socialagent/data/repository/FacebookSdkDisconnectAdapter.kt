@@ -65,8 +65,7 @@ internal class FacebookSdkDisconnectAdapter {
                 // SDK đã sạch, vẫn chờ ghi cache xuống đĩa trước khi xác nhận journal.
                 return@withContext sdkContext
             }
-            // Journal đã có phiên cần đăng xuất. Giữ journal để thử lại nếu SDK chưa nạp cache.
-            val current = checkNotNull(currentSession(sdkContext)) { "Chưa khôi phục được phiên Facebook SDK." }
+            val current = currentSession(sdkContext)
             // SDK và OAuth callback chạy trên Main. So sánh và logout liền nhau.
             // Nếu lần trước mới xóa một phần, chỉ tiếp tục khi phần còn lại thuộc phiên cũ.
             if (!current.canFinishSignOut(expectedSession)) return@withContext null
@@ -99,17 +98,15 @@ internal class FacebookSdkDisconnectAdapter {
         }
     }
 
-    private suspend fun currentSession(context: Context): FacebookSession? {
-        // SDK đánh dấu đã khởi tạo trước khi nạp token từ cache. Token null tạm thời
-        // trong khoảng đó không có nghĩa phiên đã được đăng xuất.
+    private suspend fun currentSession(context: Context): FacebookSession {
+        // SDK có thể khởi tạo xong trước khi nạp token từ cache. Báo lỗi khi hết thời gian chờ
+        // để repository vẫn dọn dữ liệu cục bộ và giữ journal cho lần thử lại.
         val cache = accessTokenCache(context)
-        val cacheLoaded = withTimeoutOrNull(CACHE_LOAD_TIMEOUT_MILLIS) {
+        withTimeoutOrNull(CACHE_LOAD_TIMEOUT_MILLIS) {
             while (cache.contains(CACHED_ACCESS_TOKEN) && AccessToken.getCurrentAccessToken() == null) {
                 delay(25L)
             }
-            true
-        }
-        if (cacheLoaded != true) return null
+        } ?: error("Chưa khôi phục được phiên Facebook SDK.")
         return FacebookSession(AccessToken.getCurrentAccessToken()?.sessionFingerprint(), authenticationFingerprint())
     }
 

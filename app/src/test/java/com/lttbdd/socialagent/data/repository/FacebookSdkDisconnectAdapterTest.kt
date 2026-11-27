@@ -18,8 +18,10 @@ import com.lttbdd.socialagent.data.model.FacebookUserToken
 import com.lttbdd.socialagent.data.model.toChannelError
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -126,25 +128,27 @@ class FacebookSdkDisconnectAdapterTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun firstDisconnectCapturesCachedSessionAndRetriesAfterSdkLoadsIt() = runTest {
-        initializeSdk()
-        val oldToken = cacheSessionWithoutLoadingIt()
+    fun sdkCacheLoadTimeoutCleansLocalDataAndRetriesSignOutOnRepositoryRestore() = runTest {
+        val app = initializeSdk()
+        val cachedToken = cacheSessionWithoutLoadingIt()
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
             val adapter = FacebookSdkDisconnectAdapter()
+            val session = checkNotNull(adapter.currentSessionKey("test-user"))
             val tokenStore = ChannelRepositoryTest.FakeTokenStore()
             val accounts = ChannelRepositoryTest.FakeAccountStore()
-            val cleanedChannels = mutableListOf<ChannelType>()
-            val repository = ChannelRepositoryImpl(tokenStore, accounts, object : ChannelDataCleanup {
+            val cleanups = mutableListOf<Pair<ChannelType, String>>()
+            val cleanup = object : ChannelDataCleanup {
                 override suspend fun clear(type: ChannelType, operationId: String) {
-                    cleanedChannels.add(type)
+                    cleanups.add(type to operationId)
                 }
 
                 override suspend fun currentFacebookSession(expectedUserId: String?) =
                     adapter.currentSessionKey(expectedUserId)
 
                 override suspend fun signOutFacebook(expectedSession: String) = adapter.signOut(expectedSession)
-            })
+            }
+            val repository = ChannelRepositoryImpl(tokenStore, accounts, cleanup)
             repository.connectFacebookSelectedPage(
                 FacebookUserToken("test-user-token", Long.MAX_VALUE, null, "test-user"),
                 FacebookPage("a", "Page A", "test-page-token"),
@@ -153,20 +157,27 @@ class FacebookSdkDisconnectAdapterTest {
             val result = repository.disconnectChannel(ChannelType.FACEBOOK, "a")
 
             assertEquals(ChannelError.FACEBOOK_SIGN_OUT_FAILED, result.exceptionOrNull()?.toChannelError())
-            val pendingSession = tokenStore.loadPendingWrites().single().facebookSessionToSignOut
-            assertNotNull(pendingSession)
+            val pending = tokenStore.loadPendingWrites().single()
+            assertEquals(session, pending.facebookSessionToSignOut)
             assertTrue(repository.hasPendingDisconnectCleanup.value)
             assertTrue(accounts.saved.isEmpty())
             assertTrue(tokenStore.storage.isEmpty())
-            assertEquals(listOf(ChannelType.FACEBOOK), cleanedChannels)
-
-            AccessToken.setCurrentAccessToken(oldToken)
-            assertEquals(pendingSession, adapter.currentSessionKey("test-user"))
-            assertTrue(repository.retryPendingDisconnectCleanup())
-            assertTrue(tokenStore.loadPendingWrites().isEmpty())
-
-            assertNull(adapter.currentSessionKey("test-user"))
+            val cleanupOperation = ChannelType.FACEBOOK to pending.id
+            assertEquals(listOf(cleanupOperation), cleanups)
             assertNull(AccessToken.getCurrentAccessToken())
+            assertTrue(reopenPreferences(app, ACCESS_TOKEN_CACHE).contains(CACHED_ACCESS_TOKEN))
+
+            val restarted = ChannelRepositoryImpl(tokenStore, accounts, cleanup)
+            assertFalse(restarted.retryPendingDisconnectCleanup())
+            assertEquals(listOf(pending), tokenStore.loadPendingWrites())
+
+            AccessToken.setCurrentAccessToken(cachedToken)
+            assertTrue(restarted.getConnectedChannels().first().isEmpty())
+            assertFalse(restarted.hasPendingDisconnectCleanup.value)
+            assertTrue(tokenStore.loadPendingWrites().isEmpty())
+            assertEquals(List(3) { cleanupOperation }, cleanups)
+            assertNull(AccessToken.getCurrentAccessToken())
+            assertFalse(reopenPreferences(app, ACCESS_TOKEN_CACHE).contains(CACHED_ACCESS_TOKEN))
         } finally {
             Dispatchers.resetMain()
         }
@@ -189,15 +200,13 @@ class FacebookSdkDisconnectAdapterTest {
     }
 
     @Test
-    fun sdkSessionOfAnotherFacebookUserIsNeverSignedOut() = runBlocking {
+    fun disconnectKeepsSdkSessionOfAnotherFacebookUser() = runTest {
         val app = initializeSdk()
-        val other = AccessToken("other-token", "123456789", "other-user", null, null, null, null, null, null, null)
+        val other = accessToken("other-token", userId = "other-user")
         AccessToken.setCurrentAccessToken(other)
         persistPreferences(app, ACCESS_TOKEN_CACHE)
-        val adapter = FacebookSdkDisconnectAdapter()
 
-        // Page bị ngắt thuộc test-user, còn SDK đang đăng nhập other-user.
-        assertNull(adapter.currentSessionKey("test-user"))
+        assertLocalDisconnectCompletesWithoutSdkSignOut()
 
         assertEquals(other, AccessToken.getCurrentAccessToken())
         assertTrue(reopenPreferences(app, ACCESS_TOKEN_CACHE).contains(CACHED_ACCESS_TOKEN))
@@ -261,6 +270,55 @@ class FacebookSdkDisconnectAdapterTest {
         assertNull(FacebookSdkDisconnectAdapter().currentSessionKey(null))
     }
 
+    @Test
+    fun disconnectCompletesWhenSdkHasNoSession() = runTest {
+        initializeSdk()
+
+        assertLocalDisconnectCompletesWithoutSdkSignOut()
+
+        assertNull(AccessToken.getCurrentAccessToken())
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private suspend fun TestScope.assertLocalDisconnectCompletesWithoutSdkSignOut() {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val adapter = FacebookSdkDisconnectAdapter()
+            val tokenStore = ChannelRepositoryTest.FakeTokenStore()
+            val accounts = ChannelRepositoryTest.FakeAccountStore()
+            val cleanedChannels = mutableListOf<ChannelType>()
+            var signOutAttempts = 0
+            val repository = ChannelRepositoryImpl(tokenStore, accounts, object : ChannelDataCleanup {
+                override suspend fun clear(type: ChannelType, operationId: String) {
+                    cleanedChannels.add(type)
+                }
+
+                override suspend fun currentFacebookSession(expectedUserId: String?) =
+                    adapter.currentSessionKey(expectedUserId)
+
+                override suspend fun signOutFacebook(expectedSession: String) {
+                    signOutAttempts++
+                    adapter.signOut(expectedSession)
+                }
+            })
+            repository.connectFacebookSelectedPage(
+                FacebookUserToken("test-user-token", Long.MAX_VALUE, null, "test-user"),
+                FacebookPage("a", "Page A", "test-page-token"),
+            ).getOrThrow()
+
+            repository.disconnectChannel(ChannelType.FACEBOOK, "a").getOrThrow()
+
+            assertEquals(0, signOutAttempts)
+            assertEquals(listOf(ChannelType.FACEBOOK), cleanedChannels)
+            assertTrue(accounts.saved.isEmpty())
+            assertTrue(tokenStore.storage.isEmpty())
+            assertTrue(tokenStore.loadPendingWrites().isEmpty())
+            assertFalse(repository.hasPendingDisconnectCleanup.value)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
     private fun cacheSessionWithoutLoadingIt(): AccessToken {
         val token = accessToken("old-test-token")
         AccessToken.setCurrentAccessToken(token)
@@ -272,8 +330,8 @@ class FacebookSdkDisconnectAdapterTest {
         return token
     }
 
-    private fun accessToken(value: String) =
-        AccessToken(value, "123456789", "test-user", null, null, null, null, null, null, null)
+    private fun accessToken(value: String, userId: String = "test-user") =
+        AccessToken(value, "123456789", userId, null, null, null, null, null, null, null)
 
     @Suppress("DEPRECATION")
     private fun initializeSdk(): Application {

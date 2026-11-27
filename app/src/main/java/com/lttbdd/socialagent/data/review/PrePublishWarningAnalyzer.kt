@@ -4,12 +4,14 @@ import java.util.Locale
 
 /**
  * Bộ phân tích cảnh báo ngoại tuyến trước khi đăng bài (F4, Issue #65):
- * 1. Số liệu/thống kê chưa có nguồn trích dẫn ([PrePublishWarningType.UNSOURCED_STATISTIC]).
- * 2. Thông tin cá nhân nhạy cảm ([PrePublishWarningType.PERSONAL_INFO]) — luôn che mờ đoạn khớp.
+ * 1. Số liệu/thống kê chưa có nguồn trích dẫn trong cùng câu ([PrePublishWarningType.UNSOURCED_STATISTIC]).
+ * 2. Thông tin cá nhân nhạy cảm ([PrePublishWarningType.PERSONAL_INFO]) — luôn che mờ đoạn khớp;
+ *    số thẻ được kiểm tra thêm bằng thuật toán Luhn để tránh nhận nhầm dãy năm/mã số.
  * 3. Lời lẽ nhạy cảm, công kích hoặc cam kết tuyệt đối ([PrePublishWarningType.SENSITIVE_LANGUAGE]).
  *
- * Thuần Kotlin, không gọi mạng/LLM, trả về tối đa 1 cảnh báo đại diện cho mỗi nhóm và sắp xếp
- * cảnh báo mức [WarningSeverity.HIGH] lên trước.
+ * Thuần Kotlin, không gọi mạng/LLM, dùng cờ `(?iu)` để nhận diện nhất quán chữ hoa tiếng Việt
+ * trên cả JVM và Android, trả về tối đa 1 cảnh báo đại diện cho mỗi nhóm và sắp xếp mức
+ * [WarningSeverity.HIGH] lên trước.
  */
 object PrePublishWarningAnalyzer {
 
@@ -25,29 +27,40 @@ object PrePublishWarningAnalyzer {
         """(?<!\d)\+\d{1,3}[\s.-]?\(?\d{2,4}\)?[\s.-]?\d{3,4}[\s.-]?\d{3,4}(?!\d)""",
     )
 
+    /** Khớp dãy 13–19 chữ số có thể ngăn cách bởi khoảng trắng hoặc dấu gạch ngang; sẽ kiểm tra thêm Luhn. */
     private val CARD_NUMBER_REGEX = Regex(
-        """(?<!\d)(?:\d{4}[\s-]?){3}\d{3,4}(?!\d)""",
+        """(?<!\d)(?:\d[\s-]?){13,19}(?!\d)""",
     )
 
     private val ID_CONTEXT_REGEX = Regex(
-        """(?i)\b(?:cccd|cmnd|căn cước|hộ chiếu|passport|ssn|stk|số tài khoản|bank account|iban)\b[^\n\r\d]{0,16}(\d{6,16})""",
+        """(?iu)(?<!\p{L})(?:cccd|cmnd|căn cước|hộ chiếu|passport|ssn|stk|số tài khoản|bank account|iban)(?!\p{L})[^\n\r\d]{0,16}(\d{6,16})""",
     )
 
+    /**
+     * Khớp số liệu phần trăm hoặc quy mô lớn; bỏ qua đơn vị tiền tệ ngay sau (`triệu đồng`, `tỷ vnđ`, ...)
+     * để hạn chế báo nhầm cho giá sản phẩm.
+     */
     private val STATISTIC_REGEX = Regex(
-        """(?i)\b\d+(?:[.,]\d+)?\s*(?:%|(?:phần trăm|percent|triệu|tỷ|tỉ|nghìn|million|billion|thousand)(?!\p{L}))""",
+        """(?iu)\b\d+(?:[.,]\d+)?\s*(?:%|(?:phần trăm|percent|triệu|tỷ|tỉ|nghìn|million|billion|thousand)(?!\p{L})(?!\s*(?:đồng|vnđ|vnd|usd|\$|đ(?!\p{L}))))""",
     )
 
+    /**
+     * Chỉ nhận các cụm trích dẫn nguồn rõ ràng hoặc URL trong cùng câu chứa số liệu
+     * (không nhận từ "theo" đứng một mình để tránh tắt cảnh báo bởi "theo dõi", "tiếp theo"...).
+     */
     private val SOURCE_CUE_REGEX = Regex(
-        """(?i)(?:https?://\S+|(?<!\p{L})(?:nguồn|theo|báo cáo|khảo sát của|nghiên cứu của|thống kê của|source|according to|report by|study by|survey by|via)(?!\p{L}))""",
+        """(?iu)(?:https?://\S+|(?<!\p{L})(?:nguồn|theo\s+(?:báo cáo|số liệu|khảo sát|thống kê|nghiên cứu)|báo cáo\s+của|khảo sát\s+của|nghiên cứu\s+của|thống kê\s+của|source|according to|report by|study by|survey by|via)(?!\p{L}))""",
     )
+
+    private val SENTENCE_SPLIT_REGEX = Regex("""(?<=[.!?])\s+|\r?\n+""")
 
     private val SENSITIVE_PATTERNS: List<Regex> = listOf(
         // Công kích, xúc phạm, thù ghét (VI & EN)
-        Regex("""(?i)(?<!\p{L})(?:đồ ngu|ngu ngốc|óc chó|khốn nạn|mất dạy|kỳ thị|phân biệt chủng tộc|đánh chết|giết chết)(?!\p{L})"""),
-        Regex("""(?i)\b(?:idiot|moron|stupid|racist|sexist|hate speech|kill yourself|scammer)\b"""),
-        // Tuyên bố tuyệt đối / gây hiểu lầm dễ bị nền tảng gắn cờ
-        Regex("""(?i)(?<!\p{L})(?:chữa khỏi 100%|cam kết 100%|làm giàu nhanh|không bao giờ thua|đảm bảo thắng 100%)(?!\p{L})"""),
-        Regex("""(?i)\b(?:guaranteed 100%|100% cure|get rich quick|zero risk guaranteed)\b"""),
+        Regex("""(?iu)(?<!\p{L})(?:đồ ngu|ngu ngốc|óc chó|khốn nạn|mất dạy|kỳ thị|phân biệt chủng tộc|đánh chết|giết chết)(?!\p{L})"""),
+        Regex("""(?iu)(?<!\p{L})(?:idiot|moron|stupid|racist|sexist|hate speech|kill yourself|scammer)(?!\p{L})"""),
+        // Tuyên bố tuyệt đối / gây hiểu lầm dễ bị nền tảng gắn cờ (không dùng \b sau ký tự %)
+        Regex("""(?iu)(?<!\p{L})(?:chữa khỏi 100%|cam kết 100%|làm giàu nhanh|không bao giờ thua|đảm bảo thắng 100%)(?!\p{L})(?!\d)"""),
+        Regex("""(?iu)(?<!\p{L})(?:guaranteed 100%|100% cure|get rich quick|zero risk guaranteed)(?!\p{L})(?!\d)"""),
     )
 
     /** Phân tích nội dung [text] và trả về danh sách cảnh báo đã chuẩn hóa (không trùng loại). */
@@ -93,8 +106,11 @@ object PrePublishWarningAnalyzer {
         INTL_PHONE_REGEX.find(text)?.let { match ->
             return maskDigits(match.value)
         }
-        CARD_NUMBER_REGEX.find(text)?.let { match ->
-            return maskDigits(match.value)
+        for (match in CARD_NUMBER_REGEX.findAll(text)) {
+            val digits = match.value.filter { it.isDigit() }
+            if (digits.length in 13..19 && passesLuhn(digits)) {
+                return maskDigits(digits)
+            }
         }
         ID_CONTEXT_REGEX.find(text)?.let { match ->
             val digits = match.groupValues.getOrNull(1).orEmpty()
@@ -114,9 +130,29 @@ object PrePublishWarningAnalyzer {
     }
 
     private fun detectUnsourcedStatistic(text: String): String? {
-        val statMatch = STATISTIC_REGEX.find(text) ?: return null
-        if (SOURCE_CUE_REGEX.containsMatchIn(text)) return null
-        return statMatch.value.trim()
+        for (sentence in text.split(SENTENCE_SPLIT_REGEX)) {
+            if (sentence.isBlank()) continue
+            val statMatch = STATISTIC_REGEX.find(sentence) ?: continue
+            if (!SOURCE_CUE_REGEX.containsMatchIn(sentence)) {
+                return statMatch.value.trim()
+            }
+        }
+        return null
+    }
+
+    private fun passesLuhn(digits: String): Boolean {
+        var sum = 0
+        var doubleNext = false
+        for (i in digits.length - 1 downTo 0) {
+            var digit = digits[i] - '0'
+            if (doubleNext) {
+                digit *= 2
+                if (digit > 9) digit -= 9
+            }
+            sum += digit
+            doubleNext = !doubleNext
+        }
+        return sum % 10 == 0
     }
 
     private fun maskEmail(email: String): String {

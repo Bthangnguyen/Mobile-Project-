@@ -1,5 +1,6 @@
 package com.lttbdd.socialagent.core.database
 
+import androidx.room.AutoMigration
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import com.lttbdd.socialagent.core.database.dao.CommentDao
@@ -24,8 +25,10 @@ import com.lttbdd.socialagent.core.database.entity.PostEntity
         CommentEntity::class,
         MetricsSnapshotEntity::class,
     ],
-    version = 1,
+    // v2 (#39): thêm cột posts.nextAttemptAtMillis (nullable) nên Room tự sinh migration.
+    version = 2,
     exportSchema = true,
+    autoMigrations = [AutoMigration(from = 1, to = 2)],
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun draftDao(): DraftDao

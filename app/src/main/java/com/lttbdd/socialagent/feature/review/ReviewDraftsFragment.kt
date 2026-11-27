@@ -10,6 +10,7 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.lttbdd.socialagent.R
 import com.lttbdd.socialagent.core.ui.components.AppDialog
@@ -48,12 +49,25 @@ class ReviewDraftsFragment : Fragment() {
 
     private fun setupViews() {
         adapter = ReviewDraftsAdapter(
+            onPreviewEditClick = { draftId ->
+                val args = Bundle().apply {
+                    putString(DraftPreviewViewModel.ARG_DRAFT_ID, draftId)
+                }
+                findNavController().navigate(R.id.action_posts_to_draft_preview, args)
+            },
             onApproveClick = viewModel::onApproveRequested,
             onRevokeClick = viewModel::onRevokeApproval,
             onPublishClick = viewModel::onPublishRequested,
         )
         binding.rvDrafts.layoutManager = LinearLayoutManager(requireContext())
         binding.rvDrafts.adapter = adapter
+        binding.btnPublishStatus.setOnClickListener {
+            val navController = findNavController()
+            // Bỏ qua lần bấm lặp khi đã rời màn hình này.
+            if (navController.currentDestination?.id == R.id.postsFragment) {
+                navController.navigate(R.id.action_posts_to_publish_status)
+            }
+        }
         binding.emptyState.setContent(
             title = getString(R.string.review_empty_title),
             message = getString(R.string.review_empty_message),

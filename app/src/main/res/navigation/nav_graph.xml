@@ -22,7 +22,20 @@
     <fragment
         android:id="@+id/postsFragment"
         android:name="com.lttbdd.socialagent.feature.review.ReviewDraftsFragment"
-        android:label="@string/nav_posts" />
+        android:label="@string/nav_posts">
+        <action
+            android:id="@+id/action_posts_to_draft_preview"
+            app:destination="@id/draftPreviewFragment" />
+        <action
+            android:id="@+id/action_posts_to_publish_status"
+            app:destination="@id/publishStatusFragment" />
+    </fragment>
+
+    <!-- Trạng thái đăng từng kênh (A, F5 #36) mở từ tab Bài viết. -->
+    <fragment
+        android:id="@+id/publishStatusFragment"
+        android:name="com.lttbdd.socialagent.feature.publishing.PublishStatusFragment"
+        android:label="@string/publish_status_title" />
 
     <fragment
         android:id="@+id/commentsFragment"
@@ -79,5 +92,17 @@
         android:id="@+id/channelFragment"
         android:name="com.lttbdd.socialagent.feature.channel.ChannelFragment"
         android:label="@string/channel_title" />
+
+    <!-- Xem trước & sửa tay bản nháp (D, F4 — Issue #34). -->
+    <fragment
+        android:id="@+id/draftPreviewFragment"
+        android:name="com.lttbdd.socialagent.feature.review.DraftPreviewFragment"
+        android:label="@string/preview_header_title">
+        <argument
+            android:name="draftId"
+            android:defaultValue="@null"
+            app:argType="string"
+            app:nullable="true" />
+    </fragment>
 
 </navigation>

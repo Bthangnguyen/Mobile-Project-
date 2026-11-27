@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingTop="@dimen/component_spacing_small"
+    android:paddingBottom="@dimen/component_spacing_small">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:minHeight="48dp"
+        android:orientation="horizontal">
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/tvChannelName"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textAppearance="@style/TextAppearance.SocialAgent.Body" />
+
+        <com.lttbdd.socialagent.core.ui.components.StatusIndicator
+            android:id="@+id/statusChannel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:accessibilityLiveRegion="polite" />
+
+        <com.lttbdd.socialagent.core.ui.components.SecondaryButton
+            android:id="@+id/btnPublishChannel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/component_spacing_small"
+            android:text="@string/review_action_publish"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <!-- Mở bài gốc khi đã đăng (#40). -->
+    <com.lttbdd.socialagent.core.ui.components.TextButton
+        android:id="@+id/btnOpenPost"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/publish_status_open_post"
+        android:visibility="gone" />
+
+    <com.google.android.material.textview.MaterialTextView
+        android:id="@+id/tvChannelHint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textAppearance="@style/TextAppearance.SocialAgent.Caption"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/confirmActions"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/component_spacing_xsmall"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <com.lttbdd.socialagent.core.ui.components.OutlinedButton
+            android:id="@+id/btnConfirmPublished"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/publish_status_confirm_published" />
+
+        <com.lttbdd.socialagent.core.ui.components.OutlinedButton
+            android:id="@+id/btnRequeue"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/component_spacing_small"
+            android:layout_weight="1"
+            android:text="@string/publish_status_confirm_not_published" />
+    </LinearLayout>
+</LinearLayout>

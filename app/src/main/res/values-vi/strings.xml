@@ -248,6 +248,7 @@
     <string name="review_empty_message">Hãy tạo chủ đề mới. Bản nháp AI sinh ra sẽ xuất hiện tại đây để bạn duyệt trước khi đăng.</string>
     <string name="review_status_approved">Đã duyệt</string>
     <string name="review_approval_required_hint">Cần người dùng duyệt trước khi có thể đăng bài này.</string>
+    <string name="review_action_edit">Xem trước &amp; Sửa</string>
     <string name="review_action_approve">Duyệt bài</string>
     <string name="review_action_revoke">Bỏ duyệt</string>
     <string name="review_action_publish">Đăng bài</string>
@@ -264,4 +265,58 @@
     <string name="review_publish_already_queued">Bản nháp này đã nằm trong hàng đợi đăng bài.</string>
     <string name="review_publish_in_progress">Bản nháp này đang được đăng hoặc đang chờ bạn xác nhận kết quả.</string>
     <string name="review_publish_already_published">Bản nháp này đã được đăng trước đó.</string>
+
+    <!-- Feature F4: Xem trước theo kênh, sửa tay & đếm ký tự (Issue #34) -->
+    <string name="preview_header_title">Xem trước &amp; Sửa bài</string>
+    <string name="preview_header_subtitle">Chuyển kênh để xem trước hiển thị, chỉnh sửa thủ công và theo dõi giới hạn ký tự từng nền tảng.</string>
+    <string name="preview_facebook_author">Trang Facebook</string>
+    <string name="preview_facebook_meta">Công khai · Vừa xong</string>
+    <string name="preview_facebook_actions">Thích · Bình luận · Chia sẻ</string>
+    <string name="preview_linkedin_author">Trang LinkedIn</string>
+    <string name="preview_linkedin_meta">1st · Vừa xong</string>
+    <string name="preview_linkedin_see_more">…xem thêm</string>
+    <string name="preview_linkedin_actions">Thích · Bình luận · Đăng lại · Gửi</string>
+    <string name="preview_placeholder_body">Nhập nội dung để xem trước bài đăng…</string>
+    <string name="preview_editor_hint">Chỉnh sửa nội dung bài viết</string>
+    <string name="preview_char_count_format">%1$d / %2$d ký tự</string>
+    <string name="preview_char_excess_format">Vượt quá giới hạn %1$d ký tự</string>
+    <string name="preview_char_reference_note">Chỉ để tham khảo — bản nháp này thuộc kênh %1$s nên vẫn lưu được trong giới hạn của kênh đó.</string>
+    <string name="preview_error_empty">Nội dung bài viết không được để trống</string>
+    <string name="preview_error_over_limit">Nội dung vượt quá giới hạn ký tự của kênh bản nháp</string>
+    <string name="preview_action_reset">Khôi phục</string>
+    <string name="preview_action_save">Lưu chỉnh sửa</string>
+    <string name="preview_save_success">Đã lưu chỉnh sửa. Cần duyệt lại trước khi đăng bài.</string>
+    <string name="preview_save_failed">Không thể lưu bản nháp. Vui lòng kiểm tra lại nội dung.</string>
+    <string name="preview_not_found_title">Không tìm thấy bản nháp</string>
+    <string name="preview_not_found_message">Bản nháp được yêu cầu không tồn tại hoặc đã bị xóa.</string>
+    <string name="preview_publishing_locked_warning">Bản nháp đang có bài chờ đăng hoặc đang đăng nên tạm khóa chỉnh sửa.</string>
+    <string name="preview_discard_dialog_title">Bỏ thay đổi chưa lưu?</string>
+    <string name="preview_discard_dialog_message">Bạn đang có nội dung chỉnh sửa chưa lưu. Thoát ngay sẽ mất các thay đổi này.</string>
+    <string name="preview_discard_action">Bỏ thay đổi</string>
+    <string name="preview_stay_action">Ở lại</string>
+
+    <!-- F5 Trạng thái đăng (#36) -->
+    <string name="publish_status_title">Trạng thái đăng bài</string>
+    <string name="publish_status_subtitle">Mỗi kênh được đăng riêng. Một kênh bị lỗi không ảnh hưởng các kênh khác.</string>
+    <string name="publish_status_empty_title">Chưa có bài để đăng</string>
+    <string name="publish_status_empty_message">Bản nháp bạn tạo sẽ hiện ở đây kèm trạng thái đăng của từng kênh.</string>
+    <string name="publish_status_publish_all">Đăng tất cả kênh đã duyệt</string>
+    <string name="publish_status_retry">Thử lại</string>
+    <string name="publish_status_needs_check">Cần kiểm tra</string>
+    <string name="publish_status_needs_approval_hint">Duyệt bản nháp này ở màn Duyệt bài trước khi đăng.</string>
+    <string name="publish_status_needs_confirmation_hint">Không rõ bài đã lên hay chưa. Hãy kiểm tra trên kênh rồi chọn bên dưới.</string>
+    <string name="publish_status_confirm_published">Bài đã lên</string>
+    <string name="publish_status_confirm_not_published">Chưa lên, đăng lại</string>
+    <string name="publish_status_requeue_dialog_title">Đăng lại bài này?</string>
+    <string name="publish_status_requeue_dialog_message">Chỉ tiếp tục nếu bạn đã kiểm tra trên kênh và không thấy bài. Nếu không, bài có thể bị đăng hai lần.</string>
+    <string name="publish_status_requeue_action">Đăng lại</string>
+    <string name="publish_status_all_queued">Đã thêm tất cả kênh đã duyệt vào hàng đợi đăng bài.</string>
+    <string name="publish_status_queued_some_unapproved">Đã thêm các kênh đã duyệt vào hàng đợi. Kênh chưa duyệt được bỏ qua.</string>
+    <string name="publish_status_nothing_to_publish">Không có kênh đã duyệt nào đang chờ đăng.</string>
+    <string name="publish_status_marked_published">Đã đánh dấu là đã đăng.</string>
+    <string name="publish_status_requeued">Đã đưa lại vào hàng đợi đăng bài.</string>
+    <string name="publish_status_state_changed">Trạng thái bài đã thay đổi. Hãy xem lại danh sách.</string>
+    <string name="publish_status_open_post">Mở bài gốc</string>
+    <string name="publish_status_open_failed">Không có ứng dụng nào trên máy mở được liên kết này.</string>
+    <string name="publish_status_action_failed">Không cập nhật được hàng đợi đăng bài. Vui lòng thử lại.</string>
 </resources>

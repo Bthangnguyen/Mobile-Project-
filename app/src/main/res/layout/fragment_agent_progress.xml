@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:scrollbars="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="@dimen/screen_padding">
+
+        <!-- Header -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnBack"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="0dp"
+                android:paddingHorizontal="@dimen/component_spacing_small"
+                android:text="@string/agent_progress_back" />
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/tvHeaderTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/component_spacing_small"
+                android:layout_weight="1"
+                android:text="@string/agent_progress_title"
+                android:textAppearance="@style/TextAppearance.SocialAgent.Headline" />
+        </LinearLayout>
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/tvOverallStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing_xsmall"
+            android:text="@string/agent_progress_status_running"
+            android:textAppearance="@style/TextAppearance.SocialAgent.Caption" />
+
+        <com.google.android.material.progressindicator.LinearProgressIndicator
+            android:id="@+id/progressOverall"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing_small"
+            android:indeterminate="true"
+            android:visibility="gone" />
+
+        <!-- Missing brief fallback -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardMissingBrief"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing"
+            android:visibility="gone"
+            app:cardBackgroundColor="@color/brand_surface_container_low"
+            app:cardCornerRadius="@dimen/corner_radius_medium"
+            app:strokeColor="@color/brand_outline_variant"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="@dimen/card_padding">
+
+                <com.google.android.material.textview.MaterialTextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/agent_progress_missing_brief_title"
+                    android:textAppearance="@style/TextAppearance.SocialAgent.Title" />
+
+                <com.google.android.material.textview.MaterialTextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/component_spacing_xsmall"
+                    android:text="@string/agent_progress_missing_brief_message"
+                    android:textAppearance="@style/TextAppearance.SocialAgent.Body" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnBackToCompose"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/component_spacing"
+                    android:text="@string/agent_progress_back_to_compose" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Shared Brief Card -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardBriefSummary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing"
+            app:cardBackgroundColor="@color/brand_surface_container_low"
+            app:cardCornerRadius="@dimen/corner_radius_medium"
+            app:strokeColor="@color/brand_outline_variant"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="@dimen/card_padding">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/agent_progress_shared_brief_title"
+                        android:textAppearance="@style/TextAppearance.SocialAgent.Title" />
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:id="@+id/tvBriefStatus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/agent_progress_waiting"
+                        android:textAppearance="@style/TextAppearance.SocialAgent.Caption" />
+                </LinearLayout>
+
+                <com.google.android.material.textview.MaterialTextView
+                    android:id="@+id/tvBriefTopic"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/component_spacing_small"
+                    android:textAppearance="@style/TextAppearance.SocialAgent.Body"
+                    android:textStyle="bold" />
+
+                <com.google.android.material.textview.MaterialTextView
+                    android:id="@+id/tvBriefSummary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/component_spacing_xsmall"
+                    android:text="@string/agent_progress_preparing_brief"
+                    android:textAppearance="@style/TextAppearance.SocialAgent.Caption" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Per-channel progress and live stream cards -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvChannelProgress"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing"
+            android:nestedScrollingEnabled="false" />
+
+        <!-- Bottom actions when run completes -->
+        <LinearLayout
+            android:id="@+id/layoutBottomActions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnOpenPosts"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/button_height"
+                android:text="@string/agent_progress_open_drafts" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnCreateAnother"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/button_height"
+                android:layout_marginTop="@dimen/component_spacing_small"
+                android:text="@string/agent_progress_create_another" />
+        </LinearLayout>
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

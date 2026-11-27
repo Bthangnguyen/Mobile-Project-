@@ -359,4 +359,42 @@
     <string name="publish_error_storage">Could not save to the device storage.</string>
     <string name="publish_error_unknown">The channel returned an error.</string>
     <string name="publish_status_action_failed">Could not update the publishing queue. Please try again.</string>
+
+    <!-- F2 Agent Progress & Content Streaming (Issue #29) -->
+    <string name="agent_progress_title">AI Agent Progress</string>
+    <string name="agent_progress_back">Back</string>
+    <string name="agent_progress_status_running">Generating content…</string>
+    <string name="agent_progress_status_running_count">Generating content… (%1$d/%2$d channels done)</string>
+    <string name="agent_progress_status_completed">Completed %1$d channel(s). Review drafts before publishing.</string>
+    <string name="agent_progress_status_partial">Completed %1$d/%2$d channels. Some channels failed.</string>
+    <string name="agent_progress_status_failed">Could not generate drafts for the selected channels.</string>
+    <string name="agent_progress_shared_brief_title">Shared Brief</string>
+    <string name="agent_progress_preparing_brief">Preparing shared brief…</string>
+    <string name="agent_progress_missing_brief_title">No topic brief found</string>
+    <string name="agent_progress_missing_brief_message">Enter your topic and channel selection first so the AI Agent can start writing.</string>
+    <string name="agent_progress_back_to_compose">Back to Create</string>
+    <string name="agent_progress_open_drafts">Open Drafts &amp; Approval</string>
+    <string name="agent_progress_create_another">Create another post</string>
+    <string name="agent_progress_review_draft">Review &amp; Approve Draft</string>
+    <string name="agent_stream_waiting_output">Waiting for content stream…</string>
+    <string name="agent_stream_step_outline">Streaming outline…</string>
+    <string name="agent_stream_step_draft">Streaming draft…</string>
+    <string name="agent_stream_step_self_review">Streaming self-reviewed post…</string>
+    <string name="agent_stream_final_content">Final draft content</string>
+    <string name="agent_stream_stopped_on_error">Stopped due to an error</string>
+    <string name="agent_stream_image_prompt_label">Image description</string>
+    <string name="agent_error_with_step">Failed at %1$s: %2$s</string>
+    <string name="agent_error_save_draft_failed">Draft was generated, but could not be saved locally.</string>
+    <string name="agent_error_timeout">The AI request timed out. Please try again.</string>
+    <string name="agent_error_rules_violated">The generated post did not meet this channel’s formatting rules.</string>
+    <string name="agent_error_unsupported_channel">This channel is not supported by the AI Agent yet.</string>
+    <string name="agent_error_channel_not_in_brief">This channel was not selected in the brief.</string>
+    <string name="agent_error_empty_response">The AI provider returned an empty or incomplete response.</string>
+    <string name="agent_error_missing_api_key">No LLM API key is configured. Add one in Settings › LLM API Keys.</string>
+    <string name="agent_error_auth_failed">The LLM API key was rejected. Check your key in Settings › LLM API Keys.</string>
+    <string name="agent_error_rate_limit">The LLM provider rate limit was reached. Try again shortly.</string>
+    <string name="agent_error_network">Network error while contacting the LLM provider.</string>
+    <string name="agent_error_content_blocked">The LLM provider blocked this content by safety policy.</string>
+    <string name="agent_error_provider">The LLM provider returned a temporary server error.</string>
+    <string name="agent_error_unknown">An unexpected error occurred while generating content.</string>
 </resources>

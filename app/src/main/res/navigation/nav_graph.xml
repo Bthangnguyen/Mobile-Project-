@@ -17,6 +17,22 @@
         android:id="@+id/composeFragment"
         android:name="com.lttbdd.socialagent.feature.compose.ComposeFragment"
         android:label="@string/nav_compose">
+        <action
+            android:id="@+id/action_compose_to_agent_progress"
+            app:destination="@id/agentProgressFragment" />
+    </fragment>
+
+    <!-- Tiến độ từng bước và stream nội dung của AI Agent (C, F2 — Issue #29). -->
+    <fragment
+        android:id="@+id/agentProgressFragment"
+        android:name="com.lttbdd.socialagent.feature.agent.AgentProgressFragment"
+        android:label="@string/agent_progress_title">
+        <action
+            android:id="@+id/action_agent_progress_to_draft_preview"
+            app:destination="@id/draftPreviewFragment" />
+        <action
+            android:id="@+id/action_agent_progress_to_posts"
+            app:destination="@id/postsFragment" />
     </fragment>
 
     <fragment

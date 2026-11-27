@@ -23,6 +23,10 @@ import kotlinx.serialization.json.put
  * - Mỗi kênh một instance với [ChannelWritingRules] riêng; kết quả bước trước là đầu vào của bước sau.
  * - Bốn bước chữ gọi [LlmClient] với loại việc [LlmTask.WRITE_POST] (model do người dùng chọn ở F8)
  *   và stream từng mẩu qua [AgentEvent.TextDelta]; token/chi phí của bước nằm trong [AgentEvent.StepFinished].
+ *   Cả bốn bước (kể cả Dàn ý và Mô tả ảnh) đều phát TextDelta kèm `step`: UI (#29) lọc theo `step` nếu chỉ muốn
+ *   hiện nội dung bài. TextDelta là chữ thô LLM trả về; nội dung cuối cùng là `draft.text` trong ChannelDone.
+ * - Kết quả mỗi bước được gỡ "vỏ" bằng [LlmOutputCleaner] (khối ``` bọc ngoài, câu dẫn như
+ *   "Here is the final post:") trước khi kiểm tra và chuyển sang bước sau.
  * - Tự rà: LLM rà và sửa bài theo quy tắc kênh, rồi kiểm tra xác định bằng [ChannelWritingRules.check].
  *   Vi phạm tìm thấy ở bản nháp được giao cho LLM sửa; bài đã rà vẫn vi phạm thì kênh lỗi với
  *   [ChannelFailureReason.CHANNEL_RULES_VIOLATED] (người dùng chạy lại riêng kênh này).
@@ -99,7 +103,7 @@ class LlmChannelSubAgent(
             }
             chunk.usage?.let { usage = it }
         }
-        val output = text.toString().trim()
+        val output = LlmOutputCleaner.clean(text.toString())
         if (output.isEmpty()) throw LlmException(LlmFailure.EMPTY_RESPONSE)
         validate(output)
         emit(AgentEvent.StepFinished(channel, step, usage ?: TokenUsage.ZERO))

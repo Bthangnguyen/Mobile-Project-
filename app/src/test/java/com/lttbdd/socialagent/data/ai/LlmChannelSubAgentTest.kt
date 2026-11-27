@@ -302,6 +302,25 @@ class LlmChannelSubAgentTest {
     }
 
     @Test
+    fun `cau dan va khoi code boc ngoai duoc go truoc khi kiem tra va chuyen buoc`() = runTest {
+        val llm = ScriptedLlm { step, _ ->
+            when (step) {
+                AgentStep.DRAFT -> reply("```\n${defaultAnswer(step)}\n```")
+                AgentStep.SELF_REVIEW -> reply("Here is the final post:\n\n```text\n${defaultAnswer(step)}\n```")
+                else -> reply(defaultAnswer(step))
+            }
+        }
+
+        val events = LlmChannelSubAgent(llm, ChannelWritingRules.of(li)).runCollecting(context())
+
+        // Bản nháp đã gỡ khối ``` nên không bị coi là vi phạm Markdown khi giao cho bước Tự rà.
+        assertEquals(defaultAnswer(AgentStep.DRAFT), llm.requests[2].userJson().text("draft"))
+        assertFalse(llm.requests[2].system().contains("automatic check"))
+        assertEquals(defaultAnswer(AgentStep.SELF_REVIEW), llm.requests[3].userJson().text("post"))
+        assertEquals(defaultAnswer(AgentStep.SELF_REVIEW), (events.last() as AgentEvent.ChannelDone).draft.text)
+    }
+
+    @Test
     fun `bai sau tu ra van vi pham thi kenh loi CHANNEL_RULES_VIOLATED va khong sinh anh`() = runTest {
         val llm = ScriptedLlm { step, _ ->
             when (step) {

@@ -55,7 +55,7 @@ class LlmModelCatalogTest {
         )
         assertEquals(
             ModelValidation.INCOMPATIBLE_WITH_TASK,
-            LlmModelCatalog.validate(LlmProvider.OPENAI, LlmTask.CLASSIFY_COMMENT, "gpt-image-1"),
+            LlmModelCatalog.validate(LlmProvider.OPENAI, LlmTask.CLASSIFY_COMMENT, "gpt-image-2.5-flare"),
         )
     }
 
@@ -105,17 +105,23 @@ class LlmModelCatalogTest {
             ModelWarning.POSSIBLY_INCOMPATIBLE_WITH_TASK,
             LlmModelCatalog.warning(LlmProvider.OPENAI, LlmTask.WRITE_POST, "gpt-x-image-input"),
         )
-        assertEquals(ModelValidation.VALID, LlmModelCatalog.validate(LlmProvider.OPENAI, LlmTask.GENERATE_IMAGE, "my-model"))
-        assertEquals(
-            ModelWarning.POSSIBLY_INCOMPATIBLE_WITH_TASK,
-            LlmModelCatalog.warning(LlmProvider.OPENAI, LlmTask.GENERATE_IMAGE, "my-model"),
-        )
         // Model ảnh phổ biến ngoài danh mục không bị cảnh báo nhầm.
-        assertNull(LlmModelCatalog.warning(LlmProvider.OPENAI, LlmTask.GENERATE_IMAGE, "dall-e-3"))
         assertNull(LlmModelCatalog.warning(LlmProvider.GEMINI, LlmTask.GENERATE_IMAGE, "imagen-4.0"))
         assertNull(LlmModelCatalog.warning(LlmProvider.GEMINI, LlmTask.WRITE_POST, "gemini-9-pro"))
         // Model trong danh mục dùng khai báo sẵn: không cảnh báo (sai loại việc thì validate đã chặn).
         assertNull(LlmModelCatalog.warning(LlmProvider.GEMINI, LlmTask.WRITE_POST, "gemini-2.5-flash"))
+    }
+
+    @Test
+    fun `OpenAI image generation accepts GPT Image snapshots and rejects retired image models`() {
+        for (id in listOf("dall-e-3", "dall-e-2", "gpt-image-1", "my-model")) {
+            assertEquals(id, ModelValidation.INCOMPATIBLE_WITH_TASK,
+                LlmModelCatalog.validate(LlmProvider.OPENAI, LlmTask.GENERATE_IMAGE, id))
+        }
+        assertEquals(
+            ModelValidation.VALID,
+            LlmModelCatalog.validate(LlmProvider.OPENAI, LlmTask.GENERATE_IMAGE, "gpt-image-2.5-flare-2026-09-08"),
+        )
     }
 
     @Test

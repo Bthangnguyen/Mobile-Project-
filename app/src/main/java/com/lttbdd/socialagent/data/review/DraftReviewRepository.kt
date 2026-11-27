@@ -1,9 +1,14 @@
 package com.lttbdd.socialagent.data.review
 
+import android.content.Context
+import androidx.room.withTransaction
+import com.lttbdd.socialagent.core.database.AppDatabase
 import com.lttbdd.socialagent.core.database.dao.DraftDao
 import com.lttbdd.socialagent.core.database.toEntity
 import com.lttbdd.socialagent.core.database.toModel
 import com.lttbdd.socialagent.core.model.Draft
+import com.lttbdd.socialagent.data.ai.DraftImageFiles
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -71,7 +76,7 @@ interface DraftReviewRepository {
 
     /**
      * Lưu bản nháp do AI Agent tạo ra. Luôn đảm bảo `approved = false` qua [DraftApprovalGuard]
-     * để agent không bao giờ tự đăng bài chưa qua duyệt.
+     * để agent không bao giờ tự đăng bài chưa qua duyệt. Bản đã duyệt hoặc còn bài chưa đăng được giữ lại.
      */
     suspend fun saveAgentDraft(draft: Draft): Result<Draft>
 
@@ -106,13 +111,19 @@ interface DraftReviewRepository {
 }
 
 @Singleton
-class RoomDraftReviewRepository @Inject constructor(
+class RoomDraftReviewRepository internal constructor(
+    private val database: AppDatabase,
     private val draftDao: DraftDao,
-    private val draftVersionStore: DraftVersionStore,
+    private val draftVersionStore: DraftVersionStore = NoOpDraftVersionStore,
+    private val discardImage: suspend (String) -> Unit = {},
 ) : DraftReviewRepository {
 
-    /** Constructor tiện ích cho unit test không cần theo dõi lịch sử phiên bản. */
-    constructor(draftDao: DraftDao) : this(draftDao, NoOpDraftVersionStore)
+    @Inject
+    constructor(
+        database: AppDatabase,
+        draftVersionStore: DraftVersionStore,
+        @ApplicationContext context: Context,
+    ) : this(database, database.draftDao(), draftVersionStore, DraftImageFiles(context)::discard)
 
     override fun observeDrafts(): Flow<List<Draft>> =
         draftDao.observeAll().map { entities -> entities.map { it.toModel() } }
@@ -120,7 +131,23 @@ class RoomDraftReviewRepository @Inject constructor(
     override suspend fun saveAgentDraft(draft: Draft): Result<Draft> = try {
         val now = System.currentTimeMillis()
         val unapprovedDraft = DraftApprovalGuard.sanitizeAgentDraft(draft)
-        draftDao.upsert(unapprovedDraft.toEntity(updatedAtMillis = now))
+        val previousImageUri = database.withTransaction {
+            val existing = draftDao.getById(unapprovedDraft.id)
+            check(existing?.approved != true && draftDao.countPendingPosts(unapprovedDraft.id) == 0) {
+                "Không thể ghi đè bản nháp đã duyệt hoặc còn bài chưa đăng"
+            }
+            draftDao.upsert(unapprovedDraft.toEntity(updatedAtMillis = now))
+            existing?.imageUri
+        }
+        if (previousImageUri != null && previousImageUri != unapprovedDraft.imageUri) {
+            try {
+                discardImage(previousImageUri)
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (_: Exception) {
+                // Dọn file cũ là thao tác phụ sau commit; bản nháp mới đã lưu thành công.
+            }
+        }
         try {
             if (unapprovedDraft.text.isNotBlank()) {
                 draftVersionStore.recordVersion(

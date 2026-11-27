@@ -1,20 +1,19 @@
 package com.lttbdd.socialagent.di
 
 import android.content.Context
-import androidx.room.withTransaction
 import com.lttbdd.socialagent.core.ai.ContentAgent
 import com.lttbdd.socialagent.core.ai.LlmClient
-import com.lttbdd.socialagent.core.database.AppDatabase
-import com.lttbdd.socialagent.core.database.toEntity
-import com.lttbdd.socialagent.core.model.ChannelType
-import com.lttbdd.socialagent.core.model.Draft
 import com.lttbdd.socialagent.data.ai.ApiKeySource
+import com.lttbdd.socialagent.data.ai.ChannelImageRequest
 import com.lttbdd.socialagent.data.ai.ContentAgentImpl
-import com.lttbdd.socialagent.data.ai.DraftChannelSubAgent
 import com.lttbdd.socialagent.data.ai.DraftImageFiles
 import com.lttbdd.socialagent.data.ai.DraftImages
 import com.lttbdd.socialagent.data.ai.LlmConfigurationSource
 import com.lttbdd.socialagent.data.ai.ProviderImageApi
+import com.lttbdd.socialagent.data.ai.SavingContentAgent
+import com.lttbdd.socialagent.data.ai.llmChannelSubAgents
+import com.lttbdd.socialagent.data.review.DraftHistoryWriteException
+import com.lttbdd.socialagent.data.review.DraftReviewRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -22,6 +21,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import okhttp3.OkHttpClient
 
 @Module
@@ -31,7 +31,7 @@ object ContentAgentModule {
     @Singleton
     fun contentAgent(
         @ApplicationContext context: Context,
-        database: AppDatabase,
+        drafts: DraftReviewRepository,
         llm: LlmClient,
         configurations: LlmConfigurationSource,
         keys: ApiKeySource,
@@ -44,17 +44,20 @@ object ContentAgentModule {
             .build()
         val files = DraftImageFiles(context)
         val images = DraftImages(configurations, keys, ProviderImageApi(http), files, files)
-        val saveDraft: suspend (Draft) -> Unit = { draft ->
-            database.withTransaction {
-                val drafts = database.draftDao()
-                val existing = drafts.getById(draft.id)
-                check(existing?.approved != true && drafts.countPendingPosts(draft.id) == 0)
-                drafts.upsert(draft.toEntity(System.currentTimeMillis()))
-            }
-        }
-        return ContentAgentImpl(
-            subAgents = ChannelType.entries.associateWith { DraftChannelSubAgent(it, llm, images, saveDraft) },
-            createImage = { draft -> images.create(draft, "") },
+        val agent = ContentAgentImpl(
+            subAgents = llmChannelSubAgents(llm, images),
+            createImage = { draft ->
+                images.create(ChannelImageRequest(draft.topicId, draft.channel, draft.text, draft.text))
+            },
         )
+        return SavingContentAgent(agent) { draft ->
+            val saved = drafts.saveAgentDraft(draft)
+            val failure = saved.exceptionOrNull()
+            // Lỗi ghi lịch sử xảy ra sau commit Room, khi bản nháp vẫn đang dùng URI này.
+            if (failure != null && failure !is DraftHistoryWriteException && failure !is CancellationException) {
+                files.discard(draft.imageUri)
+            }
+            saved.getOrThrow()
+        }
     }
 }

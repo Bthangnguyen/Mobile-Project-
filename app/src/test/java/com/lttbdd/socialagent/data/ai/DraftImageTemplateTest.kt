@@ -4,7 +4,6 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import com.lttbdd.socialagent.core.model.ChannelType
-import com.lttbdd.socialagent.core.model.Draft
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -14,7 +13,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
-@Config(manifest = Config.NONE, sdk = [34])
+@Config(manifest = Config.NONE, sdk = [36])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class DraftImageTemplateTest {
     @Test
@@ -24,8 +23,8 @@ class DraftImageTemplateTest {
             val bitmap = Bitmap.createBitmap(layout.width, layout.height, Bitmap.Config.ARGB_8888)
             try {
                 val title = "Tiếng Việt có dấu và tiêu đề dài ".repeat(60)
-                val draft = Draft("draft", "topic", channel, "Một đoạn nội dung có dấu để xem trước.")
-                drawChannelTemplate(Canvas(bitmap), DraftImageRequest(draft, title, layout))
+                val request = ChannelImageRequest("topic", channel, "Coffee", "Một đoạn nội dung có dấu để xem trước.", title)
+                drawChannelTemplate(Canvas(bitmap), request)
                 assertEquals(layout.width, bitmap.width)
                 assertEquals(layout.height, bitmap.height)
 

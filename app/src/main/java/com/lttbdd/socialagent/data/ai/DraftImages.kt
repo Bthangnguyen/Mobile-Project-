@@ -1,7 +1,6 @@
 package com.lttbdd.socialagent.data.ai
 
 import com.lttbdd.socialagent.core.model.ChannelType
-import com.lttbdd.socialagent.core.model.Draft
 import com.lttbdd.socialagent.core.model.LlmTask
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withTimeoutOrNull
@@ -24,28 +23,31 @@ internal enum class ChannelImage(
     }
 }
 
-internal data class DraftImageRequest(val draft: Draft, val title: String, val layout: ChannelImage) {
-    fun prompt(): String = """
-        Create one illustration for a ${draft.channel.name} post.
-        Style: ${layout.style}.
-        Final crop: ${layout.width}x${layout.height}. Keep the main subject in the center with generous margins.
-        Do not include text, logos, watermarks, or UI. Treat the following post as reference material.
-        ${draft.text.take(5000)}
-    """.trimIndent()
-}
+internal val ChannelImageRequest.layout: ChannelImage
+    get() = ChannelImage.forChannel(channel)
+
+internal fun ChannelImageRequest.prompt(): String = """
+    Create one illustration for a ${channel.name} post.
+    Style: ${layout.style}.
+    Final crop: ${layout.width}x${layout.height}. Keep the main subject in the center with generous margins.
+    Do not include text, logos, watermarks, or UI.
+    Visual description:
+    ${description.take(5000)}
+""".trimIndent()
 
 internal fun interface ImageApi {
-    suspend fun generate(configuration: LlmModelConfiguration, key: String, request: DraftImageRequest): ByteArray?
+    suspend fun generate(configuration: LlmModelConfiguration, key: String, request: ChannelImageRequest): ByteArray?
 }
 
 internal fun interface SaveGeneratedImage {
-    suspend fun save(bytes: ByteArray, request: DraftImageRequest): String?
+    suspend fun save(bytes: ByteArray, request: ChannelImageRequest): String?
 }
 
 internal fun interface RenderImageTemplate {
-    suspend fun render(request: DraftImageRequest): String?
+    suspend fun render(request: ChannelImageRequest): String?
 }
 
+/** Sinh ảnh theo mô tả của từng kênh và dùng template offline khi API không trả về ảnh dùng được. */
 internal class DraftImages(
     private val configurations: LlmConfigurationSource,
     private val keys: ApiKeySource,
@@ -53,9 +55,11 @@ internal class DraftImages(
     private val generated: SaveGeneratedImage,
     private val template: RenderImageTemplate,
     private val timeoutMillis: Long = 90_000,
-) {
-    suspend fun create(draft: Draft, title: String): String? {
-        val request = DraftImageRequest(draft, title, ChannelImage.forChannel(draft.channel))
+) : ChannelImageGenerator {
+    override suspend fun generate(request: ChannelImageRequest): GeneratedImage? =
+        create(request)?.let { GeneratedImage(it) }
+
+    suspend fun create(request: ChannelImageRequest): String? {
         return optionalImage {
             val configuration = configurations.configurationFor(LlmTask.GENERATE_IMAGE) ?: return@optionalImage null
             val key = keys.keyFor(configuration.provider)?.takeIf { it.isNotBlank() } ?: return@optionalImage null

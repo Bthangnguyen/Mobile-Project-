@@ -193,14 +193,26 @@ class ComposeViewModel @Inject constructor(
         _events.trySend(ComposeEvent.BriefSubmitted(brief, R.string.compose_submit_success))
         viewModelScope.launch {
             var saved = 0
+            var historyWriteFailed = false
+            var missingWritingConfiguration = false
             try {
                 agent.generate(brief).collect { event ->
-                    if (event is AgentEvent.ChannelDone) saved++
+                    if (event is AgentEvent.ChannelDone) {
+                        saved++
+                        historyWriteFailed = historyWriteFailed || event.historyWriteFailed
+                    }
+                    if (event is AgentEvent.ChannelFailed && event.reason in WRITING_CONFIGURATION_FAILURES) {
+                        missingWritingConfiguration = true
+                    }
                 }
-                val message = when (saved) {
-                    0 -> R.string.compose_generation_failed
-                    brief.channels.size -> R.string.compose_generation_saved
-                    else -> R.string.compose_generation_partial
+                val message = when {
+                    saved == brief.channels.size && historyWriteFailed ->
+                        R.string.compose_generation_saved_with_history_warning
+                    saved == brief.channels.size -> R.string.compose_generation_saved
+                    saved > 0 && historyWriteFailed -> R.string.compose_generation_partial_with_history_warning
+                    saved > 0 -> R.string.compose_generation_partial
+                    missingWritingConfiguration -> R.string.compose_generation_missing_writing_configuration
+                    else -> R.string.compose_generation_failed
                 }
                 _events.send(ComposeEvent.GenerationFinished(message))
             } catch (cancelled: CancellationException) {
@@ -250,6 +262,7 @@ class ComposeViewModel @Inject constructor(
     }
 
     private companion object {
+        val WRITING_CONFIGURATION_FAILURES = setOf("LLM_MISSING_API_KEY", "LLM_MISSING_CONFIGURATION")
         const val KEY_TOPIC = "compose_topic"
         const val KEY_GOAL = "compose_goal"
         const val KEY_AUDIENCE = "compose_audience"

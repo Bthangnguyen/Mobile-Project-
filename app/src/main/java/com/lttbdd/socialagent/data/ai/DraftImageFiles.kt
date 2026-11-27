@@ -10,17 +10,21 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.Typeface
+import android.net.Uri
 import android.text.StaticLayout
 import android.text.TextPaint
 import android.text.TextUtils
+import android.util.Log
 import androidx.core.content.FileProvider
 import java.io.File
 import java.io.IOException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/** Giải mã, cắt ảnh theo kích thước kênh và lưu ảnh JPEG riêng của ứng dụng. */
 internal class DraftImageFiles(private val context: Context) : SaveGeneratedImage, RenderImageTemplate {
-    override suspend fun save(bytes: ByteArray, request: DraftImageRequest): String? = withContext(Dispatchers.IO) {
+    override suspend fun save(bytes: ByteArray, request: ChannelImageRequest): String? = withContext(Dispatchers.IO) {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
         if (bounds.outWidth !in 1..4096 || bounds.outHeight !in 1..4096 ||
@@ -45,8 +49,28 @@ internal class DraftImageFiles(private val context: Context) : SaveGeneratedImag
         }
     }
 
-    override suspend fun render(request: DraftImageRequest): String = withContext(Dispatchers.IO) {
+    override suspend fun render(request: ChannelImageRequest): String = withContext(Dispatchers.IO) {
         saveBitmap(request.layout) { canvas -> drawChannelTemplate(canvas, request) }
+    }
+
+    /** Xóa ảnh nội bộ không còn được bản nháp sử dụng. */
+    suspend fun discard(value: String?) = withContext(Dispatchers.IO) {
+        val uri = value?.let(Uri::parse) ?: return@withContext
+        if (uri.scheme != "content" || uri.authority != "${context.packageName}.draft-images") return@withContext
+        try {
+            val deletedCount = context.contentResolver.delete(uri, null, null)
+            if (deletedCount <= 0) {
+                Log.w(LOG_TAG, "Draft image deletion returned $deletedCount.")
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: IllegalArgumentException) {
+            Log.w(LOG_TAG, "Invalid draft image URI for deletion.", error)
+        } catch (error: SecurityException) {
+            Log.w(LOG_TAG, "Draft image deletion was denied.", error)
+        } catch (error: Exception) {
+            Log.w(LOG_TAG, "Draft image deletion failed.", error)
+        }
     }
 
     private fun saveBitmap(layout: ChannelImage, draw: (Canvas) -> Unit): String {
@@ -72,9 +96,13 @@ internal class DraftImageFiles(private val context: Context) : SaveGeneratedImag
             bitmap.recycle()
         }
     }
+
+    private companion object {
+        const val LOG_TAG = "DraftImageFiles"
+    }
 }
 
-internal fun drawChannelTemplate(canvas: Canvas, request: DraftImageRequest) {
+internal fun drawChannelTemplate(canvas: Canvas, request: ChannelImageRequest) {
     val wide = request.layout == ChannelImage.FACEBOOK
     val background = if (wide) 0xff0d3c3b.toInt() else 0xff10203e.toInt()
     val accent = if (wide) 0xff66e0bd.toInt() else 0xff92b9ff.toInt()
@@ -90,9 +118,9 @@ internal fun drawChannelTemplate(canvas: Canvas, request: DraftImageRequest) {
     else canvas.drawRoundRect(inset, 106f, canvas.width - inset, 118f, 6f, 6f, paint)
 
     val width = (canvas.width - inset * 2).toInt()
-    val title = request.title.ifBlank { request.draft.text.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty() }
+    val title = request.title.ifBlank { request.postText.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty() }
     val heading = templateText(title, width, if (wide) 64f else 92f, 3, true)
-    val excerpt = request.draft.text.removePrefix(title).trim()
+    val excerpt = request.postText.removePrefix(title).trim()
     val summary = templateText(excerpt, width, if (wide) 34f else 46f, 3, false)
 
     canvas.save()

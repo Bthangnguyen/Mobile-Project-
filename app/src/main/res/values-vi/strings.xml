@@ -250,7 +250,10 @@
     <string name="compose_generating">Đang tạo bản nháp…</string>
     <string name="compose_generation_saved">Đã lưu bản nháp. Mở mục Bài viết để xem trước.</string>
     <string name="compose_generation_partial">Một số kênh chưa tạo được bản nháp. Các bản nháp đã lưu nằm trong mục Bài viết.</string>
+    <string name="compose_generation_saved_with_history_warning">Đã lưu bản nháp nhưng có phiên bản chưa được ghi vào lịch sử.</string>
+    <string name="compose_generation_partial_with_history_warning">Đã lưu một số bản nháp, nhưng có kênh chưa tạo được bản nháp và có phiên bản chưa được ghi vào lịch sử.</string>
     <string name="compose_generation_failed">Chưa tạo được bản nháp nào. Vui lòng thử lại.</string>
+    <string name="compose_generation_missing_writing_configuration">Hãy cấu hình model viết bài và API key trong Cài đặt, rồi thử lại.</string>
 
     <!-- Tone options -->
     <string name="tone_professional">Chuyên nghiệp</string>

@@ -51,7 +51,7 @@ class DefaultDraftVersionRepositoryTest {
             baseDir = tempFolder.newFolder("draft_versions"),
             ioDispatcher = Dispatchers.Unconfined,
         )
-        reviewRepository = RoomDraftReviewRepository(db.draftDao(), versionStore)
+        reviewRepository = RoomDraftReviewRepository(db, db.draftDao(), versionStore)
         versionRepository = DefaultDraftVersionRepository(
             database = db,
             draftDao = db.draftDao(),
@@ -263,23 +263,27 @@ class DefaultDraftVersionRepositoryTest {
                 throw java.io.IOException("Simulated disk error")
             }
         }
-        val reviewRepoWithFailingStore = RoomDraftReviewRepository(db.draftDao(), failingWriteStore)
+        val discarded = mutableListOf<String>()
+        val reviewRepoWithFailingStore = RoomDraftReviewRepository(db, db.draftDao(), failingWriteStore) {
+            discarded += it
+        }
+        val oldImage = "content://images/old"
+        val newImage = "content://images/new"
+        val draft = Draft("d-ai-fail", "t-ai", ChannelType.FACEBOOK, "Bản cũ", imageUri = oldImage)
+        reviewRepository.saveAgentDraft(draft).getOrThrow()
 
         // Luồng AI tạo bản nháp: Room vẫn lưu approved = false nhưng báo DraftHistoryWriteException
         val aiResult = reviewRepoWithFailingStore.saveAgentDraft(
-            Draft(
-                id = "d-ai-fail",
-                topicId = "t-ai",
-                channel = ChannelType.FACEBOOK,
-                text = "Nội dung AI",
-                approved = true,
-            ),
+            draft.copy(text = "Nội dung AI", imageUri = newImage, approved = true),
         )
         assertTrue(aiResult.isFailure)
         val historyException = aiResult.exceptionOrNull() as DraftHistoryWriteException
         assertEquals("d-ai-fail", historyException.savedDraft.id)
         assertFalse(historyException.savedDraft.approved)
         assertEquals("Nội dung AI", db.draftDao().getById("d-ai-fail")?.text)
+        assertEquals(newImage, historyException.savedDraft.imageUri)
+        assertEquals(newImage, db.draftDao().getById("d-ai-fail")?.imageUri)
+        assertEquals(listOf(oldImage), discarded)
 
         // Luồng sửa thủ công: trả UpdatedWithoutHistory và RoomDraftEditorRepository ánh xạ SavedWithoutHistory
         val editorRepo = com.lttbdd.socialagent.feature.review.RoomDraftEditorRepository(

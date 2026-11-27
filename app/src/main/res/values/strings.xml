@@ -252,7 +252,10 @@
     <string name="compose_generating">Creating drafts…</string>
     <string name="compose_generation_saved">Drafts saved. Open Posts to preview them.</string>
     <string name="compose_generation_partial">Some drafts could not be created. Saved drafts are available in Posts.</string>
+    <string name="compose_generation_saved_with_history_warning">Drafts saved. Some version history could not be recorded.</string>
+    <string name="compose_generation_partial_with_history_warning">Some drafts were saved. Others could not be created, and some version history could not be recorded.</string>
     <string name="compose_generation_failed">Could not create any drafts. Try again.</string>
+    <string name="compose_generation_missing_writing_configuration">Set up a writing model and API key in Settings, then try again.</string>
 
     <!-- Tone options -->
     <string name="tone_professional">Professional</string>

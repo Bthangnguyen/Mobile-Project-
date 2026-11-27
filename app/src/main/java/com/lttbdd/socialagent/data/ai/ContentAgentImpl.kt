@@ -34,7 +34,7 @@ import kotlinx.coroutines.sync.withPermit
  *
  * Mỗi lần gọi [generate]/[regenerate] là một Flow lạnh độc lập nên luồng cũ không ghi đè kết quả lần chạy mới.
  *
- * Viết lại từng đoạn thuộc Issue #35.
+ * [rewriteParagraph] ném [UnsupportedOperationException] cho đến khi Issue #35 triển khai.
  */
 class ContentAgentImpl(
     private val subAgents: Map<ChannelType, ChannelSubAgent>,

@@ -42,6 +42,7 @@ object ChannelFailureReason {
     const val CHANNEL_NOT_IN_BRIEF = "CHANNEL_NOT_IN_BRIEF"
     const val NO_RESULT = "NO_RESULT"
     const val TIMEOUT = "TIMEOUT"
+    const val DRAFT_SAVE_FAILED = "DRAFT_SAVE_FAILED"
 
     /** Bài sau bước Tự rà vẫn vi phạm quy tắc cứng của kênh (độ dài, số hashtag, Markdown). */
     const val CHANNEL_RULES_VIOLATED = "CHANNEL_RULES_VIOLATED"

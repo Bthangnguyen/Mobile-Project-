@@ -28,6 +28,7 @@ data class ChannelImageRequest(
     val channel: ChannelType,
     val description: String,
     val postText: String,
+    val title: String = "",
 )
 
 /** Ảnh đã sinh: [uri] để gắn vào bản nháp, [usage] là token/chi phí của bước sinh ảnh (nếu có). */

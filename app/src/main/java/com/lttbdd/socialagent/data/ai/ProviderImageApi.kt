@@ -24,15 +24,19 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 
+/** Gọi API sinh ảnh OpenAI hoặc Gemini và đọc phản hồi có giới hạn kích thước. */
 internal class ProviderImageApi(private val calls: Call.Factory) : ImageApi {
     override suspend fun generate(
         configuration: LlmModelConfiguration,
         key: String,
-        request: DraftImageRequest,
+        request: ChannelImageRequest,
     ): ByteArray? {
         if (key.any { it.code !in 33..126 }) return null
         val httpRequest = when (configuration.provider) {
-            LlmProvider.OPENAI -> openAi(configuration.model, key, request)
+            LlmProvider.OPENAI -> {
+                if (!LlmModelCatalog.supportsOpenAiImage(configuration.model)) return null
+                openAi(configuration.model, key, request)
+            }
             LlmProvider.GEMINI -> gemini(configuration.model, key, request)
             else -> return null
         }
@@ -44,10 +48,18 @@ internal class ProviderImageApi(private val calls: Call.Factory) : ImageApi {
                 .filterNot { (it["thought"] as? JsonPrimitive)?.booleanOrNull == true }
                 .firstNotNullOfOrNull { it.optionalObject("inlineData")?.get("data").textOrNull() }
         }
-        return encoded?.let { withContext(Dispatchers.Default) { Base64.getDecoder().decode(it) } }
+        return encoded?.let {
+            withContext(Dispatchers.Default) {
+                try {
+                    Base64.getDecoder().decode(it)
+                } catch (_: IllegalArgumentException) {
+                    null
+                }
+            }
+        }
     }
 
-    private fun openAi(model: String, key: String, request: DraftImageRequest): Request =
+    private fun openAi(model: String, key: String, request: ChannelImageRequest): Request =
         Request.Builder()
             .url("https://api.openai.com/v1/images/generations")
             .header("Authorization", "Bearer $key")
@@ -58,7 +70,7 @@ internal class ProviderImageApi(private val calls: Call.Factory) : ImageApi {
             }.toBody())
             .build()
 
-    private fun gemini(model: String, key: String, request: DraftImageRequest): Request =
+    private fun gemini(model: String, key: String, request: ChannelImageRequest): Request =
         Request.Builder()
             .url("https://generativelanguage.googleapis.com/v1beta/models/".toHttpUrl().newBuilder()
                 .addPathSegment("${model.removePrefix("models/")}:generateContent")

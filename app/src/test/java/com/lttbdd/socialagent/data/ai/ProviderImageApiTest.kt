@@ -1,10 +1,10 @@
 package com.lttbdd.socialagent.data.ai
 
 import com.lttbdd.socialagent.core.model.ChannelType
-import com.lttbdd.socialagent.core.model.Draft
 import com.lttbdd.socialagent.core.model.LlmProvider
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.jsonObject
+import okhttp3.Call
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Request
@@ -22,7 +22,7 @@ class ProviderImageApiTest {
     fun openAiSendsLandscapeRequestAndReadsBase64Image() = runTest {
         val http = FakeHttp("""{"data":[{"b64_json":"AQID"}]}""")
         val api = ProviderImageApi(http.client)
-        val configuration = LlmModelConfiguration(LlmProvider.OPENAI, "gpt-image-1")
+        val configuration = LlmModelConfiguration(LlmProvider.OPENAI, "gpt-image-2.5-flare")
 
         val bytes = api.generate(configuration, "test-key", request(ChannelType.FACEBOOK))
 
@@ -55,15 +55,38 @@ class ProviderImageApiTest {
         assertEquals("1:1", imageConfig?.get("aspectRatio").textOrNull())
     }
 
-    private fun request(channel: ChannelType) =
-        DraftImageRequest(Draft("draft", "topic", channel, "Bài viết"), "Tiêu đề", ChannelImage.forChannel(channel))
+    @Test
+    fun rejectsHttpErrorsAndMalformedBase64() = runTest {
+        val request = request(ChannelType.FACEBOOK)
+        val config = LlmModelConfiguration(LlmProvider.OPENAI, "gpt-image-2.5-flare")
+        val unavailable = FakeHttp("""{"data":[{"b64_json":"AQID"}]}""", status = 503)
+        val malformed = FakeHttp("""{"data":[{"b64_json":"%%%"}]}""")
 
-    private class FakeHttp(payload: String) {
+        assertNull(ProviderImageApi(unavailable.client).generate(config, "test-key", request))
+        assertNull(ProviderImageApi(malformed.client).generate(config, "test-key", request))
+    }
+
+    @Test
+    fun skipsNetworkForUnsupportedProviderRetiredModelOrNonAsciiKey() = runTest {
+        val api = ProviderImageApi(object : Call.Factory {
+            override fun newCall(request: Request): Call = throw AssertionError("Unexpected HTTP call")
+        })
+        val request = request(ChannelType.FACEBOOK)
+
+        assertNull(api.generate(LlmModelConfiguration(LlmProvider.ANTHROPIC, "model"), "test-key", request))
+        assertNull(api.generate(LlmModelConfiguration(LlmProvider.OPENAI, "dall-e-3"), "test-key", request))
+        assertNull(api.generate(LlmModelConfiguration(LlmProvider.OPENAI, "gpt-image-2.5-flare"), "khóa", request))
+    }
+
+    private fun request(channel: ChannelType) =
+        ChannelImageRequest("topic", channel, "A quiet lake at dawn", "Bài viết", "Tiêu đề")
+
+    private class FakeHttp(payload: String, status: Int = 200) {
         lateinit var request: Request
         val client = OkHttpClient.Builder().addInterceptor { chain ->
             request = chain.request()
             Response.Builder().request(request).protocol(Protocol.HTTP_1_1)
-                .code(200).message("fixture").body(payload.toResponseBody()).build()
+                .code(status).message("fixture").body(payload.toResponseBody()).build()
         }.build()
 
         fun body() = parseEvent(Buffer().also { requireNotNull(request.body).writeTo(it) }.readUtf8())

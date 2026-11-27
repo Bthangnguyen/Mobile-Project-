@@ -28,8 +28,8 @@ sealed interface AgentEvent {
 
     data class StepFinished(val channel: ChannelType, val step: AgentStep, val usage: TokenUsage) : AgentEvent
 
-    /** Sub-agent của kênh này xong. */
-    data class ChannelDone(val draft: Draft) : AgentEvent
+    /** Kênh đã hoàn tất. [historyWriteFailed] báo bản nháp đã lưu nhưng thiếu phiên bản lịch sử. */
+    data class ChannelDone(val draft: Draft, val historyWriteFailed: Boolean = false) : AgentEvent
 
     /** Sub-agent của kênh này lỗi. Các kênh khác vẫn chạy tiếp. */
     data class ChannelFailed(val channel: ChannelType, val step: AgentStep, val reason: String) : AgentEvent

@@ -2,12 +2,20 @@ package com.lttbdd.socialagent.feature.compose
 
 import androidx.lifecycle.SavedStateHandle
 import com.lttbdd.socialagent.R
+import com.lttbdd.socialagent.core.ai.ContentAgent
+import com.lttbdd.socialagent.core.model.AgentEvent
+import com.lttbdd.socialagent.core.model.AgentStep
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.ContentLanguage
+import com.lttbdd.socialagent.core.model.Draft
+import com.lttbdd.socialagent.core.model.TopicBrief
 import com.lttbdd.socialagent.data.fake.FakeContentAgent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
@@ -218,6 +226,42 @@ class ComposeViewModelTest {
             ComposeEvent.GenerationFinished(R.string.compose_generation_saved),
             viewModel.events.first(),
         )
+    }
+
+    @Test
+    fun `submit distinguishes saved drafts with history warnings from failures`() = runTest {
+        val failure = AgentEvent.ChannelFailed(ChannelType.LINKEDIN, AgentStep.OUTLINE, "UNKNOWN")
+        val draft = Draft("draft", "topic", ChannelType.FACEBOOK, "Bản nháp đã lưu")
+        val committedWithoutHistory = AgentEvent.ChannelDone(draft, historyWriteFailed = true)
+        val cases = listOf(
+            flowOf(committedWithoutHistory) to R.string.compose_generation_saved_with_history_warning,
+            flowOf(committedWithoutHistory, failure) to R.string.compose_generation_partial_with_history_warning,
+            flowOf(AgentEvent.ChannelDone(draft), failure) to R.string.compose_generation_partial,
+            flowOf(failure) to R.string.compose_generation_failed,
+            flowOf(failure.copy(reason = "LLM_MISSING_API_KEY")) to R.string.compose_generation_missing_writing_configuration,
+            flow<AgentEvent> { error("Agent failure") } to R.string.compose_generation_failed,
+        )
+        for ((events, message) in cases) {
+            val scriptedAgent = object : ContentAgent by agent {
+                override fun generate(brief: TopicBrief): Flow<AgentEvent> = events
+            }
+            val viewModel = ComposeViewModel(SavedStateHandle(), scriptedAgent)
+            viewModel.onTopicChanged("A new post")
+            viewModel.onGoalChanged("Grow reach")
+            viewModel.onAudienceChanged("Mobile devs")
+            viewModel.onToneChanged("friendly")
+            viewModel.onChannelToggled(ChannelType.FACEBOOK, true)
+            if (message != R.string.compose_generation_saved_with_history_warning) {
+                viewModel.onChannelToggled(ChannelType.LINKEDIN, true)
+            }
+
+            viewModel.onSubmit()
+            advanceUntilIdle()
+
+            assertTrue(viewModel.events.first() is ComposeEvent.BriefSubmitted)
+            assertEquals(ComposeEvent.GenerationFinished(message), viewModel.events.first())
+            assertFalse(viewModel.uiState.value.isGenerating)
+        }
     }
 
     @Test

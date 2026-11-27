@@ -174,9 +174,10 @@ class DraftPreviewFragment : Fragment() {
                 null
             }
         }
-        binding.ivDraftImage.setImageBitmap(image)
-        binding.ivDraftImage.isVisible = image != null
-        binding.tvDraftImageUnavailable.isVisible = image == null
+        val currentBinding = _binding ?: return
+        currentBinding.ivDraftImage.setImageBitmap(image)
+        currentBinding.ivDraftImage.isVisible = image != null
+        currentBinding.tvDraftImageUnavailable.isVisible = image == null
     }
 
     private fun renderUiState(state: DraftPreviewUiState) {

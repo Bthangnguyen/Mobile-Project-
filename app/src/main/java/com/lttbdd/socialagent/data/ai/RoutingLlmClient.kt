@@ -9,24 +9,32 @@ import com.lttbdd.socialagent.core.model.Comment
 import com.lttbdd.socialagent.core.model.CommentCategory
 import com.lttbdd.socialagent.core.model.LlmProvider
 import com.lttbdd.socialagent.core.model.LlmTask
+import com.lttbdd.socialagent.core.model.TokenUsage
 import java.io.IOException
 import java.util.Locale
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/** Điểm vào duy nhất cho F2/F6; mọi request lấy cấu hình và key mới, không tự retry/fallback. */
+/**
+ * Điểm vào duy nhất cho F2/F6; mọi request lấy cấu hình và key mới, không tự retry/fallback.
+ * Usage cuối của mỗi lượt gọi được báo cho [usageRecorder] (#74).
+ */
 class RoutingLlmClient(
     private val configurations: LlmConfigurationSource,
     private val keys: ApiKeySource,
     adapters: Set<ProviderAdapter>,
+    private val usageRecorder: LlmUsageRecorder = LlmUsageRecorder.NONE,
 ) : LlmClient {
     private val adaptersByProvider = adapters.associateBy { it.provider }.also {
         require(it.size == adapters.size)
@@ -64,7 +72,16 @@ class RoutingLlmClient(
         }
         if (key.isNullOrBlank()) throw LlmException(LlmFailure.MISSING_API_KEY)
         if (key.any { it.code !in 33..126 }) throw LlmException(LlmFailure.MISSING_API_KEY)
-        emitAll(adapter.streamChat(request, configuration, key))
+        // Adapter chỉ phát usage ở chunk cuối sau khi xác nhận stream hoàn tất hợp lệ. Ghi trong finally để
+        // lượt gọi đã tốn phí vẫn được thống kê kể cả khi bên gọi hủy ngay sau khi nhận chunk cuối.
+        var finalUsage: TokenUsage? = null
+        try {
+            val chunks = adapter.streamChat(request, configuration, key)
+                .onEach { chunk -> chunk.usage?.let { finalUsage = it } }
+            emitAll(chunks)
+        } finally {
+            finalUsage?.let { recordUsage(request.task, configuration, it) }
+        }
     }.catch { error ->
         when (error) {
             is CancellationException, is LlmException -> throw error
@@ -106,6 +123,19 @@ class RoutingLlmClient(
             ),
         ),
     )
+
+    /**
+     * Ghi thống kê không được làm hỏng câu trả lời người dùng đang chờ: mọi lỗi khi ghi đều bị bỏ qua.
+     * Chạy trong [NonCancellable] vì chi phí đã phát sinh ở provider dù bên gọi có hủy hay không.
+     * Một CancellationException bắt được ở đây chỉ có thể đến từ bên trong recorder, không phải từ bên gọi.
+     */
+    private suspend fun recordUsage(task: LlmTask, configuration: LlmModelConfiguration, usage: TokenUsage) {
+        try {
+            withContext(NonCancellable) { usageRecorder.record(task, configuration, usage) }
+        } catch (_: Exception) {
+            // Mất một dòng thống kê vẫn tốt hơn làm hỏng nội dung đã sinh xong.
+        }
+    }
 
     private suspend fun complete(request: ChatRequest): String {
         val text = StringBuilder()

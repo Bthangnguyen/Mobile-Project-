@@ -184,7 +184,7 @@ class AppDatabaseTest {
                     nextAttemptAtMillis = 4,
                 )
                 assertEquals(expectedPost, migrated.postDao().getById("p1"))
-                assertEquals(3, migrated.openHelper.readableDatabase.version)
+                assertEquals(4, migrated.openHelper.readableDatabase.version)
                 assertNull(migrated.channelCleanupDao().getCompletedOperation(ChannelType.FACEBOOK))
                 migrated.channelCleanupDao().deferProtectedPosts(ChannelType.FACEBOOK)
                 migrated.openHelper.readableDatabase.query(

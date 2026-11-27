@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.lttbdd.socialagent.core.database.AppDatabase
 import com.lttbdd.socialagent.core.database.dao.CommentDao
 import com.lttbdd.socialagent.core.database.dao.DraftDao
+import com.lttbdd.socialagent.core.database.dao.LlmUsageDao
 import com.lttbdd.socialagent.core.database.dao.MetricsDao
 import com.lttbdd.socialagent.core.database.dao.PostDao
 import dagger.Module
@@ -35,4 +36,7 @@ object DatabaseModule {
 
     @Provides
     fun metricsDao(db: AppDatabase): MetricsDao = db.metricsDao()
+
+    @Provides
+    fun llmUsageDao(db: AppDatabase): LlmUsageDao = db.llmUsageDao()
 }

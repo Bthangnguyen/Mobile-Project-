@@ -19,7 +19,7 @@ import com.lttbdd.socialagent.databinding.FragmentSettingsBinding
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 
-/** Màn Cài đặt (F9) với tùy chọn ngôn ngữ, quản lý API key (F8) và Kênh của tôi (F1). */
+/** Màn Cài đặt (F9) với tùy chọn ngôn ngữ, quản lý API key, model, token & chi phí (F8) và Kênh của tôi (F1). */
 @AndroidEntryPoint
 class SettingsFragment : Fragment() {
 
@@ -43,9 +43,11 @@ class SettingsFragment : Fragment() {
         ViewCompat.setAccessibilityHeading(binding.languageTitle, true)
         ViewCompat.setAccessibilityHeading(binding.apiKeysSectionTitle, true)
         ViewCompat.setAccessibilityHeading(binding.modelsSectionTitle, true)
+        ViewCompat.setAccessibilityHeading(binding.usageSectionTitle, true)
         ViewCompat.setAccessibilityHeading(binding.channelsSectionTitle, true)
         binding.manageApiKeys.setOnClickListener { navigateFromSettings(R.id.action_settings_to_api_keys) }
         binding.manageModels.setOnClickListener { navigateFromSettings(R.id.action_settings_to_model_selection) }
+        binding.manageUsage.setOnClickListener { navigateFromSettings(R.id.action_settings_to_usage) }
         binding.manageChannels.setOnClickListener { navigateFromSettings(R.id.action_settings_to_channels) }
 
         viewLifecycleOwner.lifecycleScope.launch {

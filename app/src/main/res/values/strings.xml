@@ -349,4 +349,43 @@
     <string name="publish_error_storage">Could not save to the device storage.</string>
     <string name="publish_error_unknown">The channel returned an error.</string>
     <string name="publish_status_action_failed">Could not update the publishing queue. Please try again.</string>
+
+    <!-- Token và chi phí LLM theo ngày/tháng (F8, #74) -->
+    <string name="usage_title">Tokens &amp; cost</string>
+    <string name="usage_settings_description">See how many LLM tokens you used and the estimated cost by day and month.</string>
+    <string name="usage_settings_manage">View usage</string>
+    <string name="usage_description">Counts every completed LLM call made with your API keys on this device. Cost is an estimate based on the price list checked on %1$s and may differ from your provider\'s invoice. Prompts and replies are not stored here.</string>
+    <string name="usage_loading">Loading usage</string>
+    <string name="usage_load_failed">Could not load usage statistics. Please try again.</string>
+    <string name="usage_empty">No LLM calls recorded yet. Usage appears here after the agent writes a post or classifies a comment.</string>
+    <string name="usage_today">Today</string>
+    <string name="usage_this_month">This month</string>
+    <string name="usage_tokens_detail">%1$s tokens (input %2$s · output %3$s)</string>
+    <string name="usage_tokens_short">%1$s tokens</string>
+    <plurals name="usage_calls">
+        <item quantity="one">%1$s call</item>
+        <item quantity="other">%1$s calls</item>
+    </plurals>
+    <string name="usage_cost_label">Estimated cost: %1$s</string>
+    <string name="usage_cost_unknown">unknown (model not in the price list)</string>
+    <plurals name="usage_cost_partial">
+        <item quantity="one">%1$s, excluding %2$s call with unknown price</item>
+        <item quantity="other">%1$s, excluding %2$s calls with unknown price</item>
+    </plurals>
+    <string name="usage_row_detail">%1$s · %2$s · %3$s</string>
+    <string name="usage_history_title">History</string>
+    <string name="usage_by_day">By day</string>
+    <string name="usage_by_month">By month</string>
+    <string name="usage_history_empty">No usage in this period.</string>
+    <string name="usage_breakdown_title">This month by provider, model and task</string>
+    <string name="usage_breakdown_row_title">%1$s · %2$s</string>
+    <string name="usage_breakdown_row_detail">%1$s · %2$s</string>
+    <string name="usage_provider_anthropic">Anthropic</string>
+    <string name="usage_provider_openrouter">OpenRouter</string>
+    <string name="usage_clear">Clear statistics</string>
+    <string name="usage_clear_confirm_title">Clear all usage statistics?</string>
+    <string name="usage_clear_confirm_message">This deletes the token and cost history stored on this device. It cannot be undone and does not change your provider\'s billing.</string>
+    <string name="usage_clear_confirm">Clear</string>
+    <string name="usage_cleared">Usage statistics cleared.</string>
+    <string name="usage_clear_failed">Could not clear usage statistics. Please try again.</string>
 </resources>

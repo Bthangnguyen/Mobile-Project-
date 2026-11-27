@@ -347,4 +347,41 @@
     <string name="publish_error_storage">Không ghi được vào bộ nhớ máy.</string>
     <string name="publish_error_unknown">Kênh báo lỗi khi đăng bài.</string>
     <string name="publish_status_action_failed">Không cập nhật được hàng đợi đăng bài. Vui lòng thử lại.</string>
+
+    <!-- Token và chi phí LLM theo ngày/tháng (F8, #74) -->
+    <string name="usage_title">Token &amp; chi phí</string>
+    <string name="usage_settings_description">Xem số token LLM đã dùng và chi phí ước tính theo ngày, theo tháng.</string>
+    <string name="usage_settings_manage">Xem mức sử dụng</string>
+    <string name="usage_description">Thống kê mọi lượt gọi LLM đã hoàn tất bằng API key của bạn trên máy này. Chi phí là ước tính theo bảng giá đối chiếu ngày %1$s, có thể khác hóa đơn của nhà cung cấp. Nội dung prompt và câu trả lời không được lưu ở đây.</string>
+    <string name="usage_loading">Đang tải thống kê</string>
+    <string name="usage_load_failed">Không tải được thống kê sử dụng. Vui lòng thử lại.</string>
+    <string name="usage_empty">Chưa có lượt gọi LLM nào. Số liệu sẽ xuất hiện sau khi agent viết bài hoặc phân loại comment.</string>
+    <string name="usage_today">Hôm nay</string>
+    <string name="usage_this_month">Tháng này</string>
+    <string name="usage_tokens_detail">%1$s token (vào %2$s · ra %3$s)</string>
+    <string name="usage_tokens_short">%1$s token</string>
+    <plurals name="usage_calls">
+        <item quantity="other">%1$s lượt gọi</item>
+    </plurals>
+    <string name="usage_cost_label">Chi phí ước tính: %1$s</string>
+    <string name="usage_cost_unknown">chưa xác định (model chưa có trong bảng giá)</string>
+    <plurals name="usage_cost_partial">
+        <item quantity="other">%1$s, chưa gồm %2$s lượt chưa rõ giá</item>
+    </plurals>
+    <string name="usage_row_detail">%1$s · %2$s · %3$s</string>
+    <string name="usage_history_title">Lịch sử</string>
+    <string name="usage_by_day">Theo ngày</string>
+    <string name="usage_by_month">Theo tháng</string>
+    <string name="usage_history_empty">Không có lượt gọi nào trong kỳ này.</string>
+    <string name="usage_breakdown_title">Tháng này theo provider, model và loại việc</string>
+    <string name="usage_breakdown_row_title">%1$s · %2$s</string>
+    <string name="usage_breakdown_row_detail">%1$s · %2$s</string>
+    <string name="usage_provider_anthropic">Anthropic</string>
+    <string name="usage_provider_openrouter">OpenRouter</string>
+    <string name="usage_clear">Xóa thống kê</string>
+    <string name="usage_clear_confirm_title">Xóa toàn bộ thống kê sử dụng?</string>
+    <string name="usage_clear_confirm_message">Lịch sử token và chi phí lưu trên máy này sẽ bị xóa và không khôi phục được. Việc này không thay đổi hóa đơn của nhà cung cấp.</string>
+    <string name="usage_clear_confirm">Xóa</string>
+    <string name="usage_cleared">Đã xóa thống kê sử dụng.</string>
+    <string name="usage_clear_failed">Không xóa được thống kê sử dụng. Vui lòng thử lại.</string>
 </resources>

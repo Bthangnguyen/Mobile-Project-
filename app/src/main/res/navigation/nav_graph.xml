@@ -103,6 +103,19 @@
             android:defaultValue="@null"
             app:argType="string"
             app:nullable="true" />
+        <action
+            android:id="@+id/action_draft_preview_to_draft_history"
+            app:destination="@id/draftHistoryFragment" />
+    </fragment>
+
+    <!-- Lịch sử phiên bản bản nháp (D, F4 — Issue #62). -->
+    <fragment
+        android:id="@+id/draftHistoryFragment"
+        android:name="com.lttbdd.socialagent.feature.review.DraftHistoryFragment"
+        android:label="@string/history_header_title">
+        <argument
+            android:name="draftId"
+            app:argType="string" />
     </fragment>
 
 </navigation>

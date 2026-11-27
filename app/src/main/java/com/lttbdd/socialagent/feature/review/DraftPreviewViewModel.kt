@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.lttbdd.socialagent.R
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.Draft
+import com.lttbdd.socialagent.data.review.PrePublishWarning
+import com.lttbdd.socialagent.data.review.PrePublishWarningAnalyzer
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -73,6 +75,12 @@ class DraftPreviewViewModel @Inject constructor(
         }
     }
 
+    /** Tải lại bản nháp mới nhất từ DB sau khi người dùng khôi phục phiên bản ở màn Lịch sử (#62). */
+    fun reloadDraftFromStorage() {
+        savedStateHandle.remove<String>(KEY_EDITED_TEXT)
+        loadDraft()
+    }
+
     /** Cập nhật nội dung khi người dùng sửa tay và tính lại bộ đếm ký tự theo thời gian thực. */
     fun onTextChanged(newText: String) {
         var didUpdate = false
@@ -111,6 +119,7 @@ class DraftPreviewViewModel @Inject constructor(
                 selectedChannel = channel,
                 editedText = current.editedText,
                 showBlankError = current.textErrorRes == R.string.preview_error_empty,
+                cachedWarnings = current.prePublishWarnings,
             )
         }
         if (didUpdate) {
@@ -172,6 +181,19 @@ class DraftPreviewViewModel @Inject constructor(
                     )
                     _events.trySend(DraftPreviewEvent.ShowMessage(R.string.preview_save_success))
                 }
+                is DraftSaveResult.SavedWithoutHistory -> {
+                    val saved = result.draft
+                    persistEditedTextSafely(saved.text)
+                    _uiState.value = buildState(
+                        isLoading = false,
+                        isEditingLockedByPublishing = false,
+                        draft = saved,
+                        selectedChannel = current.selectedChannel,
+                        editedText = saved.text,
+                        showBlankError = false,
+                    )
+                    _events.trySend(DraftPreviewEvent.ShowMessage(R.string.preview_save_success_without_history))
+                }
                 DraftSaveResult.BlockedByActivePublish -> {
                     _uiState.update {
                         buildState(
@@ -220,6 +242,7 @@ class DraftPreviewViewModel @Inject constructor(
         selectedChannel: ChannelType,
         editedText: String,
         showBlankError: Boolean,
+        cachedWarnings: List<PrePublishWarning>? = null,
     ): DraftPreviewUiState {
         val previewCount = DraftCharacterCounter.evaluate(editedText, selectedChannel)
         val draftChannelOverLimit = draft != null &&
@@ -245,6 +268,7 @@ class DraftPreviewViewModel @Inject constructor(
             hasUnsavedChanges = hasUnsavedChanges,
             canSave = canSave,
             textErrorRes = errorRes,
+            prePublishWarnings = cachedWarnings ?: PrePublishWarningAnalyzer.analyze(editedText),
         )
     }
 

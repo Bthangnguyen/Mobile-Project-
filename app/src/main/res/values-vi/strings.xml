@@ -333,4 +333,8 @@
     <string name="publish_error_storage">Không ghi được vào bộ nhớ máy.</string>
     <string name="publish_error_unknown">Kênh báo lỗi khi đăng bài.</string>
     <string name="publish_status_action_failed">Không cập nhật được hàng đợi đăng bài. Vui lòng thử lại.</string>
+    <!-- #72: tự chuyển nhà cung cấp phụ -->
+    <string name="models_fallback_title">Nhà cung cấp phụ</string>
+    <string name="models_fallback_switch">Tự chuyển nhà cung cấp phụ khi nhà cung cấp chính lỗi</string>
+    <string name="models_fallback_description">Khi nhà cung cấp chính lỗi máy chủ, vượt giới hạn, hết thời gian chờ hoặc lỗi key trước khi trả về nội dung, app thử lại một lần với nhà cung cấp còn lại đã có key, dùng model gợi ý của nhà cung cấp đó. Lượt gọi này dùng key của bạn và tính phí ở nhà cung cấp đó.</string>
 </resources>

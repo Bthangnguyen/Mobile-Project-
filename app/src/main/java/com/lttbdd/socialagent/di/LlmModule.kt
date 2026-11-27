@@ -4,7 +4,11 @@ import android.content.Context
 import com.lttbdd.socialagent.core.ai.LlmClient
 import com.lttbdd.socialagent.data.ai.ApiKeySource
 import com.lttbdd.socialagent.data.ai.GeminiClient
+import com.lttbdd.socialagent.data.ai.DataStoreFallbackPreferenceStore
 import com.lttbdd.socialagent.data.ai.DataStoreTaskModelSelectionStore
+import com.lttbdd.socialagent.data.ai.FallbackConfigurationSource
+import com.lttbdd.socialagent.data.ai.FallbackLlmClient
+import com.lttbdd.socialagent.data.ai.FallbackPreferenceStore
 import com.lttbdd.socialagent.data.ai.LlmConfigurationSource
 import com.lttbdd.socialagent.data.ai.OkHttpSseTransport
 import com.lttbdd.socialagent.data.ai.OpenAiClient
@@ -33,6 +37,12 @@ object LlmModule {
     fun taskModelStore(@ApplicationContext context: Context): TaskModelSelectionStore =
         DataStoreTaskModelSelectionStore(context)
 
+    /** Có tự chuyển sang nhà cung cấp phụ khi lỗi hay không (#72); không chứa key. */
+    @Provides
+    @Singleton
+    fun fallbackPreference(@ApplicationContext context: Context): FallbackPreferenceStore =
+        DataStoreFallbackPreferenceStore(context)
+
     /** Chỉ hỏi trạng thái key, không bao giờ đọc nội dung key. */
     @Provides
     fun providerKeyAvailability(store: ApiKeyStore): ProviderKeyAvailability =
@@ -52,7 +62,12 @@ object LlmModule {
 
     @Provides
     @Singleton
-    fun llmClient(configurations: LlmConfigurationSource, keys: ApiKeySource): LlmClient {
+    fun llmClient(
+        configurations: LlmConfigurationSource,
+        keys: ApiKeySource,
+        keyAvailability: ProviderKeyAvailability,
+        fallbackPreference: FallbackPreferenceStore,
+    ): LlmClient {
         // Client riêng cho LLM, không ảnh hưởng HTTP/DI của mảng khác. Không có interceptor ghi log.
         val http = OkHttpClient.Builder()
             .followRedirects(false)
@@ -62,6 +77,14 @@ object LlmModule {
             .readTimeout(60, TimeUnit.SECONDS)
             .build()
         val transport = OkHttpSseTransport(EventSources.createFactory(http))
-        return RoutingLlmClient(configurations, keys, setOf(OpenAiClient(transport), GeminiClient(transport)))
+        val adapters = setOf(OpenAiClient(transport), GeminiClient(transport))
+        // #72: router thứ hai dùng cấu hình nhà cung cấp phụ; chỉ được gọi khi người dùng bật và router chính lỗi.
+        val fallbackConfigurations = FallbackConfigurationSource(configurations, keyAvailability)
+        return FallbackLlmClient(
+            primary = RoutingLlmClient(configurations, keys, adapters),
+            fallback = RoutingLlmClient(fallbackConfigurations, keys, adapters),
+            fallbackConfigurations = fallbackConfigurations,
+            preference = fallbackPreference,
+        )
     }
 }

@@ -40,7 +40,11 @@ Fragment → ViewModel → Repository / ContentAgent → LlmClient
   Deadline hoạt động cả khi server tiếp tục gửi heartbeat vì không dựa vào `callTimeout`
   (OkHttp SSE chủ động tắt timeout này sau handshake). Hết hạn trả `TIMEOUT` và hủy HTTP Call;
   cancellation/timeout từ bên gọi vẫn được truyền nguyên trạng.
-- Không tự fallback/retry. Bên gọi quyết định thử lại; không tạo request thứ hai ngầm khi gặp lỗi.
+- Router không tự fallback/retry. Bên gọi quyết định thử lại; router không tạo request thứ hai ngầm khi gặp lỗi.
+  Riêng #72 thêm lớp `FallbackLlmClient` bọc ngoài router: **chỉ khi người dùng bật** ở màn Chọn model,
+  lỗi phía nhà cung cấp (`SERVER`, `RATE_LIMIT`, `TIMEOUT`, `AUTHENTICATION`, `PERMISSION`, `PROVIDER`)
+  xảy ra **trước chunk đầu tiên** được thử lại đúng một lần với provider còn lại đã có key và model gợi ý
+  đầu tiên của provider đó cho loại việc.
 
 ## Usage và chi phí chưa biết
 

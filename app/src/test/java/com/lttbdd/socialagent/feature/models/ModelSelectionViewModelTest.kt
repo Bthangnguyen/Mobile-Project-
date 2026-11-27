@@ -3,11 +3,14 @@ package com.lttbdd.socialagent.feature.models
 import com.lttbdd.socialagent.core.model.LlmProvider
 import com.lttbdd.socialagent.core.model.LlmTask
 import com.lttbdd.socialagent.data.ai.FakeKeyAvailability
+import com.lttbdd.socialagent.data.ai.FallbackPreferenceStore
 import com.lttbdd.socialagent.data.ai.FakeTaskModelStore
 import com.lttbdd.socialagent.data.ai.ModelSelectionRepository
 import com.lttbdd.socialagent.data.ai.TaskModelResolver
 import com.lttbdd.socialagent.data.ai.TaskModelSelection
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -26,7 +29,50 @@ class ModelSelectionViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private val store = FakeTaskModelStore()
     private val keys = FakeKeyAvailability(LlmProvider.GEMINI, LlmProvider.OPENAI)
-    private val viewModel = ModelSelectionViewModel(ModelSelectionRepository(store, TaskModelResolver(store, keys), keys))
+    private val fallback = FakeFallbackPreference()
+    private val viewModel = ModelSelectionViewModel(
+        ModelSelectionRepository(store, TaskModelResolver(store, keys), keys),
+        fallback,
+    )
+
+    private class FakeFallbackPreference : FallbackPreferenceStore {
+        val enabled = MutableStateFlow(false)
+        val saved = mutableListOf<Boolean>()
+
+        override fun observe(): Flow<Boolean> = enabled
+
+        override suspend fun setEnabled(enabled: Boolean) {
+            saved += enabled
+            this.enabled.value = enabled
+        }
+    }
+
+    // ---------- #72: tự chuyển nhà cung cấp phụ ----------
+
+    @Test
+    fun `fallback switch is off by default and refresh reads the stored value`() = runTest(dispatcher) {
+        viewModel.refresh()
+        advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.fallbackEnabled)
+
+        fallback.enabled.value = true
+        viewModel.refresh()
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.fallbackEnabled)
+    }
+
+    @Test
+    fun `toggling fallback saves it once`() = runTest(dispatcher) {
+        advanceUntilIdle()
+
+        viewModel.onFallbackToggled(true)
+        viewModel.onFallbackToggled(true)
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.fallbackEnabled)
+        assertEquals(listOf(true), fallback.saved)
+    }
 
     @Before
     fun setUp() {

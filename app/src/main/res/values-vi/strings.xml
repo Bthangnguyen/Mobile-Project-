@@ -308,6 +308,25 @@
     <string name="preview_discard_dialog_message">Bạn đang có nội dung chỉnh sửa chưa lưu. Thoát ngay sẽ mất các thay đổi này.</string>
     <string name="preview_discard_action">Bỏ thay đổi</string>
     <string name="preview_stay_action">Ở lại</string>
+    <string name="preview_opening_suggest_action">Gợi ý câu mở đầu</string>
+    <string name="preview_opening_sheet_title">Chọn câu mở đầu</string>
+    <string name="preview_opening_sheet_subtitle">AI gợi ý 3 phương án. Chọn một phương án chỉ đổi nội dung đang soạn; bấm Lưu chỉnh sửa để giữ lại.</string>
+    <string name="preview_opening_current_label">Câu mở đầu hiện tại</string>
+    <string name="preview_opening_loading">Đang viết 3 phương án…</string>
+    <string name="preview_opening_error">Không tạo được gợi ý. Kiểm tra kết nối mạng và API key rồi thử lại.</string>
+    <string name="preview_opening_retry">Thử lại</string>
+    <string name="preview_opening_regenerate">Sinh 3 phương án khác</string>
+    <string name="preview_opening_keep">Giữ nguyên</string>
+    <string name="preview_opening_option_label">Phương án %1$d</string>
+    <plurals name="preview_opening_option_char_count">
+        <item quantity="other">%1$d ký tự</item>
+    </plurals>
+    <string name="preview_opening_option_over_limit">Dùng câu này bài sẽ vượt giới hạn ký tự của kênh</string>
+    <plurals name="preview_opening_option_description">
+        <item quantity="other">Phương án %1$d: %2$s. %3$d ký tự.</item>
+    </plurals>
+    <string name="preview_opening_replaced">Đã thay câu mở đầu</string>
+    <string name="preview_opening_undo">Hoàn tác</string>
 
     <!-- F5 Trạng thái đăng (#36) -->
     <string name="publish_status_title">Trạng thái đăng bài</string>

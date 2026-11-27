@@ -20,9 +20,14 @@ data class DraftPreviewUiState(
     val hasUnsavedChanges: Boolean = false,
     val canSave: Boolean = false,
     @param:StringRes val textErrorRes: Int? = null,
+    /** Bật nút Gợi ý câu mở đầu (#63): có bản nháp, không bị khoá vì đang đăng và nội dung không rỗng. */
+    val canSuggestOpening: Boolean = false,
 )
 
 /** Sự kiện dùng một lần phát từ [DraftPreviewViewModel] sang [DraftPreviewFragment]. */
 sealed interface DraftPreviewEvent {
     data class ShowMessage(@param:StringRes val messageRes: Int) : DraftPreviewEvent
+
+    /** Đã thay câu mở đầu trong ô soạn thảo (#63): hiện Snackbar kèm nút Hoàn tác. */
+    data object OpeningReplaced : DraftPreviewEvent
 }

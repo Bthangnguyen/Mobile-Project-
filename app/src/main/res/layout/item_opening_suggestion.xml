@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.lttbdd.socialagent.core.ui.components.AppCard xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/cardOpeningOption"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="@dimen/component_spacing_small"
+    android:clickable="true"
+    android:focusable="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:importantForAccessibility="noHideDescendants"
+        android:orientation="vertical">
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/tvOptionLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textAppearance="@style/TextAppearance.SocialAgent.Label" />
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/tvOptionText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing_xsmall"
+            android:textAppearance="@style/TextAppearance.SocialAgent.Body" />
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/tvOptionCharCount"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing_xsmall"
+            android:textAppearance="@style/TextAppearance.SocialAgent.Caption"
+            android:textColor="@color/brand_on_surface_variant" />
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/tvOptionOverLimit"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing_xsmall"
+            android:text="@string/preview_opening_option_over_limit"
+            android:textAppearance="@style/TextAppearance.SocialAgent.Caption"
+            android:textColor="@color/brand_error"
+            android:visibility="gone" />
+    </LinearLayout>
+</com.lttbdd.socialagent.core.ui.components.AppCard>

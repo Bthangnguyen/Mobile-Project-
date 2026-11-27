@@ -192,6 +192,15 @@
                 android:textColor="@color/brand_on_surface_variant"
                 android:visibility="gone" />
 
+            <!-- Gợi ý 3 phương án câu mở đầu (#63) -->
+            <com.lttbdd.socialagent.core.ui.components.SecondaryButton
+                android:id="@+id/btnSuggestOpening"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/component_spacing"
+                android:enabled="false"
+                android:text="@string/preview_opening_suggest_action" />
+
             <!-- Nút Khôi phục và Lưu chỉnh sửa -->
             <LinearLayout
                 android:layout_width="match_parent"

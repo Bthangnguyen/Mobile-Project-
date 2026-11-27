@@ -310,6 +310,27 @@
     <string name="preview_discard_dialog_message">You have unsaved edits. Leaving now will discard them.</string>
     <string name="preview_discard_action">Discard</string>
     <string name="preview_stay_action">Stay</string>
+    <string name="preview_opening_suggest_action">Suggest opening lines</string>
+    <string name="preview_opening_sheet_title">Choose an opening line</string>
+    <string name="preview_opening_sheet_subtitle">AI suggests 3 options. Picking one only changes the editor; tap Save changes to keep it.</string>
+    <string name="preview_opening_current_label">Current opening line</string>
+    <string name="preview_opening_loading">Writing 3 options…</string>
+    <string name="preview_opening_error">Could not create suggestions. Check your connection and API key, then try again.</string>
+    <string name="preview_opening_retry">Try again</string>
+    <string name="preview_opening_regenerate">Suggest 3 more</string>
+    <string name="preview_opening_keep">Keep current</string>
+    <string name="preview_opening_option_label">Option %1$d</string>
+    <plurals name="preview_opening_option_char_count">
+        <item quantity="one">%1$d character</item>
+        <item quantity="other">%1$d characters</item>
+    </plurals>
+    <string name="preview_opening_option_over_limit">Using this line would push the post over the channel limit</string>
+    <plurals name="preview_opening_option_description">
+        <item quantity="one">Option %1$d: %2$s. %3$d character.</item>
+        <item quantity="other">Option %1$d: %2$s. %3$d characters.</item>
+    </plurals>
+    <string name="preview_opening_replaced">Opening line replaced</string>
+    <string name="preview_opening_undo">Undo</string>
 
     <!-- F5 Trạng thái đăng (#36) -->
     <string name="publish_status_title">Publishing status</string>

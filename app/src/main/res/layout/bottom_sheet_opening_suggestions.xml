@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="@dimen/screen_padding">
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/tvOpeningSheetTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/preview_opening_sheet_title"
+            android:textAppearance="@style/TextAppearance.SocialAgent.Title" />
+
+        <com.google.android.material.textview.MaterialTextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing_xsmall"
+            android:text="@string/preview_opening_sheet_subtitle"
+            android:textAppearance="@style/TextAppearance.SocialAgent.Caption" />
+
+        <!-- Câu mở đầu hiện tại để so sánh -->
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/tvCurrentOpeningLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing"
+            android:text="@string/preview_opening_current_label"
+            android:textAppearance="@style/TextAppearance.SocialAgent.Label" />
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/tvCurrentOpening"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing_xsmall"
+            android:textAppearance="@style/TextAppearance.SocialAgent.Body"
+            android:textColor="@color/brand_on_surface_variant" />
+
+        <!-- Đang sinh -->
+        <LinearLayout
+            android:id="@+id/loadingContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing_large"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <com.lttbdd.socialagent.core.ui.components.AppLoading
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:indeterminate="true" />
+
+            <com.google.android.material.textview.MaterialTextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/component_spacing"
+                android:layout_weight="1"
+                android:accessibilityLiveRegion="polite"
+                android:text="@string/preview_opening_loading"
+                android:textAppearance="@style/TextAppearance.SocialAgent.Body" />
+        </LinearLayout>
+
+        <!-- Lỗi -->
+        <LinearLayout
+            android:id="@+id/errorContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing_large"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <com.google.android.material.textview.MaterialTextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:accessibilityLiveRegion="polite"
+                android:text="@string/preview_opening_error"
+                android:textAppearance="@style/TextAppearance.SocialAgent.Body"
+                android:textColor="@color/brand_error" />
+
+            <com.lttbdd.socialagent.core.ui.components.PrimaryButton
+                android:id="@+id/btnRetryOpening"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/component_spacing_small"
+                android:text="@string/preview_opening_retry" />
+        </LinearLayout>
+
+        <!-- 3 phương án, thêm bằng code từ item_opening_suggestion.xml -->
+        <LinearLayout
+            android:id="@+id/optionsContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing"
+            android:orientation="vertical"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing_large"
+            android:orientation="horizontal">
+
+            <com.lttbdd.socialagent.core.ui.components.OutlinedButton
+                android:id="@+id/btnKeepOpening"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/preview_opening_keep" />
+
+            <com.lttbdd.socialagent.core.ui.components.SecondaryButton
+                android:id="@+id/btnRegenerateOpening"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/component_spacing_small"
+                android:layout_weight="1"
+                android:enabled="false"
+                android:text="@string/preview_opening_regenerate" />
+        </LinearLayout>
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

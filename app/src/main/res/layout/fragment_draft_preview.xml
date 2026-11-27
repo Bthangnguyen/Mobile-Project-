@@ -228,7 +228,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/component_spacing_large"
-                android:layout_marginBottom="@dimen/component_spacing_large"
                 android:orientation="horizontal">
 
                 <com.lttbdd.socialagent.core.ui.components.OutlinedButton
@@ -248,6 +247,15 @@
                     android:enabled="false"
                     android:text="@string/preview_action_save" />
             </LinearLayout>
+
+            <!-- Lối vào lịch sử phiên bản bản nháp (F4, Issue #62) -->
+            <com.lttbdd.socialagent.core.ui.components.OutlinedButton
+                android:id="@+id/btnVersionHistory"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/component_spacing_small"
+                android:layout_marginBottom="@dimen/component_spacing_large"
+                android:text="@string/preview_action_history" />
         </LinearLayout>
     </FrameLayout>
 </androidx.core.widget.NestedScrollView>

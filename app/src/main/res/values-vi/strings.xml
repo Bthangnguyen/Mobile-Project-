@@ -300,6 +300,7 @@
     <string name="preview_action_reset">Khôi phục</string>
     <string name="preview_action_save">Lưu chỉnh sửa</string>
     <string name="preview_save_success">Đã lưu chỉnh sửa. Cần duyệt lại trước khi đăng bài.</string>
+    <string name="preview_save_success_without_history">Đã lưu chỉnh sửa và thu hồi duyệt, nhưng không ghi được mục lịch sử phiên bản.</string>
     <string name="preview_save_failed">Không thể lưu bản nháp. Vui lòng kiểm tra lại nội dung.</string>
     <string name="preview_not_found_title">Không tìm thấy bản nháp</string>
     <string name="preview_not_found_message">Bản nháp được yêu cầu không tồn tại hoặc đã bị xóa.</string>
@@ -308,6 +309,31 @@
     <string name="preview_discard_dialog_message">Bạn đang có nội dung chỉnh sửa chưa lưu. Thoát ngay sẽ mất các thay đổi này.</string>
     <string name="preview_discard_action">Bỏ thay đổi</string>
     <string name="preview_stay_action">Ở lại</string>
+    <string name="preview_action_history">Lịch sử phiên bản</string>
+
+    <!-- Feature F4: Lịch sử phiên bản bản nháp (Issue #62) -->
+    <string name="history_header_title">Lịch sử phiên bản</string>
+    <string name="history_header_subtitle">Xem các phiên bản đã lưu của bản nháp này và khôi phục lại phiên bản trước bất cứ lúc nào.</string>
+    <string name="history_empty_title">Chưa có lịch sử phiên bản</string>
+    <string name="history_empty_message">Các phiên bản sẽ được lưu tự động khi AI tạo bản nháp hoặc khi bạn lưu chỉnh sửa.</string>
+    <string name="history_version_badge">v%1$d</string>
+    <string name="history_current_version_badge">Hiện tại</string>
+    <string name="history_source_initial">Bản gốc</string>
+    <string name="history_source_ai">AI tạo</string>
+    <string name="history_source_manual">Sửa tay</string>
+    <string name="history_source_restored">Khôi phục</string>
+    <string name="history_char_count_format">%1$d ký tự</string>
+    <string name="history_meta_format">%1$s · %2$s</string>
+    <string name="history_action_restore">Khôi phục phiên bản này</string>
+    <string name="history_restore_dialog_title">Khôi phục phiên bản này?</string>
+    <string name="history_restore_dialog_message">Thao tác này sẽ thay thế nội dung bản nháp hiện tại và thu hồi trạng thái duyệt để bạn kiểm tra lại trước khi đăng.</string>
+    <string name="history_restore_success">Đã khôi phục phiên bản. Cần duyệt lại trước khi đăng bài.</string>
+    <string name="history_restore_saved_without_history">Đã khôi phục nội dung và thu hồi duyệt, nhưng không ghi được mục lịch sử mới.</string>
+    <string name="history_restore_failed">Không thể khôi phục phiên bản này. Vui lòng thử lại.</string>
+    <string name="history_load_error_title">Không thể tải lịch sử phiên bản</string>
+    <string name="history_load_error_message">Đã xảy ra lỗi khi tải lịch sử bản nháp. Vui lòng mở lại và thử lại.</string>
+    <string name="history_load_failed">Không thể tải lịch sử phiên bản bản nháp. Vui lòng thử lại.</string>
+    <string name="history_publishing_locked_warning">Bản nháp đang có bài chờ đăng hoặc đang đăng nên tạm khóa khôi phục phiên bản.</string>
 
     <!-- Feature F4: Cảnh báo nội dung trước khi đăng (Issue #65) -->
     <string name="warning_banner_title">Cảnh báo trước khi đăng</string>

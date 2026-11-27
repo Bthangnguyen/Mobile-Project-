@@ -12,6 +12,7 @@ import com.lttbdd.socialagent.core.publishing.EnqueueResult
 import com.lttbdd.socialagent.core.publishing.PublishErrorReason
 import com.lttbdd.socialagent.core.publishing.PublishQueue
 import com.lttbdd.socialagent.core.social.SocialChannelClient
+import com.lttbdd.socialagent.data.social.DestinationBoundClient
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.Flow
@@ -74,6 +75,10 @@ class PublishQueueRepository @Inject constructor(
      * cùng một transaction. Bài cũ [PostStatus.FAILED] không chặn — người dùng được đăng lại với khoá mới.
      */
     override suspend fun enqueue(draftId: String): EnqueueResult {
+        // Khôi phục tài khoản ngoài Room transaction để tránh lồng thao tác lưu.
+        val boundClients = clients.filterIsInstance<DestinationBoundClient>()
+        val channel = if (boundClients.isEmpty()) null else draftDao.getById(draftId)?.takeIf { it.approved }?.channel
+        val publishKey = boundClients.firstOrNull { it.type == channel }?.newPublishKey()
         val result = database.withTransaction {
             val draft = draftDao.getById(draftId) ?: return@withTransaction EnqueueResult.DraftNotFound
             if (!draft.approved) return@withTransaction EnqueueResult.NotApproved
@@ -86,13 +91,19 @@ class PublishQueueRepository @Inject constructor(
                 return@withTransaction EnqueueResult.AlreadyPublished(it.id, it.url)
             }
 
+            val idempotencyKey = if (boundClients.any { it.type == draft.channel }) {
+                publishKey?.takeIf { channel == draft.channel }
+                    ?: return@withTransaction EnqueueResult.DestinationRequired
+            } else {
+                UUID.randomUUID().toString()
+            }
             val now = clock.nowMillis()
             val post = PostEntity(
                 id = UUID.randomUUID().toString(),
                 draftId = draftId,
                 channel = draft.channel,
                 status = PostStatus.QUEUED,
-                idempotencyKey = UUID.randomUUID().toString(),
+                idempotencyKey = idempotencyKey,
                 remotePostId = null,
                 url = null,
                 errorMessage = null,

@@ -279,6 +279,22 @@ class PublishStatusViewModelTest {
         assertEquals(R.string.review_publish_already_queued, nextMessage())
     }
 
+    @Test
+    fun `publish all reports missing destination and still queues the other channel`() = runTest {
+        collectState()
+        tracker.topics.value = listOf(
+            topic("t1", state(PostStatus.DRAFT, draftId = "fb"), state(PostStatus.DRAFT, draftId = "li")),
+        )
+        queue.results["fb"] = EnqueueResult.DestinationRequired
+        advanceUntilIdle()
+
+        viewModel.onPublishAll("t1")
+        advanceUntilIdle()
+
+        assertEquals(listOf("fb", "li"), queue.enqueued)
+        assertEquals(R.string.publish_status_some_destinations_required, nextMessage())
+    }
+
     // ---------- Từng kênh ----------
 
     @Test
@@ -289,6 +305,7 @@ class PublishStatusViewModelTest {
             EnqueueResult.AlreadyActive("p", PostStatus.PUBLISHING) to R.string.review_publish_in_progress,
             EnqueueResult.AlreadyPublished("p", null) to R.string.review_publish_already_published,
             EnqueueResult.NotApproved to R.string.review_publish_blocked_unapproved,
+            EnqueueResult.DestinationRequired to R.string.review_publish_destination_required,
             EnqueueResult.DraftNotFound to R.string.publish_status_action_failed,
         )
         cases.forEach { (result, message) ->

@@ -1,15 +1,11 @@
 package com.lttbdd.socialagent.di
 
 import com.lttbdd.socialagent.core.ai.ContentAgent
-import com.lttbdd.socialagent.core.model.ChannelType
-import com.lttbdd.socialagent.core.social.SocialChannelClient
 import com.lttbdd.socialagent.data.fake.FakeContentAgent
-import com.lttbdd.socialagent.data.fake.FakeSocialChannelClient
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
-import dagger.multibindings.IntoSet
 import javax.inject.Singleton
 
 /**
@@ -19,16 +15,6 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object FakeDataModule {
-
-    @Provides
-    @IntoSet
-    @Singleton
-    fun facebookClient(): SocialChannelClient = FakeSocialChannelClient(ChannelType.FACEBOOK)
-
-    @Provides
-    @IntoSet
-    @Singleton
-    fun linkedInClient(): SocialChannelClient = FakeSocialChannelClient(ChannelType.LINKEDIN)
 
     @Provides
     @Singleton

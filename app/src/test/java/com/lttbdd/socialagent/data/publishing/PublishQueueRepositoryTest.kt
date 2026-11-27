@@ -16,6 +16,10 @@ import com.lttbdd.socialagent.core.model.PostStatus
 import com.lttbdd.socialagent.core.model.PublishResult
 import com.lttbdd.socialagent.core.publishing.EnqueueResult
 import com.lttbdd.socialagent.core.social.SocialChannelClient
+import com.lttbdd.socialagent.data.model.OAuthToken
+import com.lttbdd.socialagent.data.social.DestinationBoundClient
+import com.lttbdd.socialagent.data.social.PublishDestinations
+import com.lttbdd.socialagent.data.social.PublishingAccounts
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -109,6 +113,61 @@ class PublishQueueRepositoryTest {
         assertEquals(0, saved.attemptCount)
         assertEquals(1, scheduler.calls)
         assertEquals("Chưa gọi API khi mới bấm đăng", 0, facebook.calls)
+    }
+
+    @Test
+    fun `worker uses original destination key after repository restart`() = runTest {
+        saveDraft()
+        val client = object : DestinationBoundClient, SocialChannelClient by facebook {
+            override suspend fun newPublishKey() = "bound-to-page"
+        }
+
+        val id = queuedId(repository(clients = setOf(client)))
+        assertEquals("bound-to-page", post(id).idempotencyKey)
+        assertEquals(0, facebook.calls)
+
+        val result = repository(clients = setOf(client)).processQueue()
+
+        assertEquals(1, result.published)
+        assertEquals(listOf("bound-to-page"), facebook.keys)
+        assertEquals(PostStatus.PUBLISHED, post(id).status)
+    }
+
+    @Test
+    fun `enqueue requires exactly one publishing account for Facebook and LinkedIn`() = runTest {
+        val candidates = mapOf(
+            ChannelType.FACEBOOK to listOf("123", "456").map {
+                it to OAuthToken("test-page", null, isFacebookProfile = false)
+            },
+            ChannelType.LINKEDIN to listOf("member-1", "member-2").map {
+                it to OAuthToken("test-member", null, "w_member_social")
+            },
+        )
+        for ((channel, connected) in candidates) {
+            val draftId = "draft-${channel.name}"
+            saveDraft(id = draftId, channel = channel)
+            var accounts = connected
+            val destinations = PublishDestinations(PublishingAccounts { accounts })
+            val client = object : DestinationBoundClient, SocialChannelClient by ScriptedClient(channel) {
+                override suspend fun newPublishKey() = destinations.newKey(type)
+            }
+            val repo = repository(clients = setOf(client))
+            val scheduledBefore = scheduler.calls
+
+            assertEquals(EnqueueResult.DestinationRequired, repo.enqueue(draftId))
+            accounts = emptyList()
+            assertEquals(EnqueueResult.DestinationRequired, repo.enqueue(draftId))
+            assertTrue(db.postDao().getByDraft(draftId).isEmpty())
+            assertEquals(scheduledBefore, scheduler.calls)
+
+            accounts = connected.take(1)
+            val postId = queuedId(repo, draftId)
+            assertEquals(accounts.single(), destinations.resolve(channel, post(postId).idempotencyKey))
+            assertEquals(scheduledBefore + 1, scheduler.calls)
+
+            accounts = connected
+            assertEquals(EnqueueResult.AlreadyActive(postId, PostStatus.QUEUED), repo.enqueue(draftId))
+        }
     }
 
     @Test

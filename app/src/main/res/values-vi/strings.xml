@@ -265,6 +265,7 @@
     <string name="review_publish_already_queued">Bản nháp này đã nằm trong hàng đợi đăng bài.</string>
     <string name="review_publish_in_progress">Bản nháp này đang được đăng hoặc đang chờ bạn xác nhận kết quả.</string>
     <string name="review_publish_already_published">Bản nháp này đã được đăng trước đó.</string>
+    <string name="review_publish_destination_required">Hãy kết nối một tài khoản có thể đăng bài hoặc chỉ giữ một tài khoản như vậy trên kênh này.</string>
 
     <!-- Feature F4: Xem trước theo kênh, sửa tay & đếm ký tự (Issue #34) -->
     <string name="preview_header_title">Xem trước &amp; Sửa bài</string>
@@ -333,4 +334,5 @@
     <string name="publish_error_storage">Không ghi được vào bộ nhớ máy.</string>
     <string name="publish_error_unknown">Kênh báo lỗi khi đăng bài.</string>
     <string name="publish_status_action_failed">Không cập nhật được hàng đợi đăng bài. Vui lòng thử lại.</string>
+    <string name="publish_status_some_destinations_required">Một số bản nháp chưa được đưa vào hàng đợi. Mỗi kênh cần đúng một tài khoản có thể đăng bài đã kết nối.</string>
 </resources>

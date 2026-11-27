@@ -12,6 +12,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.lttbdd.socialagent.R
 import com.lttbdd.socialagent.core.ui.components.AppDialog
 import com.lttbdd.socialagent.core.ui.components.AppSnackbar
@@ -112,6 +113,19 @@ class ReviewDraftsFragment : Fragment() {
                         viewModel.onApproveConfirmed(event.draftId, event.expectedText)
                     },
                 )
+            }
+            is ReviewDraftsEvent.ConfirmPublishWithWarnings -> {
+                val context = requireContext()
+                val warningList = PrePublishWarningFormatter.formatBulletList(context, event.warnings)
+                val message = getString(R.string.warning_publish_dialog_message, warningList)
+                MaterialAlertDialogBuilder(context)
+                    .setTitle(R.string.warning_publish_dialog_title)
+                    .setMessage(message)
+                    .setPositiveButton(R.string.warning_publish_anyway_action) { _, _ ->
+                        viewModel.onPublishConfirmedAfterWarnings(event.draftId)
+                    }
+                    .setNegativeButton(R.string.action_cancel, null)
+                    .show()
             }
             is ReviewDraftsEvent.ShowMessage -> {
                 AppSnackbar.show(binding.root, event.messageRes)

@@ -43,6 +43,7 @@ class PublishStatusFragment : Fragment() {
             onPublishChannel = viewModel::onPublishChannel,
             onConfirmPublished = viewModel::onConfirmPublished,
             onRequeue = viewModel::onRequeueRequested,
+            onOpenPost = ::openPost,
         )
         binding.rvTopics.layoutManager = LinearLayoutManager(requireContext())
         binding.rvTopics.adapter = adapter
@@ -77,6 +78,13 @@ class PublishStatusFragment : Fragment() {
                 negativeActionRes = R.string.action_cancel,
                 onPositiveAction = { viewModel.onRequeueConfirmed(event.postId) },
             )
+        }
+    }
+
+    /** Mở bài gốc bằng trình duyệt hoặc app mạng xã hội (#40). URL đã được ViewModel kiểm tra là http/https. */
+    private fun openPost(url: String) {
+        if (!PostLinkOpener.open(requireContext(), url)) {
+            AppSnackbar.show(binding.root, R.string.publish_status_open_failed)
         }
     }
 

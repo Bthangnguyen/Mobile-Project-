@@ -9,6 +9,7 @@ import com.lttbdd.socialagent.core.database.toModel
 import com.lttbdd.socialagent.core.model.PostStatus
 import com.lttbdd.socialagent.core.model.PublishResult
 import com.lttbdd.socialagent.core.publishing.EnqueueResult
+import com.lttbdd.socialagent.core.publishing.PublishErrorReason
 import com.lttbdd.socialagent.core.publishing.PublishQueue
 import com.lttbdd.socialagent.core.social.SocialChannelClient
 import kotlinx.coroutines.CancellationException
@@ -34,6 +35,11 @@ data class QueueRunResult(
     val needsConfirmation: Int = 0,
     /** Bài còn đang PUBLISHING chưa quá hạn sau lượt này — đã hẹn lượt kiểm tra trễ. */
     val inFlight: Int = 0,
+    /**
+     * Bài kênh yêu cầu chờ theo `Retry-After` (#39). Không tính vào [shouldRetry]: đã hẹn lượt chạy đúng lúc hết chờ,
+     * để backoff của WorkManager không gọi lại sớm hơn.
+     */
+    val deferred: Int = 0,
 ) {
     val shouldRetry: Boolean get() = retryLater > 0
 }
@@ -106,6 +112,8 @@ class PublishQueueRepository @Inject constructor(
      * phải được giữ chỗ thành công mới gọi API.
      */
     suspend fun processQueue(): QueueRunResult {
+        val cleanup = database.channelCleanupDao()
+        cleanup.finishDeferredCleanup()
         val now = clock.nowMillis()
         postDao.markStalePublishingAsUnknown(startedBeforeMillis = now - STALE_PUBLISHING_MILLIS, nowMillis = now)
 
@@ -116,14 +124,28 @@ class PublishQueueRepository @Inject constructor(
                 Outcome.RETRY_LATER -> result.copy(retryLater = result.retryLater + 1)
                 Outcome.FAILED -> result.copy(failed = result.failed + 1)
                 Outcome.NEEDS_CONFIRMATION -> result.copy(needsConfirmation = result.needsConfirmation + 1)
+                Outcome.DEFERRED -> result.copy(deferred = result.deferred + 1)
                 Outcome.SKIPPED -> result
             }
         }
+        cleanup.finishDeferredCleanup()
+        scheduleNextRetry()
         // Bài kẹt PUBLISHING chưa quá hạn (worker trước bị dừng giữa chừng) sẽ không còn ai xử lý nếu không hẹn
         // lượt sau: hẹn kiểm tra lại khi đã quá STALE_PUBLISHING_MILLIS để chuyển nó sang "chờ xác nhận".
         val inFlight = postDao.countInFlight()
         if (inFlight > 0) scheduler.scheduleStaleCheck(STALE_PUBLISHING_MILLIS + STALE_CHECK_MARGIN_MILLIS)
         return result.copy(inFlight = inFlight)
+    }
+
+    /**
+     * Hẹn lượt chạy cho bài chờ `Retry-After` sớm nhất (#39), kể cả bài được hẹn từ lượt trước. Mốc đã qua nghĩa là
+     * bài tới giờ trong lúc lượt này đang chạy (bị bỏ qua vì lúc giữ chỗ chưa tới giờ): hẹn ngay trên chuỗi chính,
+     * vì work của đúng mốc đó có thể chính là lượt đang chạy và `KEEP` sẽ bỏ qua yêu cầu.
+     */
+    private suspend fun scheduleNextRetry() {
+        val retryAt = postDao.earliestNextAttempt() ?: return
+        val delay = retryAt - clock.nowMillis()
+        if (delay > 0) scheduler.scheduleRetryAt(retryAt, delay) else scheduler.schedule()
     }
 
     /** Gọi khi app khởi động: hẹn worker để xử lý bài QUEUED/PUBLISHING còn sót (app bị tắt trước khi kịp hẹn). */
@@ -133,14 +155,23 @@ class PublishQueueRepository @Inject constructor(
 
     /** Người dùng xác nhận bài không rõ kết quả thật ra ĐÃ lên mạng xã hội. */
     suspend fun confirmPublishedManually(postId: String, url: String? = null): Boolean =
-        postDao.resolveUnknownAsPublished(postId, url, clock.nowMillis()) == 1
+        database.withTransaction {
+            val confirmed = postDao.resolveUnknownAsPublished(postId, url, clock.nowMillis()) == 1
+            if (confirmed) database.channelCleanupDao().finishDeferredCleanup()
+            confirmed
+        }
 
     /**
      * Người dùng đã kiểm tra trên mạng xã hội và bài CHƯA được đăng: đưa lại vào hàng đợi với cùng
      * idempotencyKey (client vẫn phải chặn trùng theo hợp đồng).
      */
     suspend fun requeueAfterUserCheck(postId: String): Boolean {
-        if (postDao.requeueUnknown(postId, clock.nowMillis()) == 0) return false
+        val requeued = database.withTransaction {
+            val changed = postDao.requeueUnknown(postId, clock.nowMillis()) == 1
+            if (changed) database.channelCleanupDao().retainPostForExplicitRetry(postId)
+            changed
+        }
+        if (!requeued) return false
         scheduler.schedule()
         return true
     }
@@ -197,18 +228,33 @@ class PublishQueueRepository @Inject constructor(
                 )
                 Outcome.PUBLISHED
             }
-            is PublishResult.RetryableError ->
-                if (post.attemptCount >= MAX_RETRYABLE_ATTEMPTS) {
-                    post.fail("$REASON_RETRY_LIMIT (${result.reason})")
-                } else {
-                    post.requeue(result.reason)
+            is PublishResult.RetryableError -> {
+                val retryAfter = result.retryAfterMillis
+                when {
+                    post.attemptCount >= MAX_RETRYABLE_ATTEMPTS ->
+                        post.fail("$REASON_RETRY_LIMIT (${result.reason})")
+                    retryAfter != null && retryAfter > 0 -> {
+                        // Retry-After quá dài (hoặc kênh trả giá trị sai) vẫn bị giới hạn để bài không treo mãi.
+                        val wait = retryAfter.coerceAtMost(MAX_RETRY_AFTER_MILLIS)
+                        post.requeue(result.reason, nextAttemptAtMillis = clock.nowMillis() + wait)
+                        Outcome.DEFERRED
+                    }
+                    else -> post.requeue(result.reason)
                 }
+            }
             is PublishResult.PermanentError -> post.fail(result.reason)
         }
     }
 
-    private suspend fun PostEntity.requeue(reason: String): Outcome {
-        postDao.update(copy(status = PostStatus.QUEUED, errorMessage = reason, updatedAtMillis = clock.nowMillis()))
+    private suspend fun PostEntity.requeue(reason: String, nextAttemptAtMillis: Long? = null): Outcome {
+        postDao.update(
+            copy(
+                status = PostStatus.QUEUED,
+                errorMessage = reason,
+                nextAttemptAtMillis = nextAttemptAtMillis,
+                updatedAtMillis = clock.nowMillis(),
+            ),
+        )
         return Outcome.RETRY_LATER
     }
 
@@ -251,7 +297,7 @@ class PublishQueueRepository @Inject constructor(
         return Outcome.NEEDS_CONFIRMATION
     }
 
-    private enum class Outcome { PUBLISHED, RETRY_LATER, FAILED, NEEDS_CONFIRMATION, SKIPPED }
+    private enum class Outcome { PUBLISHED, RETRY_LATER, FAILED, NEEDS_CONFIRMATION, DEFERRED, SKIPPED }
 
     companion object {
         /** Worker của WorkManager bị dừng sau tối đa 10 phút; quá mốc này mà còn PUBLISHING thì lượt đó đã chết. */
@@ -260,15 +306,19 @@ class PublishQueueRepository @Inject constructor(
 
         /**
          * Số lần gọi API tối đa khi kênh trả lỗi tạm thời (5xx, rate limit). Lần chưa gửi được request
-         * (mất mạng, DNS, lỗi bắt tay TLS) không được tính vào `attemptCount`. Đọc `retryAfterMillis`: #39.
+         * (mất mạng, DNS, lỗi bắt tay TLS) không được tính vào `attemptCount`.
          */
         const val MAX_RETRYABLE_ATTEMPTS = 8
+
+        /** Chờ tối đa theo `Retry-After` (#39); kênh trả lâu hơn thì vẫn thử lại sau mốc này. */
+        const val MAX_RETRY_AFTER_MILLIS = 24 * 60 * 60 * 1000L
 
         /** Trạng thái chặn tạo bài mới cho cùng bản nháp. */
         private val ACTIVE_STATUSES = setOf(PostStatus.QUEUED, PostStatus.PUBLISHING, PostStatus.HANDED_OFF)
 
-        // Lý do lưu trong errorMessage; UI (#39) đổi sang chuỗi VI/EN, không hiển thị nguyên văn.
-        const val REASON_NOT_SENT = "network_unavailable"
+        // Lý do lưu trong errorMessage; UI (feature/publishing/PublishErrorMessages, #39) đổi sang chuỗi VI/EN,
+        // không hiển thị nguyên văn. Mã kênh trả về: core/publishing/PublishErrorReason.
+        const val REASON_NOT_SENT = PublishErrorReason.NETWORK_UNAVAILABLE
         const val REASON_STORAGE = "storage_error"
         const val REASON_OUTCOME_UNKNOWN = "outcome_unknown"
         const val REASON_DRAFT_MISSING = "draft_missing"

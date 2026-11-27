@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lttbdd.socialagent.core.model.LlmProvider
 import com.lttbdd.socialagent.core.model.LlmTask
+import com.lttbdd.socialagent.data.ai.FallbackPreferenceStore
 import com.lttbdd.socialagent.data.ai.LlmModelCatalog
 import com.lttbdd.socialagent.data.ai.ModelSelectionRepository
 import com.lttbdd.socialagent.data.ai.ModelSelectionSnapshot
@@ -53,14 +54,24 @@ data class ModelSelectionUiState(
     val providerKeys: Map<LlmProvider, Boolean> = emptyMap(),
     val tasks: Map<LlmTask, TaskModelUiState> = emptyMap(),
     val loadFailed: Boolean = false,
+    /** Tự chuyển sang nhà cung cấp phụ khi nhà cung cấp chính lỗi (#72). */
+    val fallbackEnabled: Boolean = false,
 )
 
 @HiltViewModel
 class ModelSelectionViewModel @Inject constructor(
     private val repository: ModelSelectionRepository,
+    private val fallbackPreference: FallbackPreferenceStore,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ModelSelectionUiState())
     val uiState: StateFlow<ModelSelectionUiState> = _uiState.asStateFlow()
+
+    /** Bật/tắt tự chuyển nhà cung cấp phụ (#72); có tác dụng từ lệnh gọi LLM kế tiếp. */
+    fun onFallbackToggled(enabled: Boolean) {
+        if (enabled == _uiState.value.fallbackEnabled) return
+        _uiState.update { it.copy(fallbackEnabled = enabled) }
+        viewModelScope.launch { fallbackPreference.setEnabled(enabled) }
+    }
 
     /** `refresh()` bị gọi khi đang bận: chạy lại ngay khi thao tác hiện tại kết thúc để không dùng trạng thái key cũ. */
     private var refreshPending = false
@@ -71,7 +82,11 @@ class ModelSelectionViewModel @Inject constructor(
             refreshPending = true
             return
         }
-        launchOperation { applySnapshot(repository.snapshot(), rebuildDraft = emptySet()) }
+        launchOperation {
+            applySnapshot(repository.snapshot(), rebuildDraft = emptySet())
+            val fallbackEnabled = fallbackPreference.isEnabled()
+            _uiState.update { it.copy(fallbackEnabled = fallbackEnabled) }
+        }
     }
 
     fun onProviderSelected(task: LlmTask, provider: LlmProvider) {

@@ -53,6 +53,10 @@ class ModelSelectionFragment : Fragment() {
             }
         }
         sections.forEach { (task, section) -> setUpSection(task, section) }
+        ViewCompat.setAccessibilityHeading(binding.fallbackTitle, true)
+        binding.fallbackSwitch.setOnCheckedChangeListener { _, checked ->
+            if (!rendering) viewModel.onFallbackToggled(checked)
+        }
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.uiState.collect(::render)
@@ -91,6 +95,12 @@ class ModelSelectionFragment : Fragment() {
     }
 
     private fun render(state: ModelSelectionUiState) {
+        rendering = true
+        try {
+            binding.fallbackSwitch.isChecked = state.fallbackEnabled
+        } finally {
+            rendering = false
+        }
         binding.progress.visibility = if (state.loading || state.busy) View.VISIBLE else View.GONE
         binding.loadError.visibility = if (state.loadFailed) View.VISIBLE else View.GONE
         rendering = true

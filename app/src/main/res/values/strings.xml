@@ -196,7 +196,7 @@
 
     <!-- Chọn model theo loại việc, Issue #54. -->
     <string name="models_title">Models by task</string>
-    <string name="models_description">Choose the provider and model for each kind of work. Only providers with a saved API key can be selected, and the app never switches provider on its own.</string>
+    <string name="models_description">Choose the provider and model for each kind of work. Only providers with a saved API key can be selected, and the app only switches provider when you turn on Backup provider.</string>
     <string name="models_manage_keys">Manage API keys</string>
     <string name="models_loading">Loading model settings…</string>
     <string name="models_load_failed">Could not load model settings. Reopen this screen to retry.</string>
@@ -349,4 +349,8 @@
     <string name="publish_error_storage">Could not save to the device storage.</string>
     <string name="publish_error_unknown">The channel returned an error.</string>
     <string name="publish_status_action_failed">Could not update the publishing queue. Please try again.</string>
+    <!-- #72: tự chuyển nhà cung cấp phụ -->
+    <string name="models_fallback_title">Backup provider</string>
+    <string name="models_fallback_switch">Switch to the backup provider when the main one fails</string>
+    <string name="models_fallback_description">If the main provider has a server error, rate limit, timeout or key problem before any text arrives, the app retries once with the other provider that has a key, using its suggested model. That call uses your key and is billed by that provider.</string>
 </resources>

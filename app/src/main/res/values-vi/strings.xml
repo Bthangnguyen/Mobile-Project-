@@ -326,5 +326,21 @@
     <string name="publish_status_marked_published">Đã đánh dấu là đã đăng.</string>
     <string name="publish_status_requeued">Đã đưa lại vào hàng đợi đăng bài.</string>
     <string name="publish_status_state_changed">Trạng thái bài đã thay đổi. Hãy xem lại danh sách.</string>
+    <string name="publish_status_open_post">Mở bài gốc</string>
+    <string name="publish_status_open_failed">Không có ứng dụng nào trên máy mở được liên kết này.</string>
+    <string name="publish_status_retrying">Sẽ tự thử lại. %1$s</string>
+    <string name="publish_error_network_unavailable">Không kết nối được mạng.</string>
+    <string name="publish_error_rate_limited">Kênh đang giới hạn tần suất đăng bài.</string>
+    <string name="publish_error_server_error">Kênh đang gặp sự cố tạm thời.</string>
+    <string name="publish_error_retry_limit">Đã thử lại nhiều lần nhưng không thành công. Hãy thử lại sau.</string>
+    <string name="publish_error_permission_denied">Ứng dụng chưa có quyền đăng bài trên kênh này. Hãy kết nối lại ở Cài đặt › Kênh của tôi và cho phép đăng bài.</string>
+    <string name="publish_error_auth_expired">Phiên đăng nhập kênh đã hết hạn. Hãy kết nối lại ở Cài đặt › Kênh của tôi.</string>
+    <string name="publish_error_content_rejected">Kênh từ chối nội dung này. Hãy sửa bản nháp, duyệt lại rồi thử lại.</string>
+    <string name="publish_error_duplicate_content">Kênh từ chối vì bài trùng với một bài đã đăng trước đó.</string>
+    <string name="publish_error_draft_missing">Bản nháp của bài này không còn nữa.</string>
+    <string name="publish_error_not_approved">Bản nháp đã bị sửa sau khi duyệt. Hãy duyệt lại trước khi đăng.</string>
+    <string name="publish_error_channel_not_supported">Chưa hỗ trợ đăng bài lên kênh này.</string>
+    <string name="publish_error_storage">Không ghi được vào bộ nhớ máy.</string>
+    <string name="publish_error_unknown">Kênh báo lỗi khi đăng bài.</string>
     <string name="publish_status_action_failed">Không cập nhật được hàng đợi đăng bài. Vui lòng thử lại.</string>
 </resources>

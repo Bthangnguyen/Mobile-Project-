@@ -18,6 +18,7 @@ class PublishStatusAdapter(
     private val onPublishChannel: (draftId: String) -> Unit,
     private val onConfirmPublished: (postId: String) -> Unit,
     private val onRequeue: (postId: String) -> Unit,
+    private val onOpenPost: (url: String) -> Unit,
 ) : ListAdapter<TopicPublishItem, PublishStatusAdapter.TopicViewHolder>(DiffCallback) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): TopicViewHolder =
@@ -65,20 +66,27 @@ class PublishStatusAdapter(
                 else -> row.statusChannel.setStatus(state.status)
             }
 
-            row.tvChannelHint.isVisible =
-                item.action == ChannelAction.NEEDS_APPROVAL || item.action == ChannelAction.CONFIRM_OUTCOME
-            when (item.action) {
-                ChannelAction.NEEDS_APPROVAL -> row.tvChannelHint.setText(R.string.publish_status_needs_approval_hint)
-                ChannelAction.CONFIRM_OUTCOME ->
-                    row.tvChannelHint.setText(R.string.publish_status_needs_confirmation_hint)
-                else -> Unit
+            val reason = item.reasonRes?.let(context::getString)
+            val hint = when {
+                item.action == ChannelAction.NEEDS_APPROVAL ->
+                    context.getString(R.string.publish_status_needs_approval_hint)
+                item.action == ChannelAction.CONFIRM_OUTCOME ->
+                    context.getString(R.string.publish_status_needs_confirmation_hint)
+                reason != null && item.isRetrying -> context.getString(R.string.publish_status_retrying, reason)
+                else -> reason
             }
+            row.tvChannelHint.isVisible = hint != null
+            row.tvChannelHint.text = hint
 
             row.btnPublishChannel.isVisible = item.action == ChannelAction.PUBLISH
             row.btnPublishChannel.setText(
                 if (state.postId == null) R.string.review_action_publish else R.string.publish_status_retry,
             )
             row.btnPublishChannel.setOnClickListener { onPublishChannel(state.draftId) }
+
+            val openUrl = item.openUrl
+            row.btnOpenPost.isVisible = openUrl != null
+            row.btnOpenPost.setOnClickListener { openUrl?.let(onOpenPost) }
 
             val postId = state.postId
             row.confirmActions.isVisible = item.action == ChannelAction.CONFIRM_OUTCOME && postId != null

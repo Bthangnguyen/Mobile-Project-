@@ -66,6 +66,7 @@ class LlmChannelSubAgent(
                 channel = channel,
                 description = imageDescription,
                 postText = post,
+                title = context.brief.topic,
             ),
         )
         emit(AgentEvent.StepFinished(channel, AgentStep.IMAGE, image?.usage ?: TokenUsage.ZERO))

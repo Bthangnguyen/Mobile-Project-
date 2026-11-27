@@ -34,12 +34,12 @@ import kotlinx.coroutines.sync.withPermit
  *
  * Mỗi lần gọi [generate]/[regenerate] là một Flow lạnh độc lập nên luồng cũ không ghi đè kết quả lần chạy mới.
  *
- * [rewriteParagraph] và [regenerateImage] chưa thuộc Issue #26 (thuộc #35 và #28) nên ném
- * [UnsupportedOperationException]; vì vậy lớp này chưa được gắn vào DI thay cho `FakeContentAgent`.
+ * [rewriteParagraph] ném [UnsupportedOperationException] cho đến khi Issue #35 triển khai.
  */
 class ContentAgentImpl(
     private val subAgents: Map<ChannelType, ChannelSubAgent>,
     private val maxConcurrentChannels: Int = DEFAULT_MAX_CONCURRENT_CHANNELS,
+    private val createImage: suspend (Draft) -> String? = { null },
 ) : ContentAgent {
 
     init {
@@ -72,7 +72,7 @@ class ContentAgentImpl(
     ): String = throw UnsupportedOperationException("Viết lại đoạn thuộc Issue #35")
 
     override suspend fun regenerateImage(draft: Draft): String =
-        throw UnsupportedOperationException("Sinh lại ảnh thuộc Issue #28")
+        createImage(draft) ?: throw LlmException(LlmFailure.EMPTY_RESPONSE)
 
     /**
      * Trạng thái riêng của một lần chạy kênh. Sub-agent có thể phát từ nhiều coroutine con nên mọi thao tác

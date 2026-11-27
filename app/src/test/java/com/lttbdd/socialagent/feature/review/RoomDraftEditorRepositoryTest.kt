@@ -43,7 +43,7 @@ class RoomDraftEditorRepositoryTest {
         repository = RoomDraftEditorRepository(
             draftDao = db.draftDao(),
             postDao = db.postDao(),
-            draftReviewRepository = RoomDraftReviewRepository(db.draftDao()),
+            draftReviewRepository = RoomDraftReviewRepository(db, db.draftDao()),
         )
     }
 
@@ -209,7 +209,7 @@ class RoomDraftEditorRepositoryTest {
         val repoWithFailingDao = RoomDraftEditorRepository(
             draftDao = failingDao,
             postDao = db.postDao(),
-            draftReviewRepository = RoomDraftReviewRepository(failingDao),
+            draftReviewRepository = RoomDraftReviewRepository(db, failingDao),
         )
         val result = repoWithFailingDao.saveEditedDraft("d-fail", "Nội dung mới")
 

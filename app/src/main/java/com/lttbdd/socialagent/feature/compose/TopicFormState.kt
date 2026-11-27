@@ -42,6 +42,7 @@ data class TopicFormState(
 data class ComposeUiState(
     val formState: TopicFormState = TopicFormState(),
     val submittedBrief: TopicBrief? = null,
+    val isGenerating: Boolean = false,
 )
 
 /**
@@ -52,4 +53,6 @@ sealed interface ComposeEvent {
         val brief: TopicBrief,
         @param:StringRes val messageRes: Int,
     ) : ComposeEvent
+
+    data class GenerationFinished(@param:StringRes val messageRes: Int) : ComposeEvent
 }

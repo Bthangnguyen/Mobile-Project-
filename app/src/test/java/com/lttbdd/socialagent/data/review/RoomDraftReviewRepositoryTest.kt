@@ -8,6 +8,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.lttbdd.socialagent.core.database.AppDatabase
 import com.lttbdd.socialagent.core.database.dao.DraftDao
 import com.lttbdd.socialagent.core.database.entity.DraftEntity
+import com.lttbdd.socialagent.core.database.entity.PostEntity
 import com.lttbdd.socialagent.core.database.toEntity
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.Draft
@@ -39,7 +40,7 @@ class RoomDraftReviewRepositoryTest {
         db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
             .allowMainThreadQueries()
             .build()
-        repository = RoomDraftReviewRepository(db.draftDao())
+        repository = RoomDraftReviewRepository(db, db.draftDao())
     }
 
     @After
@@ -63,6 +64,55 @@ class RoomDraftReviewRepositoryTest {
         assertFalse(saved.approved)
         assertEquals(1, observed.size)
         assertFalse(observed.first().approved)
+    }
+
+    @Test
+    fun `saveAgentDraft preserves approved and queued drafts when regenerating`() = runTest {
+        val approved = Draft("approved", "topic-a", ChannelType.FACEBOOK, "Bản đã duyệt", approved = true)
+        val queued = Draft("queued", "topic-b", ChannelType.LINKEDIN, "Bản còn chờ đăng")
+        db.draftDao().upsert(approved.toEntity(updatedAtMillis = 1_000L))
+        db.draftDao().upsert(queued.toEntity(updatedAtMillis = 1_000L))
+        db.postDao().insertIfAbsent(
+            PostEntity(
+                id = "post",
+                draftId = queued.id,
+                channel = queued.channel,
+                status = PostStatus.QUEUED,
+                idempotencyKey = "queued-post",
+                remotePostId = null,
+                url = null,
+                errorMessage = null,
+                attemptCount = 0,
+                createdAtMillis = 1_000L,
+                updatedAtMillis = 1_000L,
+            ),
+        )
+
+        for (draft in listOf(approved, queued)) {
+            assertTrue(repository.saveAgentDraft(draft.copy(text = "Bản sinh lại")).isFailure)
+            assertEquals(draft.toEntity(1_000L), db.draftDao().getById(draft.id))
+        }
+    }
+
+    @Test
+    fun `saveAgentDraft discards a replaced image only after successful commit`() = runTest {
+        val draft = Draft("d-image", "topic-image", ChannelType.FACEBOOK, "Bản nháp", imageUri = "content://images/old")
+        val discarded = mutableListOf<Pair<String, String?>>()
+        val repo = RoomDraftReviewRepository(db, db.draftDao()) { uri ->
+            discarded += uri to db.draftDao().getById(draft.id)?.imageUri
+        }
+        repo.saveAgentDraft(draft).getOrThrow()
+        repo.saveAgentDraft(draft.copy(text = "Nội dung mới")).getOrThrow()
+        assertTrue(discarded.isEmpty())
+
+        val replacement = draft.copy(imageUri = "content://images/new")
+        repo.saveAgentDraft(replacement).getOrThrow()
+        assertEquals(listOf(draft.imageUri to replacement.imageUri), discarded)
+
+        repo.approveDraft(draft.id, expectedText = replacement.text)
+        assertTrue(repo.saveAgentDraft(replacement.copy(imageUri = null)).isFailure)
+        assertEquals(1, discarded.size)
+        assertEquals(replacement.imageUri, db.draftDao().getById(draft.id)?.imageUri)
     }
 
     @Test
@@ -186,7 +236,7 @@ class RoomDraftReviewRepositoryTest {
             override suspend fun deleteByChannel(channel: ChannelType) {}
         }
 
-        val repoWithFailingDao = RoomDraftReviewRepository(failingDao)
+        val repoWithFailingDao = RoomDraftReviewRepository(db, failingDao)
 
         val approveErr = repoWithFailingDao.approveDraft("d-err", expectedText = "Nội dung hợp lệ")
         assertTrue(approveErr is DraftApprovalResult.StorageError)

@@ -125,6 +125,26 @@
                         android:textAppearance="@style/TextAppearance.SocialAgent.Caption"
                         android:visibility="gone" />
 
+                    <ImageView
+                        android:id="@+id/ivDraftImage"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/component_spacing_small"
+                        android:adjustViewBounds="true"
+                        android:contentDescription="@string/preview_draft_image"
+                        android:maxHeight="320dp"
+                        android:scaleType="fitCenter"
+                        android:visibility="gone" />
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:id="@+id/tvDraftImageUnavailable"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/component_spacing_small"
+                        android:text="@string/preview_draft_image_unavailable"
+                        android:textAppearance="@style/TextAppearance.SocialAgent.Caption"
+                        android:visibility="gone" />
+
                     <com.lttbdd.socialagent.core.ui.components.AppDivider
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"

@@ -246,7 +246,14 @@
     <string name="compose_channel_facebook">Trang Facebook</string>
     <string name="compose_channel_linkedin">LinkedIn</string>
     <string name="action_continue">Tiếp tục</string>
-    <string name="compose_submit_success">Tạo brief thành công</string>
+    <string name="compose_submit_success">Đang tạo bản nháp cho các kênh đã chọn…</string>
+    <string name="compose_generating">Đang tạo bản nháp…</string>
+    <string name="compose_generation_saved">Đã lưu bản nháp. Mở mục Bài viết để xem trước.</string>
+    <string name="compose_generation_partial">Một số kênh chưa tạo được bản nháp. Các bản nháp đã lưu nằm trong mục Bài viết.</string>
+    <string name="compose_generation_saved_with_history_warning">Đã lưu bản nháp nhưng có phiên bản chưa được ghi vào lịch sử.</string>
+    <string name="compose_generation_partial_with_history_warning">Đã lưu một số bản nháp, nhưng có kênh chưa tạo được bản nháp và có phiên bản chưa được ghi vào lịch sử.</string>
+    <string name="compose_generation_failed">Chưa tạo được bản nháp nào. Vui lòng thử lại.</string>
+    <string name="compose_generation_missing_writing_configuration">Hãy cấu hình model viết bài và API key trong Cài đặt, rồi thử lại.</string>
 
     <!-- Tone options -->
     <string name="tone_professional">Chuyên nghiệp</string>
@@ -291,6 +298,8 @@
     <string name="preview_linkedin_see_more">…xem thêm</string>
     <string name="preview_linkedin_actions">Thích · Bình luận · Đăng lại · Gửi</string>
     <string name="preview_placeholder_body">Nhập nội dung để xem trước bài đăng…</string>
+    <string name="preview_draft_image">Ảnh bản nháp</string>
+    <string name="preview_draft_image_unavailable">Bản nháp này chưa có ảnh để xem.</string>
     <string name="preview_editor_hint">Chỉnh sửa nội dung bài viết</string>
     <string name="preview_char_count_format">%1$d / %2$d ký tự</string>
     <string name="preview_char_excess_format">Vượt quá giới hạn %1$d ký tự</string>

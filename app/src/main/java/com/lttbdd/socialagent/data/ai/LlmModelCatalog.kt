@@ -24,7 +24,8 @@ enum class ModelWarning { POSSIBLY_INCOMPATIBLE_WITH_TASK }
  *
  * Người dùng có thể nhập model ID tùy chọn nên danh mục không phải danh sách đóng. Model có trong danh mục
  * dùng khai báo sẵn nên bị chặn khi sai loại việc. Model ngoài danh mục chỉ bị cảnh báo theo quy ước đặt tên
- * ([warning]) vì không đủ dữ liệu để khẳng định, nên vẫn cho lưu.
+ * ([warning]) vì không đủ dữ liệu để khẳng định, nên vẫn cho lưu. Riêng tác vụ sinh ảnh OpenAI
+ * chỉ nhận model GPT Image mà adapter có thể gửi yêu cầu.
  */
 object LlmModelCatalog {
     const val MAX_MODEL_ID_LENGTH = 128
@@ -37,7 +38,7 @@ object LlmModelCatalog {
 
     /** Gemini ghép ID vào đường dẫn URL nên chỉ nhận ký tự an toàn sau khi bỏ tiền tố `models/`. */
     private val geminiModelIdPattern = Regex("[A-Za-z0-9._-]+")
-    private val imageModelMarkers = listOf("image", "imagen", "dall-e")
+    private val imageModelMarkers = listOf("image", "imagen")
 
     /** Các provider đã có adapter gọi thật (#52). */
     val supportedProviders: List<LlmProvider> = listOf(LlmProvider.GEMINI, LlmProvider.OPENAI)
@@ -51,7 +52,7 @@ object LlmModelCatalog {
         LlmProvider.OPENAI to listOf(
             ModelOption("gpt-6-luna", textTasks),
             ModelOption("gpt-6.1-terra", setOf(LlmTask.WRITE_POST)),
-            ModelOption("gpt-image-1", imageTasks),
+            ModelOption("gpt-image-2.5-flare", imageTasks),
         ),
     )
 
@@ -87,9 +88,16 @@ object LlmModelCatalog {
         if (modelId.isEmpty()) return ModelValidation.EMPTY
         if (modelId.length > MAX_MODEL_ID_LENGTH) return ModelValidation.TOO_LONG
         if (!isValidModelIdFormat(provider, modelId)) return ModelValidation.INVALID_FORMAT
+        if (provider == LlmProvider.OPENAI && task == LlmTask.GENERATE_IMAGE && !supportsOpenAiImage(modelId)) {
+            return ModelValidation.INCOMPATIBLE_WITH_TASK
+        }
         val known = options[provider].orEmpty().firstOrNull { it.id == modelId }
         return if (known == null || task in known.tasks) ModelValidation.VALID else ModelValidation.INCOMPATIBLE_WITH_TASK
     }
+
+    /** Endpoint sinh ảnh dùng các model GPT Image còn hỗ trợ, kể cả ID snapshot. */
+    internal fun supportsOpenAiImage(model: String): Boolean =
+        model.startsWith("gpt-image-") && model != "gpt-image-1"
 
     /** Chỉ áp dụng cho model hợp lệ nhưng ngoài danh mục; model trong danh mục đã được [validate] chặn nếu sai. */
     fun warning(provider: LlmProvider, task: LlmTask, modelId: String): ModelWarning? {

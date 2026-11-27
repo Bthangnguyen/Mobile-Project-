@@ -114,6 +114,9 @@ class ComposeFragment : Fragment() {
                             is ComposeEvent.BriefSubmitted -> {
                                 AppSnackbar.show(binding.root, event.messageRes)
                             }
+                            is ComposeEvent.GenerationFinished -> {
+                                AppSnackbar.show(binding.root, event.messageRes)
+                            }
                         }
                     }
                 }
@@ -174,7 +177,8 @@ class ComposeFragment : Fragment() {
         }
 
         // Cập nhật nút Tiếp tục
-        binding.btnContinue.isEnabled = form.isFormValid
+        binding.btnContinue.isEnabled = form.isFormValid && !state.isGenerating
+        binding.btnContinue.setText(if (state.isGenerating) R.string.compose_generating else R.string.action_continue)
     }
 
     override fun onDestroyView() {

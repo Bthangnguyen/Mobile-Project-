@@ -6,6 +6,8 @@ import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.ContentLanguage
 import com.lttbdd.socialagent.core.model.Draft
 import com.lttbdd.socialagent.core.model.TopicBrief
+import com.lttbdd.socialagent.data.review.DraftHistoryWriteException
+import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -272,6 +274,53 @@ class ContentAgentImplTest {
         val events = agent.generate(brief(setOf(fb))).toList()
 
         assertEquals(1, done(events).size + failures(events).size)
+    }
+
+    @Test
+    fun `save failure is scoped to package and regenerate saves only its target channel`() = runTest {
+        val saved = mutableListOf<ChannelType>()
+        val agent = SavingContentAgent(ContentAgentImpl(mapOf(fb to okAgent(fb), li to okAgent(li)))) {
+            if (it.channel == fb) throw IllegalStateException("storage failed")
+            saved += it.channel
+            it.copy(text = "Nội dung đã lưu")
+        }
+
+        val events = agent.generate(brief()).toList()
+        assertEquals(listOf(AgentEvent.ChannelFailed(fb, AgentStep.PACKAGE, ChannelFailureReason.DRAFT_SAVE_FAILED)), failures(events))
+        assertEquals(listOf(li), done(events))
+        assertEquals(listOf(li), saved)
+        assertEquals("Nội dung đã lưu", events.filterIsInstance<AgentEvent.ChannelDone>().single().draft.text)
+
+        val regeneration = agent.regenerate(brief(), li).toList()
+        assertEquals(listOf(li), done(regeneration))
+        assertEquals(listOf(li, li), saved)
+    }
+
+    @Test
+    fun `a draft committed without history remains a successful channel with a warning`() = runTest {
+        val committed = draft(fb).copy(text = "Bản đã lưu", imageUri = "content://images/new")
+        val agent = SavingContentAgent(ContentAgentImpl(mapOf(fb to okAgent(fb)))) {
+            throw DraftHistoryWriteException(committed, IOException("History storage unavailable"))
+        }
+
+        val events = agent.regenerate(brief(), fb).toList()
+
+        assertEquals(listOf(AgentEvent.ChannelDone(committed, historyWriteFailed = true)),
+            events.filterIsInstance<AgentEvent.ChannelDone>())
+        assertTrue(failures(events).isEmpty())
+    }
+
+    @Test
+    fun `regenerateImage passes the draft to the generator and fails when both image paths return null`() = runTest {
+        val draft = draft(fb)
+        val agent = ContentAgentImpl(emptyMap(), createImage = {
+            assertEquals(draft, it)
+            "content://images/new"
+        })
+        assertEquals("content://images/new", agent.regenerateImage(draft))
+
+        val failure = runCatching { ContentAgentImpl(emptyMap()).regenerateImage(draft) }.exceptionOrNull()
+        assertEquals(LlmFailure.EMPTY_RESPONSE, (failure as? LlmException)?.failure)
     }
 
     @Test

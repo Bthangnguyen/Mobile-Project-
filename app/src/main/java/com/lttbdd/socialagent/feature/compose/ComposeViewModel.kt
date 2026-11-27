@@ -2,10 +2,14 @@ package com.lttbdd.socialagent.feature.compose
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.lttbdd.socialagent.R
+import com.lttbdd.socialagent.core.ai.ContentAgent
+import com.lttbdd.socialagent.core.model.AgentEvent
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.ContentLanguage
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,6 +18,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.updateAndGet
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
@@ -23,6 +28,7 @@ import javax.inject.Inject
 @HiltViewModel
 class ComposeViewModel @Inject constructor(
     private val savedStateHandle: SavedStateHandle,
+    private val agent: ContentAgent,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ComposeUiState(formState = restoreFormState()))
@@ -175,18 +181,48 @@ class ComposeViewModel @Inject constructor(
 
     /**
      * Bấm nút Tiếp tục: kiểm tra hợp lệ, đóng gói [com.lttbdd.socialagent.core.model.TopicBrief]
-     * và phát sự kiện [ComposeEvent.BriefSubmitted].
-     * Trong phạm vi Issue #32 (chưa gắn màn tiến độ AI ở F2), form giữ nguyên dữ liệu để người dùng
-     * có thể chỉnh sửa lại và UI hiển thị thông báo xác nhận đã tạo brief.
+     * rồi tạo bản nháp cho các kênh đã chọn.
      */
     fun onSubmit() {
-        if (!validate()) return
+        if (_uiState.value.isGenerating || !validate()) return
 
         val brief = _uiState.value.formState.toTopicBrief()
         _uiState.update { current ->
-            current.copy(submittedBrief = brief)
+            current.copy(submittedBrief = brief, isGenerating = true)
         }
         _events.trySend(ComposeEvent.BriefSubmitted(brief, R.string.compose_submit_success))
+        viewModelScope.launch {
+            var saved = 0
+            var historyWriteFailed = false
+            var missingWritingConfiguration = false
+            try {
+                agent.generate(brief).collect { event ->
+                    if (event is AgentEvent.ChannelDone) {
+                        saved++
+                        historyWriteFailed = historyWriteFailed || event.historyWriteFailed
+                    }
+                    if (event is AgentEvent.ChannelFailed && event.reason in WRITING_CONFIGURATION_FAILURES) {
+                        missingWritingConfiguration = true
+                    }
+                }
+                val message = when {
+                    saved == brief.channels.size && historyWriteFailed ->
+                        R.string.compose_generation_saved_with_history_warning
+                    saved == brief.channels.size -> R.string.compose_generation_saved
+                    saved > 0 && historyWriteFailed -> R.string.compose_generation_partial_with_history_warning
+                    saved > 0 -> R.string.compose_generation_partial
+                    missingWritingConfiguration -> R.string.compose_generation_missing_writing_configuration
+                    else -> R.string.compose_generation_failed
+                }
+                _events.send(ComposeEvent.GenerationFinished(message))
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _events.send(ComposeEvent.GenerationFinished(R.string.compose_generation_failed))
+            } finally {
+                _uiState.update { it.copy(isGenerating = false) }
+            }
+        }
     }
 
     private fun restoreFormState(): TopicFormState {
@@ -226,6 +262,7 @@ class ComposeViewModel @Inject constructor(
     }
 
     private companion object {
+        val WRITING_CONFIGURATION_FAILURES = setOf("LLM_MISSING_API_KEY", "LLM_MISSING_CONFIGURATION")
         const val KEY_TOPIC = "compose_topic"
         const val KEY_GOAL = "compose_goal"
         const val KEY_AUDIENCE = "compose_audience"

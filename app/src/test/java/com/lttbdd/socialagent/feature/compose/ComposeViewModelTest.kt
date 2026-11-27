@@ -2,12 +2,29 @@ package com.lttbdd.socialagent.feature.compose
 
 import androidx.lifecycle.SavedStateHandle
 import com.lttbdd.socialagent.R
+import com.lttbdd.socialagent.core.ai.ContentAgent
+import com.lttbdd.socialagent.core.model.AgentEvent
+import com.lttbdd.socialagent.core.model.AgentStep
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.ContentLanguage
+import com.lttbdd.socialagent.core.model.Draft
+import com.lttbdd.socialagent.core.model.TopicBrief
+import com.lttbdd.socialagent.data.fake.FakeContentAgent
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -17,15 +34,24 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class ComposeViewModelTest {
+
+    private val agent = FakeContentAgent(stepDelayMillis = 0)
 
     private lateinit var savedStateHandle: SavedStateHandle
     private lateinit var viewModel: ComposeViewModel
 
     @Before
     fun setUp() {
+        Dispatchers.setMain(StandardTestDispatcher())
         savedStateHandle = SavedStateHandle()
-        viewModel = ComposeViewModel(savedStateHandle)
+        viewModel = ComposeViewModel(savedStateHandle, agent)
+    }
+
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
     }
 
     @Test
@@ -193,6 +219,49 @@ class ComposeViewModelTest {
         val submittedEvent = event as ComposeEvent.BriefSubmitted
         assertEquals(brief, submittedEvent.brief)
         assertEquals(R.string.compose_submit_success, submittedEvent.messageRes)
+        assertTrue(viewModel.uiState.value.isGenerating)
+        advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.isGenerating)
+        assertEquals(
+            ComposeEvent.GenerationFinished(R.string.compose_generation_saved),
+            viewModel.events.first(),
+        )
+    }
+
+    @Test
+    fun `submit distinguishes saved drafts with history warnings from failures`() = runTest {
+        val failure = AgentEvent.ChannelFailed(ChannelType.LINKEDIN, AgentStep.OUTLINE, "UNKNOWN")
+        val draft = Draft("draft", "topic", ChannelType.FACEBOOK, "Bản nháp đã lưu")
+        val committedWithoutHistory = AgentEvent.ChannelDone(draft, historyWriteFailed = true)
+        val cases = listOf(
+            flowOf(committedWithoutHistory) to R.string.compose_generation_saved_with_history_warning,
+            flowOf(committedWithoutHistory, failure) to R.string.compose_generation_partial_with_history_warning,
+            flowOf(AgentEvent.ChannelDone(draft), failure) to R.string.compose_generation_partial,
+            flowOf(failure) to R.string.compose_generation_failed,
+            flowOf(failure.copy(reason = "LLM_MISSING_API_KEY")) to R.string.compose_generation_missing_writing_configuration,
+            flow<AgentEvent> { error("Agent failure") } to R.string.compose_generation_failed,
+        )
+        for ((events, message) in cases) {
+            val scriptedAgent = object : ContentAgent by agent {
+                override fun generate(brief: TopicBrief): Flow<AgentEvent> = events
+            }
+            val viewModel = ComposeViewModel(SavedStateHandle(), scriptedAgent)
+            viewModel.onTopicChanged("A new post")
+            viewModel.onGoalChanged("Grow reach")
+            viewModel.onAudienceChanged("Mobile devs")
+            viewModel.onToneChanged("friendly")
+            viewModel.onChannelToggled(ChannelType.FACEBOOK, true)
+            if (message != R.string.compose_generation_saved_with_history_warning) {
+                viewModel.onChannelToggled(ChannelType.LINKEDIN, true)
+            }
+
+            viewModel.onSubmit()
+            advanceUntilIdle()
+
+            assertTrue(viewModel.events.first() is ComposeEvent.BriefSubmitted)
+            assertEquals(ComposeEvent.GenerationFinished(message), viewModel.events.first())
+            assertFalse(viewModel.uiState.value.isGenerating)
+        }
     }
 
     @Test
@@ -222,9 +291,10 @@ class ComposeViewModelTest {
         viewModel.onChannelToggled(ChannelType.FACEBOOK, true)
 
         viewModel.onSubmit()
+        advanceUntilIdle()
         viewModel.onSubmit()
 
-        val emittedEvents = viewModel.events.take(2).toList()
+        val emittedEvents = viewModel.events.filterIsInstance<ComposeEvent.BriefSubmitted>().take(2).toList()
         assertEquals(2, emittedEvents.size)
         val firstBrief = (emittedEvents[0] as ComposeEvent.BriefSubmitted).brief
         val secondBrief = (emittedEvents[1] as ComposeEvent.BriefSubmitted).brief
@@ -243,7 +313,7 @@ class ComposeViewModelTest {
         viewModel.onChannelToggled(ChannelType.FACEBOOK, true)
         viewModel.onChannelToggled(ChannelType.LINKEDIN, true)
 
-        val restoredViewModel = ComposeViewModel(savedStateHandle)
+        val restoredViewModel = ComposeViewModel(savedStateHandle, agent)
         val restoredForm = restoredViewModel.uiState.value.formState
 
         assertEquals("Saved Topic", restoredForm.topic)

@@ -1,5 +1,7 @@
 package com.lttbdd.socialagent.feature.review
 
+import android.graphics.BitmapFactory
+import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -20,7 +22,12 @@ import com.lttbdd.socialagent.core.ui.components.AppDialog
 import com.lttbdd.socialagent.core.ui.components.AppSnackbar
 import com.lttbdd.socialagent.databinding.FragmentDraftPreviewBinding
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Màn hình xem trước bài viết theo giao diện từng kênh (Facebook Page / LinkedIn),
@@ -135,6 +142,11 @@ class DraftPreviewFragment : Fragment() {
                     }
                 }
                 launch {
+                    viewModel.uiState.map { it.draft?.imageUri }.distinctUntilChanged().collectLatest { uri ->
+                        renderDraftImage(uri)
+                    }
+                }
+                launch {
                     viewModel.events.collect { event ->
                         when (event) {
                             is DraftPreviewEvent.ShowMessage -> {
@@ -145,6 +157,27 @@ class DraftPreviewFragment : Fragment() {
                 }
             }
         }
+    }
+
+    private suspend fun renderDraftImage(value: String?) {
+        binding.ivDraftImage.setImageDrawable(null)
+        binding.ivDraftImage.isVisible = false
+        binding.tvDraftImageUnavailable.isVisible = false
+        val context = requireContext()
+        val uri = value?.let(Uri::parse)?.takeIf {
+            it.scheme == "content" && it.authority == "${context.packageName}.draft-images"
+        }
+        val image = if (uri == null) null else withContext(Dispatchers.IO) {
+            try {
+                context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
+            } catch (_: Exception) {
+                null
+            }
+        }
+        val currentBinding = _binding ?: return
+        currentBinding.ivDraftImage.setImageBitmap(image)
+        currentBinding.ivDraftImage.isVisible = image != null
+        currentBinding.tvDraftImageUnavailable.isVisible = image == null
     }
 
     private fun renderUiState(state: DraftPreviewUiState) {

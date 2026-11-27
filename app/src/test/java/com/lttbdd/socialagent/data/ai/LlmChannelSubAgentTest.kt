@@ -185,6 +185,7 @@ class LlmChannelSubAgentTest {
                 channel = li,
                 description = defaultAnswer(AgentStep.IMAGE_PROMPT),
                 postText = defaultAnswer(AgentStep.SELF_REVIEW),
+                title = context().brief.topic,
             ),
             image.requests.single(),
         )

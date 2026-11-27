@@ -316,5 +316,7 @@
     <string name="publish_status_marked_published">Đã đánh dấu là đã đăng.</string>
     <string name="publish_status_requeued">Đã đưa lại vào hàng đợi đăng bài.</string>
     <string name="publish_status_state_changed">Trạng thái bài đã thay đổi. Hãy xem lại danh sách.</string>
+    <string name="publish_status_open_post">Mở bài gốc</string>
+    <string name="publish_status_open_failed">Không có ứng dụng nào trên máy mở được liên kết này.</string>
     <string name="publish_status_action_failed">Không cập nhật được hàng đợi đăng bài. Vui lòng thử lại.</string>
 </resources>

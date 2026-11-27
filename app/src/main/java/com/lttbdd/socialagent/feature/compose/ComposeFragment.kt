@@ -11,11 +11,12 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.navigation.fragment.findNavController
 import com.lttbdd.socialagent.R
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.ContentLanguage
-import com.lttbdd.socialagent.core.ui.components.AppSnackbar
 import com.lttbdd.socialagent.databinding.FragmentComposeBinding
+import com.lttbdd.socialagent.feature.agent.AgentBriefArgs
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 
@@ -112,7 +113,10 @@ class ComposeFragment : Fragment() {
                     viewModel.events.collect { event ->
                         when (event) {
                             is ComposeEvent.BriefSubmitted -> {
-                                AppSnackbar.show(binding.root, event.messageRes)
+                                findNavController().navigate(
+                                    R.id.action_compose_to_agent_progress,
+                                    AgentBriefArgs.toBundle(event.brief),
+                                )
                             }
                         }
                     }

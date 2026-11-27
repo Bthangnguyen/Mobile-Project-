@@ -357,4 +357,42 @@
     <string name="publish_error_storage">Không ghi được vào bộ nhớ máy.</string>
     <string name="publish_error_unknown">Kênh báo lỗi khi đăng bài.</string>
     <string name="publish_status_action_failed">Không cập nhật được hàng đợi đăng bài. Vui lòng thử lại.</string>
+
+    <!-- F2 Tiến độ Agent & Stream nội dung (Issue #29) -->
+    <string name="agent_progress_title">Tiến độ AI Agent</string>
+    <string name="agent_progress_back">Quay lại</string>
+    <string name="agent_progress_status_running">Đang sinh nội dung…</string>
+    <string name="agent_progress_status_running_count">Đang sinh nội dung… (xong %1$d/%2$d kênh)</string>
+    <string name="agent_progress_status_completed">Đã hoàn tất %1$d kênh. Hãy duyệt bản nháp trước khi đăng.</string>
+    <string name="agent_progress_status_partial">Đã hoàn tất %1$d/%2$d kênh. Một số kênh gặp lỗi.</string>
+    <string name="agent_progress_status_failed">Không thể sinh bản nháp cho các kênh đã chọn.</string>
+    <string name="agent_progress_shared_brief_title">Brief chung</string>
+    <string name="agent_progress_preparing_brief">Đang lập brief chung…</string>
+    <string name="agent_progress_missing_brief_title">Chưa có thông tin brief</string>
+    <string name="agent_progress_missing_brief_message">Hãy nhập chủ đề và chọn kênh trước để AI Agent bắt đầu viết bài.</string>
+    <string name="agent_progress_back_to_compose">Quay lại Tạo bài</string>
+    <string name="agent_progress_open_drafts">Mở danh sách Duyệt bài</string>
+    <string name="agent_progress_create_another">Tạo bài viết khác</string>
+    <string name="agent_progress_review_draft">Xem &amp; duyệt bản nháp</string>
+    <string name="agent_stream_waiting_output">Đang chờ nội dung stream…</string>
+    <string name="agent_stream_step_outline">Đang stream dàn ý…</string>
+    <string name="agent_stream_step_draft">Đang stream bản nháp…</string>
+    <string name="agent_stream_step_self_review">Đang stream bản tự rà soát…</string>
+    <string name="agent_stream_final_content">Nội dung bản nháp hoàn chỉnh</string>
+    <string name="agent_stream_stopped_on_error">Đã dừng do gặp lỗi</string>
+    <string name="agent_stream_image_prompt_label">Mô tả ảnh</string>
+    <string name="agent_error_with_step">Lỗi ở bước %1$s: %2$s</string>
+    <string name="agent_error_save_draft_failed">Đã sinh bản nháp nhưng không thể lưu xuống thiết bị.</string>
+    <string name="agent_error_timeout">Yêu cầu AI quá thời gian chờ. Vui lòng thử lại.</string>
+    <string name="agent_error_rules_violated">Bài viết sinh ra chưa đáp ứng quy tắc định dạng của kênh này.</string>
+    <string name="agent_error_unsupported_channel">AI Agent chưa hỗ trợ kênh này.</string>
+    <string name="agent_error_channel_not_in_brief">Kênh này không nằm trong danh sách đã chọn.</string>
+    <string name="agent_error_empty_response">Nhà cung cấp LLM trả về phản hồi rỗng hoặc không đầy đủ.</string>
+    <string name="agent_error_missing_api_key">Chưa cấu hình API key LLM. Hãy thêm tại Cài đặt › API Key LLM.</string>
+    <string name="agent_error_auth_failed">API key LLM bị từ chối. Hãy kiểm tra lại tại Cài đặt › API Key LLM.</string>
+    <string name="agent_error_rate_limit">Đã chạm giới hạn tần suất của nhà cung cấp LLM. Hãy thử lại sau ít phút.</string>
+    <string name="agent_error_network">Lỗi mạng khi kết nối tới nhà cung cấp LLM.</string>
+    <string name="agent_error_content_blocked">Nhà cung cấp LLM đã chặn nội dung theo chính sách an toàn.</string>
+    <string name="agent_error_provider">Nhà cung cấp LLM đang gặp sự cố tạm thời.</string>
+    <string name="agent_error_unknown">Đã xảy ra lỗi không mong muốn khi sinh nội dung.</string>
 </resources>

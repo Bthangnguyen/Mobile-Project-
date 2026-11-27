@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="@dimen/component_spacing"
+    app:cardBackgroundColor="@color/brand_surface_container_low"
+    app:cardCornerRadius="@dimen/corner_radius_medium"
+    app:strokeColor="@color/brand_outline_variant"
+    app:strokeWidth="1dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="@dimen/card_padding">
+
+        <!-- Channel title + status badge -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/tvChannelName"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textAppearance="@style/TextAppearance.SocialAgent.Title" />
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/tvChannelStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_status_indicator"
+                android:paddingHorizontal="@dimen/component_spacing_small"
+                android:paddingVertical="@dimen/component_spacing_xsmall"
+                android:textAppearance="@style/TextAppearance.SocialAgent.Caption" />
+        </LinearLayout>
+
+        <!-- Step-by-step progress indicator (reused from core/ui) -->
+        <com.lttbdd.socialagent.core.ui.components.ai.AgentProgress
+            android:id="@+id/viewAgentProgress"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing_small" />
+
+        <!-- Live streaming content preview -->
+        <LinearLayout
+            android:id="@+id/layoutStreamContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing"
+            android:background="@color/brand_surface"
+            android:orientation="vertical"
+            android:padding="@dimen/component_spacing_small">
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/tvStreamLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/agent_stream_waiting_output"
+                android:textAppearance="@style/TextAppearance.SocialAgent.Caption"
+                android:textColor="@color/brand_info"
+                android:textStyle="bold" />
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/tvStreamContent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/component_spacing_xsmall"
+                android:textAppearance="@style/TextAppearance.SocialAgent.Body"
+                android:textIsSelectable="true" />
+        </LinearLayout>
+
+        <!-- Optional image prompt preview (kept separate from post content) -->
+        <LinearLayout
+            android:id="@+id/layoutImagePromptPreview"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing_small"
+            android:background="@color/brand_surface_container"
+            android:orientation="vertical"
+            android:padding="@dimen/component_spacing_small"
+            android:visibility="gone">
+
+            <com.google.android.material.textview.MaterialTextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/agent_stream_image_prompt_label"
+                android:textAppearance="@style/TextAppearance.SocialAgent.Caption"
+                android:textStyle="bold" />
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/tvImagePromptContent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/component_spacing_xsmall"
+                android:textAppearance="@style/TextAppearance.SocialAgent.Caption" />
+        </LinearLayout>
+
+        <!-- Error banner (channel error or draft save error) -->
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/tvChannelError"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing_small"
+            android:background="@color/brand_error_container"
+            android:padding="@dimen/component_spacing_small"
+            android:textAppearance="@style/TextAppearance.SocialAgent.Caption"
+            android:textColor="@color/brand_error"
+            android:visibility="gone" />
+
+        <!-- Open draft preview button when channel finishes -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnReviewDraft"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/component_spacing_small"
+            android:text="@string/agent_progress_review_draft"
+            android:visibility="gone" />
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

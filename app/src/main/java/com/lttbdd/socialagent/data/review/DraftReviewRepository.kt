@@ -20,9 +20,20 @@ sealed interface DraftApprovalResult {
     data class StorageError(val cause: Throwable) : DraftApprovalResult
 }
 
+/**
+ * Ngoại lệ báo hiệu bản nháp đã được lưu vào Room (với `approved = false`),
+ * nhưng ghi mục lịch sử phiên bản tương ứng thất bại để bên gọi không âm thầm bỏ qua (#62).
+ */
+class DraftHistoryWriteException(
+    val savedDraft: Draft,
+    cause: Throwable,
+) : Exception("Bản nháp đã lưu nhưng không ghi được lịch sử phiên bản", cause)
+
 /** Kết quả cập nhật nội dung bản nháp (luôn tự động thu hồi trạng thái duyệt). */
 sealed interface DraftContentUpdateResult {
     data class Updated(val draft: Draft) : DraftContentUpdateResult
+    /** Nội dung bản nháp đã lưu vào Room và thu hồi duyệt, nhưng ghi mục lịch sử phiên bản thất bại. */
+    data class UpdatedWithoutHistory(val draft: Draft, val cause: Throwable) : DraftContentUpdateResult
     data object EmptyContent : DraftContentUpdateResult
     data object NotFound : DraftContentUpdateResult
     data class StorageError(val cause: Throwable) : DraftContentUpdateResult
@@ -71,6 +82,13 @@ interface DraftReviewRepository {
     suspend fun updateDraftContent(draftId: String, newText: String): DraftContentUpdateResult
 
     /**
+     * Khôi phục nội dung bản nháp từ một phiên bản lịch sử (#62): thu hồi duyệt qua [DraftApprovalGuard]
+     * và ghi nhận phiên bản mới với nguồn [DraftVersionSource.RESTORED].
+     */
+    suspend fun restoreDraftContent(draftId: String, newText: String): DraftContentUpdateResult =
+        updateDraftContent(draftId, newText)
+
+    /**
      * Người dùng phê duyệt tường minh bản nháp.
      * Chỉ chấp nhận khi nội dung hiện tại trong DB vẫn khớp đúng [expectedText] mà người dùng đã xem;
      * nếu nội dung đã đổi thì trả [DraftApprovalResult.ContentChanged] để yêu cầu xem lại.
@@ -90,15 +108,34 @@ interface DraftReviewRepository {
 @Singleton
 class RoomDraftReviewRepository @Inject constructor(
     private val draftDao: DraftDao,
+    private val draftVersionStore: DraftVersionStore,
 ) : DraftReviewRepository {
+
+    /** Constructor tiện ích cho unit test không cần theo dõi lịch sử phiên bản. */
+    constructor(draftDao: DraftDao) : this(draftDao, NoOpDraftVersionStore)
 
     override fun observeDrafts(): Flow<List<Draft>> =
         draftDao.observeAll().map { entities -> entities.map { it.toModel() } }
 
     override suspend fun saveAgentDraft(draft: Draft): Result<Draft> = try {
+        val now = System.currentTimeMillis()
         val unapprovedDraft = DraftApprovalGuard.sanitizeAgentDraft(draft)
-        draftDao.upsert(unapprovedDraft.toEntity(updatedAtMillis = System.currentTimeMillis()))
-        Result.success(unapprovedDraft)
+        draftDao.upsert(unapprovedDraft.toEntity(updatedAtMillis = now))
+        try {
+            if (unapprovedDraft.text.isNotBlank()) {
+                draftVersionStore.recordVersion(
+                    draftId = unapprovedDraft.id,
+                    text = unapprovedDraft.text,
+                    source = DraftVersionSource.AI_GENERATED,
+                    createdAtMillis = now,
+                )
+            }
+            Result.success(unapprovedDraft)
+        } catch (ce: CancellationException) {
+            throw ce
+        } catch (historyError: Exception) {
+            Result.failure(DraftHistoryWriteException(unapprovedDraft, historyError))
+        }
     } catch (ce: CancellationException) {
         throw ce
     } catch (e: Exception) {
@@ -108,6 +145,25 @@ class RoomDraftReviewRepository @Inject constructor(
     override suspend fun updateDraftContent(
         draftId: String,
         newText: String,
+    ): DraftContentUpdateResult = updateDraftContentInternal(
+        draftId = draftId,
+        newText = newText,
+        source = DraftVersionSource.MANUAL_EDIT,
+    )
+
+    override suspend fun restoreDraftContent(
+        draftId: String,
+        newText: String,
+    ): DraftContentUpdateResult = updateDraftContentInternal(
+        draftId = draftId,
+        newText = newText,
+        source = DraftVersionSource.RESTORED,
+    )
+
+    private suspend fun updateDraftContentInternal(
+        draftId: String,
+        newText: String,
+        source: DraftVersionSource,
     ): DraftContentUpdateResult = try {
         if (newText.isBlank()) {
             DraftContentUpdateResult.EmptyContent
@@ -116,16 +172,39 @@ class RoomDraftReviewRepository @Inject constructor(
             if (freshEntity == null) {
                 DraftContentUpdateResult.NotFound
             } else {
+                val now = System.currentTimeMillis()
                 val editedModel = DraftApprovalGuard.onDraftContentEdited(
                     freshEntity.toModel().copy(text = newText),
                 )
                 val updatedEntity = freshEntity.copy(
                     text = editedModel.text,
                     approved = editedModel.approved,
-                    updatedAtMillis = System.currentTimeMillis(),
+                    updatedAtMillis = now,
                 )
                 draftDao.upsert(updatedEntity)
-                DraftContentUpdateResult.Updated(updatedEntity.toModel())
+                val savedDraft = updatedEntity.toModel()
+                try {
+                    // Nếu bản nháp tồn tại từ trước khi có lịch sử phiên bản, lưu bản chụp gốc trước bản mới.
+                    if (freshEntity.text.isNotBlank() && draftVersionStore.getVersions(draftId).isEmpty()) {
+                        draftVersionStore.recordVersion(
+                            draftId = draftId,
+                            text = freshEntity.text,
+                            source = DraftVersionSource.INITIAL,
+                            createdAtMillis = freshEntity.updatedAtMillis,
+                        )
+                    }
+                    draftVersionStore.recordVersion(
+                        draftId = draftId,
+                        text = editedModel.text,
+                        source = source,
+                        createdAtMillis = now,
+                    )
+                    DraftContentUpdateResult.Updated(savedDraft)
+                } catch (ce: CancellationException) {
+                    throw ce
+                } catch (historyError: Exception) {
+                    DraftContentUpdateResult.UpdatedWithoutHistory(savedDraft, historyError)
+                }
             }
         }
     } catch (ce: CancellationException) {

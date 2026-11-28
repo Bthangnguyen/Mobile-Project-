@@ -62,6 +62,14 @@ class ReviewDraftsAdapter(
 
             binding.tvApprovalHint.isVisible = !draft.approved
 
+            if (item.warnings.isNotEmpty()) {
+                binding.tvPrePublishWarnings.text =
+                    PrePublishWarningFormatter.formatBulletList(context, item.warnings)
+                binding.tvPrePublishWarnings.isVisible = true
+            } else {
+                binding.tvPrePublishWarnings.isVisible = false
+            }
+
             binding.btnApprove.isVisible = !draft.approved
             binding.btnRevoke.isVisible = draft.approved
             binding.btnPublish.isEnabled = item.canPublish

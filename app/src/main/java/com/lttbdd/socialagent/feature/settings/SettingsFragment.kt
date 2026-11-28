@@ -14,6 +14,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import com.lttbdd.socialagent.R
+import com.lttbdd.socialagent.core.ui.components.AppSnackbar
 import com.lttbdd.socialagent.data.settings.AppLanguage
 import com.lttbdd.socialagent.databinding.FragmentSettingsBinding
 import dagger.hilt.android.AndroidEntryPoint
@@ -51,7 +52,8 @@ class SettingsFragment : Fragment() {
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.uiState.collect(::render)
+                launch { viewModel.uiState.collect(::render) }
+                launch { viewModel.messages.collect { AppSnackbar.show(binding.root, it) } }
             }
         }
     }

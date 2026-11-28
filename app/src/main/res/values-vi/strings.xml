@@ -338,4 +338,5 @@
     <string name="settings_demo_switch">Dùng chế độ Demo</string>
     <string name="settings_demo_description">Dùng thử app bằng nội dung mẫu. Không cần API key, không gọi nhà cung cấp LLM và không tốn phí. Bản nháp vẫn cần bạn duyệt trước khi đăng.</string>
     <string name="settings_demo_active">Đang bật chế độ Demo: nội dung AI là văn bản mẫu, không do model thật viết.</string>
+    <string name="settings_demo_save_failed">Không lưu được cài đặt chế độ Demo. Vui lòng thử lại.</string>
 </resources>

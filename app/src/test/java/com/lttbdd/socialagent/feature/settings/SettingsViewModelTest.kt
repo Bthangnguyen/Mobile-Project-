@@ -1,5 +1,6 @@
 package com.lttbdd.socialagent.feature.settings
 
+import com.lttbdd.socialagent.R
 import com.lttbdd.socialagent.data.demo.DemoModeStore
 import com.lttbdd.socialagent.data.settings.AppLanguage
 import com.lttbdd.socialagent.data.settings.LanguageManager
@@ -7,9 +8,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import java.io.IOException
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -34,10 +39,12 @@ class SettingsViewModelTest {
     private class FakeDemoModeStore : DemoModeStore {
         val enabled = MutableStateFlow(false)
         val saved = mutableListOf<Boolean>()
+        var failure: Exception? = null
 
         override fun observe(): Flow<Boolean> = enabled
 
         override suspend fun setEnabled(enabled: Boolean) {
+            failure?.let { throw it }
             saved += enabled
             this.enabled.value = enabled
         }
@@ -124,5 +131,20 @@ class SettingsViewModelTest {
         viewModel.onDemoModeToggled(false)
 
         assertTrue(demoStore.saved.isEmpty())
+    }
+
+    @Test
+    fun `demo switch reverts and reports when saving fails`() = runTest {
+        val viewModel = viewModel(FakeLanguageManager())
+        demoStore.failure = IOException("disk full")
+        val messages = mutableListOf<Int>()
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.messages.toList(messages) }
+
+        viewModel.onDemoModeToggled(true)
+
+        assertFalse("Lưu lỗi thì công tắc trở về giá trị cũ", viewModel.uiState.value.demoMode)
+        assertEquals(listOf(R.string.settings_demo_save_failed), messages)
+        assertTrue(demoStore.saved.isEmpty())
+        job.cancel()
     }
 }

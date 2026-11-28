@@ -309,6 +309,54 @@ class PublishStatusViewModelTest {
     }
 
     @Test
+    fun `draft that lost approval meanwhile is not counted as a failed channel`() = runTest {
+        collectState()
+        tracker.topics.value = listOf(
+            topic("t1", state(PostStatus.DRAFT, draftId = "fb"), state(PostStatus.DRAFT, draftId = "li")),
+        )
+        // Màn hình còn thấy "đã duyệt", nhưng hàng đợi kiểm lại trong DB thì bản nháp đã mất duyệt.
+        queue.results["li"] = EnqueueResult.NotApproved
+        advanceUntilIdle()
+
+        viewModel.onPublishAll("t1")
+        advanceUntilIdle()
+
+        assertEquals(R.string.publish_status_queued_some_unapproved, nextMessage())
+        val li = viewModel.uiState.value.topics.single().channels.first { it.state.draftId == "li" }
+        assertFalse("Kênh mất duyệt không bị đánh dấu lỗi để hiện Thử lại", li.enqueueFailed)
+    }
+
+    @Test
+    fun `publish all reports unapproved when every channel lost approval meanwhile`() = runTest {
+        collectState()
+        tracker.topics.value = listOf(topic("t1", state(PostStatus.DRAFT, draftId = "fb")))
+        queue.results["fb"] = EnqueueResult.NotApproved
+        advanceUntilIdle()
+
+        viewModel.onPublishAll("t1")
+        advanceUntilIdle()
+
+        assertEquals(R.string.review_publish_blocked_unapproved, nextMessage())
+    }
+
+    @Test
+    fun `publish all with every channel failing reports zero queued`() = runTest {
+        collectState()
+        tracker.topics.value = listOf(
+            topic("t1", state(PostStatus.DRAFT, draftId = "fb"), state(PostStatus.DRAFT, draftId = "li")),
+        )
+        queue.results["fb"] = EnqueueResult.DraftNotFound
+        queue.errorFor = "li"
+        advanceUntilIdle()
+
+        viewModel.onPublishAll("t1")
+        advanceUntilIdle()
+
+        // Fragment đổi sang câu "N kênh bị lỗi…" khi queued = 0, không hiện "0 kênh…".
+        assertEquals(PublishStatusEvent.PublishAllPartial(queued = 0, failed = 2), viewModel.events.first())
+    }
+
+    @Test
     fun `channel that failed to enqueue shows retry until it is queued`() = runTest {
         collectState()
         tracker.topics.value = listOf(

@@ -93,12 +93,19 @@ class PublishStatusFragment : Fragment() {
         }
     }
 
-    /** "Đăng tất cả" có kênh lỗi (#111): nêu số kênh đã vào hàng đợi và số kênh lỗi. */
-    private fun partialMessage(event: PublishStatusEvent.PublishAllPartial): String = getString(
-        R.string.publish_status_publish_all_partial,
-        resources.getQuantityString(R.plurals.publish_status_channels_queued, event.queued, event.queued),
-        resources.getQuantityString(R.plurals.publish_status_channels_failed, event.failed, event.failed),
-    )
+    /**
+     * "Đăng tất cả" có kênh lỗi (#111): nêu số kênh đã vào hàng đợi và số kênh lỗi.
+     * Không kênh nào vào được hàng đợi thì chỉ nêu số kênh lỗi, không hiện "0 kênh…".
+     */
+    private fun partialMessage(event: PublishStatusEvent.PublishAllPartial): String {
+        val failed = resources.getQuantityString(R.plurals.publish_status_channels_failed, event.failed, event.failed)
+        if (event.queued == 0) return getString(R.string.publish_status_publish_all_failed, failed)
+        return getString(
+            R.string.publish_status_publish_all_partial,
+            resources.getQuantityString(R.plurals.publish_status_channels_queued, event.queued, event.queued),
+            failed,
+        )
+    }
 
     /** Mở bài gốc bằng trình duyệt hoặc app mạng xã hội (#40). URL đã được ViewModel kiểm tra là http/https. */
     private fun openPost(url: String) {

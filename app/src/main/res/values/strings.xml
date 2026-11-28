@@ -326,6 +326,7 @@
     <string name="publish_status_confirm_published_dialog_message">Only continue if you can see the post on the channel. After this, the app will not publish this post again.</string>
     <string name="publish_status_confirm_published_action">Yes, it is live</string>
     <string name="publish_status_publish_all_partial">%1$s, %2$s. Tap Retry on the failed channels.</string>
+    <string name="publish_status_publish_all_failed">%1$s. Tap Retry on the failed channels.</string>
     <plurals name="publish_status_channels_queued">
         <item quantity="one">%d channel is in the publishing queue</item>
         <item quantity="other">%d channels are in the publishing queue</item>

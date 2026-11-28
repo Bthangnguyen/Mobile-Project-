@@ -324,6 +324,7 @@
     <string name="publish_status_confirm_published_dialog_message">Chỉ tiếp tục nếu bạn đã thấy bài trên kênh. Sau bước này, app sẽ không đăng lại bài này nữa.</string>
     <string name="publish_status_confirm_published_action">Đúng, bài đã lên</string>
     <string name="publish_status_publish_all_partial">%1$s, %2$s. Bấm Thử lại ở các kênh lỗi.</string>
+    <string name="publish_status_publish_all_failed">%1$s. Bấm Thử lại ở các kênh lỗi.</string>
     <plurals name="publish_status_channels_queued">
         <item quantity="other">%d kênh đã vào hàng đợi đăng bài</item>
     </plurals>

@@ -75,20 +75,25 @@ class PublishStatusViewModel @Inject constructor(
             var queued = 0
             var alreadyActive = 0
             var failed = 0
+            var notApproved = 0
             for (target in targets) {
                 when (trackedEnqueue(target.state.draftId)) {
                     is EnqueueResult.Queued -> queued++
                     // Đã ở hàng đợi (bấm hai lần, hoặc màn hình chưa kịp cập nhật): không phải lỗi.
                     is EnqueueResult.AlreadyActive -> alreadyActive++
                     is EnqueueResult.AlreadyPublished -> Unit
+                    // Bản nháp vừa mất duyệt sau khi màn hình hiển thị: dòng đó chuyển sang "Cần duyệt",
+                    // không có nút "Thử lại", nên không tính là kênh lỗi (review #117).
+                    EnqueueResult.NotApproved -> notApproved++
                     else -> failed++
                 }
             }
             when {
                 // #111: nói rõ bao nhiêu kênh đã nằm trong hàng đợi và bao nhiêu kênh lỗi; kênh lỗi hiện "Thử lại".
                 failed > 0 -> _events.trySend(PublishStatusEvent.PublishAllPartial(queued + alreadyActive, failed))
+                queued == 0 && alreadyActive == 0 && notApproved > 0 -> send(R.string.review_publish_blocked_unapproved)
                 queued == 0 -> send(R.string.review_publish_already_queued)
-                skippedUnapproved -> send(R.string.publish_status_queued_some_unapproved)
+                skippedUnapproved || notApproved > 0 -> send(R.string.publish_status_queued_some_unapproved)
                 else -> send(R.string.publish_status_all_queued)
             }
         }

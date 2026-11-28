@@ -62,16 +62,19 @@ class PublishStatusViewModel @Inject constructor(
         viewModelScope.launch {
             var queued = 0
             var failed = 0
+            var needsDestination = false
             for (target in targets) {
                 when (safeEnqueue(target.state.draftId)) {
                     is EnqueueResult.Queued -> queued++
                     // Đã ở hàng đợi hoặc đã đăng (bấm hai lần, hoặc màn hình chưa kịp cập nhật): không phải lỗi.
                     is EnqueueResult.AlreadyActive, is EnqueueResult.AlreadyPublished -> Unit
+                    EnqueueResult.DestinationRequired -> needsDestination = true
                     else -> failed++
                 }
             }
             send(
                 when {
+                    needsDestination -> R.string.publish_status_some_destinations_required
                     failed > 0 -> R.string.publish_status_action_failed
                     queued == 0 -> R.string.review_publish_already_queued
                     skippedUnapproved -> R.string.publish_status_queued_some_unapproved
@@ -94,6 +97,7 @@ class PublishStatusViewModel @Inject constructor(
                             R.string.review_publish_in_progress
                         }
                     is EnqueueResult.AlreadyPublished -> R.string.review_publish_already_published
+                    EnqueueResult.DestinationRequired -> R.string.review_publish_destination_required
                     EnqueueResult.NotApproved -> R.string.review_publish_blocked_unapproved
                     EnqueueResult.DraftNotFound, null -> R.string.publish_status_action_failed
                 },
@@ -169,6 +173,10 @@ class PublishStatusViewModel @Inject constructor(
             if (state.status != PostStatus.PUBLISHED) return null
             // Không trim: AC #40 chặn link có khoảng trắng ở bất kỳ đâu, kể cả đầu/cuối (review của Minh ở #106).
             val url = state.url ?: return null
+            return url.takeIf { parseWebUrl(it) != null }
+        }
+
+        private fun parseWebUrl(url: String): URI? {
             if (url.isEmpty() || url.any(Char::isWhitespace)) return null
             // Parse thay vì chỉ so tiền tố, để chặn link thiếu host như `https:///post/1` hay `https://?q=1`.
             val uri = try {
@@ -177,7 +185,7 @@ class PublishStatusViewModel @Inject constructor(
                 return null
             }
             val scheme = uri.scheme?.lowercase()
-            return url.takeIf { scheme in WEB_SCHEMES && !uri.host.isNullOrEmpty() }
+            return uri.takeIf { scheme in WEB_SCHEMES && !it.host.isNullOrEmpty() }
         }
 
         private val WEB_SCHEMES = setOf("https", "http")

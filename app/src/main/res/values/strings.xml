@@ -281,6 +281,7 @@
     <string name="review_publish_already_queued">This draft is already waiting in the publishing queue.</string>
     <string name="review_publish_in_progress">This draft is being published or waiting for you to confirm its result.</string>
     <string name="review_publish_already_published">This draft has already been published.</string>
+    <string name="review_publish_destination_required">Connect a publishing account or leave only one eligible account connected for this channel.</string>
 
     <!-- Feature F4: Channel Preview, Manual Edit & Character Counter (Issue #34) -->
     <string name="preview_header_title">Preview &amp; Edit Draft</string>
@@ -385,4 +386,5 @@
     <string name="publish_error_storage">Could not save to the device storage.</string>
     <string name="publish_error_unknown">The channel returned an error.</string>
     <string name="publish_status_action_failed">Could not update the publishing queue. Please try again.</string>
+    <string name="publish_status_some_destinations_required">Some drafts could not be queued. Each channel needs exactly one eligible account connected to publish.</string>
 </resources>

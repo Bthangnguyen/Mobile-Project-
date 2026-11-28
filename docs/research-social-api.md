@@ -342,16 +342,17 @@ Nếu Meta hỗ trợ cấu hình custom scheme và bỏ qua secret qua `code_ve
    ```
    *Lưu ý kỹ thuật với Page thuộc Business Portfolio (⚠️ Chưa xác minh (cần thử trên Portal/API thực tế)):*
    Theo quan sát thực tế khi tích hợp (⚠️ nội dung ngoài tài liệu chính thức [Meta Pages API - Overview](https://developers.facebook.com/documentation/pages-api/overview)), nếu Page được quản lý bởi Meta Business Portfolio / Business Manager và người dùng chỉ được gán nhiệm vụ (*Page Tasks*) qua tài khoản doanh nghiệp thay vì sở hữu trực tiếp cá nhân, endpoint `/me/accounts` có thể không trả về đầy đủ hoặc trả về mảng rỗng `data: []` (điểm này chưa được mô tả trong tài liệu chính thức [Meta Pages API - Overview](https://developers.facebook.com/documentation/pages-api/overview)). Khi đó, cần kiểm tra cấp quyền `business_management` ([Meta Permissions Reference](https://developers.facebook.com/docs/permissions)) hoặc kiểm tra cấu hình tài sản trong Meta Business Suite; nhóm cần kiểm thử thực tế hành vi của `/me/accounts` với tài khoản doanh nghiệp trên môi trường dev.
-2. **Đăng bài viết kèm nội dung văn bản (F5):**
+2. **Đăng bài viết kèm nội dung văn bản hoặc liên kết (F5):**
    ```http
    POST https://graph.facebook.com/v26.0/{page-id}/feed
    Authorization: Bearer {page-access-token}
-   Content-Type: application/json
+   Content-Type: application/x-www-form-urlencoded
 
-   {
-     "message": "Nội dung bài viết do AI soạn..."
-   }
+   message=Xem+bai+viet&link=https%3A%2F%2Fexample.com%2Fstory
    ```
+   Client mã hóa từng trường bằng `FormBody`, bỏ qua `link` nếu bài không có liên kết và chỉ gửi Page token trong header `Authorization`. Xem ví dụ HTTP trong [Meta Graph API - Page Feed](https://developers.facebook.com/docs/graph-api/reference/page/feed/).
+
+   Mã Graph `368` là chặn tạm thời do chính sách. Hàng đợi chờ theo `Retry-After` nếu có, hoặc dùng backoff của WorkManager. Xem [Meta Graph API Error Handling](https://developers.facebook.com/docs/graph-api/guides/error-handling).
 3. **Đăng bài viết kèm ảnh đơn (F5):**
    ```http
    POST https://graph.facebook.com/v26.0/{page-id}/photos
@@ -376,18 +377,12 @@ Nếu Meta hỗ trợ cấu hình custom scheme và bỏ qua secret qua `code_ve
      ```
      *Nhận về:* `{"id": "{photo_id_1}"}`. Lặp lại cho từng ảnh để thu thập danh sách `[photo_id_1, photo_id_2, ...]`.
    - **Bước 2: Tạo bài post trên Feed đính kèm mảng `attached_media` (hướng dẫn chi tiết tại [Meta Graph API - Page Photos](https://developers.facebook.com/docs/graph-api/reference/page/photos/)):**
-     ```http
-     POST https://graph.facebook.com/v26.0/{page-id}/feed
-     Authorization: Bearer {page-access-token}
-     Content-Type: application/json
-
-     {
-       "message": "Nội dung bài viết kèm album ảnh...",
-       "attached_media": [
-         {"media_fbid": "{photo_id_1}"},
-         {"media_fbid": "{photo_id_2}"}
-       ]
-     }
+     ```sh
+     curl 'https://graph.facebook.com/v26.0/{page-id}/feed' \
+       -H 'Authorization: Bearer {page-access-token}' \
+       --data-urlencode 'message=Nội dung bài viết kèm album ảnh' \
+       --data-urlencode 'attached_media[0]={"media_fbid":"{photo_id_1}"}' \
+       --data-urlencode 'attached_media[1]={"media_fbid":"{photo_id_2}"}'
      ```
      *Nhận về:* `{"id": "{page-id}_{post-id}"}`.
    - *Lưu ý kỹ thuật & Vòng đời ảnh:*
@@ -407,7 +402,7 @@ Nếu Meta hỗ trợ cấu hình custom scheme và bỏ qua secret qua `code_ve
    > 2. **Gọi API:** Khi nhận được response thành công, ghi ngay `remotePostId` và chuyển sang trạng thái thành công trong transaction riêng.
    > 3. **Phân loại lỗi mạng khi thất bại:**
    >    - Lỗi chắc chắn **chưa gửi** được request (DNS thất bại `UnknownHostException`, không kết nối được `ConnectException`): cho phép retry theo backoff thông thường.
-   >    - Lỗi **không rõ kết quả / có thể đã tới server** (`SocketTimeoutException` sau khi đã gửi body, lỗi khi đọc response stream, process bị hủy giữa chừng): đánh dấu `outcomeUnknown = true`. **Tuyệt đối không gọi publish lại ngay**.
+   >    - Lỗi **không rõ kết quả / có thể đã tới server** (`SocketTimeoutException` sau khi đã gửi body, lỗi khi đọc response stream, HTTP 5xx sau POST, process bị hủy giữa chừng): đánh dấu `outcomeUnknown = true`. **Tuyệt đối không gọi publish lại ngay**.
    > 4. **Cơ chế đối soát (Reconciliation) trước khi retry:** Khi Worker chạy lại và gặp bài viết đang ở trạng thái `PUBLISHING` mà chưa có `remotePostId` (hoặc `outcomeUnknown = true`):
    >    - Worker **không được đăng lại ngay**, mà phải gọi đối soát: `GET https://graph.facebook.com/v26.0/{page-id}/feed?since={attemptStartedAt - 60s}&fields=id,message,created_time`.
    >    - So khớp `message` bài đăng và thời gian tạo `created_time`:

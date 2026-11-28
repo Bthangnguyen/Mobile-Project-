@@ -727,6 +727,16 @@ class ChannelRepositoryImpl @Inject constructor(
             .digest((refreshLogSalt + accountId).toByteArray())
             .take(6).joinToString("") { "%02x".format(it) }
 
+    /** Đọc đích và token đã xác nhận dưới cùng một khoá. */
+    internal suspend fun readPublishingAccounts(type: ChannelType): List<Pair<String, OAuthToken>> =
+        accountsMutex.withLock {
+            ensureRestored(reload = true)
+            channelsFlow.value.filter { it.type == type }.mapNotNull { account ->
+                val id = account.accountId
+                readToken(type, id, pendingWrites[type to id])?.let { id to it }
+            }
+        }
+
     private suspend fun readCommittedToken(type: ChannelType, accountId: String): OAuthToken? = try {
         accountsMutex.withLock {
             ensureRestored()

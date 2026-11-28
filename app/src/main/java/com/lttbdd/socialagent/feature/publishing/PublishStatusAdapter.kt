@@ -49,12 +49,13 @@ class PublishStatusAdapter(
         private fun bindChannel(row: ItemPublishChannelBinding, item: ChannelPublishItem) {
             val state = item.state
             val context = row.root.context
-            row.tvChannelName.setText(
+            val channelName = context.getString(
                 when (state.channel) {
                     ChannelType.FACEBOOK -> R.string.compose_channel_facebook
                     ChannelType.LINKEDIN -> R.string.compose_channel_linkedin
                 },
             )
+            row.tvChannelName.text = channelName
 
             when (item.action) {
                 ChannelAction.NEEDS_APPROVAL -> row.statusChannel.setPendingApproval()
@@ -80,13 +81,23 @@ class PublishStatusAdapter(
 
             row.btnPublishChannel.isVisible = item.action == ChannelAction.PUBLISH
             row.btnPublishChannel.setText(
-                if (state.postId == null) R.string.review_action_publish else R.string.publish_status_retry,
+                if (item.isRetryAction) R.string.publish_status_retry else R.string.review_action_publish,
             )
             row.btnPublishChannel.setOnClickListener { onPublishChannel(state.draftId) }
 
             val openUrl = item.openUrl
             row.btnOpenPost.isVisible = openUrl != null
             row.btnOpenPost.setOnClickListener { openUrl?.let(onOpenPost) }
+
+            // #111: nhãn nút giống nhau ở mọi dòng, nên TalkBack đọc kèm tên kênh để phân biệt.
+            row.btnPublishChannel.contentDescription = context.getString(
+                if (item.isRetryAction) R.string.publish_status_cd_retry else R.string.publish_status_cd_publish,
+                channelName,
+            )
+            row.btnOpenPost.contentDescription = context.getString(R.string.publish_status_cd_open_post, channelName)
+            row.btnConfirmPublished.contentDescription =
+                context.getString(R.string.publish_status_cd_confirm_published, channelName)
+            row.btnRequeue.contentDescription = context.getString(R.string.publish_status_cd_requeue, channelName)
 
             val postId = state.postId
             row.confirmActions.isVisible = item.action == ChannelAction.CONFIRM_OUTCOME && postId != null

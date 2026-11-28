@@ -24,3 +24,21 @@ sealed interface PublishResult {
     /** Lỗi không thử lại được (thiếu quyền, nội dung bị từ chối): báo rõ cho người dùng. */
     data class PermanentError(val reason: String) : PublishResult
 }
+
+/**
+ * Kết quả đối soát bài không rõ kết quả (#94): bài có thật sự đã lên mạng xã hội chưa.
+ * Hàng đợi dùng để quyết định đánh dấu đã đăng, đăng lại, hay chờ người dùng xác nhận.
+ */
+sealed interface ReconcileResult {
+    /** Tìm thấy bài trên kênh: hàng đợi đánh dấu đã đăng và lưu link. */
+    data class Found(val remotePostId: String, val url: String) : ReconcileResult
+
+    /**
+     * Đã kiểm tra và chắc chắn chưa có bài. Hàng đợi chỉ dùng kết quả này khi đã qua thời gian chờ feed
+     * kể từ lần gọi API gần nhất, và tự đăng lại đúng một lần với cùng idempotencyKey; lần sau chờ người dùng.
+     */
+    data object NotFound : ReconcileResult
+
+    /** Kênh không hỗ trợ hoặc không kiểm tra được: hàng đợi chuyển sang chờ người dùng xác nhận. */
+    data class Unavailable(val reason: String) : ReconcileResult
+}

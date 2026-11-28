@@ -5,6 +5,7 @@ import com.lttbdd.socialagent.core.model.Comment
 import com.lttbdd.socialagent.core.model.Draft
 import com.lttbdd.socialagent.core.model.PostMetrics
 import com.lttbdd.socialagent.core.model.PublishResult
+import com.lttbdd.socialagent.core.model.ReconcileResult
 import com.lttbdd.socialagent.core.social.SocialChannelClient
 import kotlinx.coroutines.delay
 import java.util.concurrent.ConcurrentHashMap
@@ -20,15 +21,27 @@ class FakeSocialChannelClient(
 
     private val publishedByKey = ConcurrentHashMap<String, PublishResult.Success>()
 
+    /** Bài đã đăng theo bản nháp, để [findPublishedPost] đối soát được (#94). */
+    private val publishedByDraft = ConcurrentHashMap<String, PublishResult.Success>()
+
     val publishedCount: Int get() = publishedByKey.size
 
     override suspend fun publish(draft: Draft, idempotencyKey: String): PublishResult {
         publishedByKey[idempotencyKey]?.let { return it }
         delay(latencyMillis)
         val remoteId = "${type.name.lowercase()}-${publishedByKey.size + 1}"
-        return publishedByKey.getOrPut(idempotencyKey) {
+        val result = publishedByKey.getOrPut(idempotencyKey) {
             PublishResult.Success(remotePostId = remoteId, url = "https://example.com/${type.name.lowercase()}/$remoteId")
         }
+        publishedByDraft[draft.id] = result
+        return result
+    }
+
+    /** Bản nháp đã đăng qua client này thì [ReconcileResult.Found], chưa đăng thì [ReconcileResult.NotFound]. */
+    override suspend fun findPublishedPost(draft: Draft, sinceMillis: Long): ReconcileResult {
+        delay(latencyMillis)
+        val published = publishedByDraft[draft.id] ?: return ReconcileResult.NotFound
+        return ReconcileResult.Found(remotePostId = published.remotePostId, url = published.url)
     }
 
     override suspend fun fetchComments(remotePostId: String): List<Comment> {

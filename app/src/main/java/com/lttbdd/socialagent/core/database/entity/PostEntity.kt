@@ -1,5 +1,6 @@
 package com.lttbdd.socialagent.core.database.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -58,4 +59,11 @@ data class PostEntity(
      * [com.lttbdd.socialagent.core.database.dao.PostDao.claimForPublishing] bỏ qua bài chưa tới giờ.
      */
     val nextAttemptAtMillis: Long? = null,
+    /**
+     * Số lần hàng đợi đã tự đăng lại sau khi đối soát không tìm thấy bài (#94). Chỉ được tự đăng lại
+     * [com.lttbdd.socialagent.data.publishing.PublishQueueRepository.MAX_RECONCILE_REQUEUES] lần; sau đó
+     * người dùng phải tự kiểm tra trên kênh, vì feed có thể hiện bài trễ và tự đăng tiếp dễ gây bài trùng.
+     */
+    @ColumnInfo(defaultValue = "0")
+    val reconcileRequeueCount: Int = 0,
 )

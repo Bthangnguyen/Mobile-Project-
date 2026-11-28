@@ -184,7 +184,7 @@ class AppDatabaseTest {
                     nextAttemptAtMillis = 4,
                 )
                 assertEquals(expectedPost, migrated.postDao().getById("p1"))
-                assertEquals(3, migrated.openHelper.readableDatabase.version)
+                assertEquals(4, migrated.openHelper.readableDatabase.version)
                 assertNull(migrated.channelCleanupDao().getCompletedOperation(ChannelType.FACEBOOK))
                 migrated.channelCleanupDao().deferProtectedPosts(ChannelType.FACEBOOK)
                 migrated.openHelper.readableDatabase.query(
@@ -196,6 +196,44 @@ class AppDatabaseTest {
                     assertFalse(cursor.isNull(1))
                     assertEquals(0L, cursor.getLong(1))
                 }
+            } finally {
+                migrated.close()
+            }
+        } finally {
+            context.deleteDatabase(name)
+        }
+    }
+
+    @Test
+    fun migrationFromVersionThreeKeepsPostsAndStartsReconcileCountAtZero() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val name = "reconcile-v3.db"
+        val oldSchema = JSONObject(File("schemas/${AppDatabase::class.java.name}/3.json").readText())
+            .getJSONObject("database")
+        val path = context.getDatabasePath(name)
+        path.parentFile?.mkdirs()
+        try {
+            SQLiteDatabase.openOrCreateDatabase(path, null).use { oldDb ->
+                installSchema(oldDb, oldSchema)
+                oldDb.execSQL(
+                    "INSERT INTO drafts (id, topicId, channel, text, approved, updatedAtMillis, revision) " +
+                        "VALUES ('d1', 't1', 'FACEBOOK', 'Saved draft', 1, 1, 0)",
+                )
+                oldDb.execSQL(
+                    "INSERT INTO posts (id, draftId, channel, status, idempotencyKey, attemptCount, " +
+                        "createdAtMillis, updatedAtMillis, attemptStartedAtMillis, outcomeUnknown) " +
+                        "VALUES ('p1', 'd1', 'FACEBOOK', 'PUBLISHING', 'key', 1, 2, 3, 2, 1)",
+                )
+                oldDb.version = 3
+            }
+
+            val migrated = Room.databaseBuilder(context, AppDatabase::class.java, name).build()
+            try {
+                val post = migrated.postDao().getById("p1")
+                assertNotNull(post)
+                assertTrue("Dữ liệu cũ giữ nguyên", post!!.outcomeUnknown)
+                assertEquals("Bài cũ chưa từng được tự đăng lại", 0, post.reconcileRequeueCount)
+                assertEquals(4, migrated.openHelper.readableDatabase.version)
             } finally {
                 migrated.close()
             }

@@ -2,6 +2,8 @@ package com.lttbdd.socialagent.data.fake
 
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.Draft
+import com.lttbdd.socialagent.core.model.PublishResult
+import com.lttbdd.socialagent.core.model.ReconcileResult
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -28,5 +30,34 @@ class FakeSocialChannelClientTest {
 
         assertNotEquals(first, second)
         assertEquals(2, client.publishedCount)
+    }
+
+    // ---------- #94: đối soát ----------
+
+    @Test
+    fun `published draft is found with the same remote id and link`() = runTest {
+        val published = client.publish(draft, idempotencyKey = "key-1") as PublishResult.Success
+
+        assertEquals(
+            ReconcileResult.Found(published.remotePostId, published.url),
+            client.findPublishedPost(draft, sinceMillis = 0),
+        )
+    }
+
+    @Test
+    fun `draft that was never published is not found`() = runTest {
+        client.publish(draft, idempotencyKey = "key-1")
+
+        assertEquals(
+            ReconcileResult.NotFound,
+            client.findPublishedPost(draft.copy(id = "d2"), sinceMillis = 0),
+        )
+    }
+
+    @Test
+    fun `reconcile never creates a post`() = runTest {
+        client.findPublishedPost(draft, sinceMillis = 0)
+
+        assertEquals(0, client.publishedCount)
     }
 }

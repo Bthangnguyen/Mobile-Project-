@@ -14,6 +14,7 @@ import com.lttbdd.socialagent.core.model.Draft
 import com.lttbdd.socialagent.core.model.PostMetrics
 import com.lttbdd.socialagent.core.model.PostStatus
 import com.lttbdd.socialagent.core.model.PublishResult
+import com.lttbdd.socialagent.core.model.ReconcileResult
 import com.lttbdd.socialagent.core.publishing.EnqueueResult
 import com.lttbdd.socialagent.core.social.SocialChannelClient
 import kotlinx.coroutines.CompletableDeferred
@@ -787,6 +788,193 @@ class PublishQueueRepositoryTest {
         assertEquals("Mỗi kênh gọi API đúng một lần", listOf(1, 1), listOf(facebook.calls, linkedin.calls))
     }
 
+    // ---------- #94: đối soát bài không rõ kết quả ----------
+
+    /** Đưa một bài vào trạng thái không rõ kết quả: gọi API bị timeout khi đang chờ response. */
+    private suspend fun unknownPost(repo: PublishQueueRepository): String {
+        saveDraft()
+        val id = queuedId(repo)
+        facebook.next(SocketTimeoutException("read timed out"))
+        repo.processQueue()
+        assertTrue(post(id).outcomeUnknown)
+        return id
+    }
+
+    @Test
+    fun `reconcile found marks post published with remote id and link`() = runTest {
+        val repo = repository()
+        val id = unknownPost(repo)
+        val createdAt = post(id).createdAtMillis
+        facebook.reconcile = ReconcileResult.Found("fb-9", "https://facebook.com/fb-9")
+
+        repo.processQueue()
+
+        val published = post(id)
+        assertEquals(PostStatus.PUBLISHED, published.status)
+        assertEquals("fb-9", published.remotePostId)
+        assertEquals("https://facebook.com/fb-9", published.url)
+        assertFalse(published.outcomeUnknown)
+        assertEquals("Tìm thấy bài thì không gọi API đăng lần hai", 1, facebook.calls)
+        assertEquals(
+            "Tìm từ trước lúc tạo bài (phủ mọi lần thử), trừ hao lệch đồng hồ",
+            listOf(createdAt - PublishQueueRepository.RECONCILE_WINDOW_MILLIS),
+            facebook.reconcileSince,
+        )
+    }
+
+    @Test
+    fun `reconcile not found republishes once in the same run with the same key`() = runTest {
+        val repo = repository()
+        val id = unknownPost(repo)
+        facebook.reconcile = ReconcileResult.NotFound
+        nowMillis += PublishQueueRepository.RECONCILE_DELAY_MILLIS
+
+        val run = repo.processQueue()
+        nowMillis += 1_000
+        repo.processQueue()
+
+        assertEquals(1, run.published)
+        assertEquals(PostStatus.PUBLISHED, post(id).status)
+        assertEquals("Đăng lại đúng một lần", 2, facebook.calls)
+        assertEquals("Dùng lại idempotencyKey cũ", 1, facebook.keys.toSet().size)
+        assertEquals("Bài đã đăng không bị đối soát lại", 1, facebook.reconcileSince.size)
+    }
+
+    @Test
+    fun `reconcile unavailable keeps post waiting for the user`() = runTest {
+        val repo = repository()
+        val id = unknownPost(repo)
+        // Mặc định của hợp đồng: kênh chưa hỗ trợ đối soát.
+
+        repo.processQueue()
+
+        val pending = post(id)
+        assertEquals(PostStatus.PUBLISHING, pending.status)
+        assertTrue(pending.outcomeUnknown)
+        assertEquals(1, facebook.calls)
+        assertTrue("Người dùng vẫn xác nhận được", repo.confirmPublishedManually(id))
+    }
+
+    @Test
+    fun `reconcile error keeps post waiting and does not crash the run`() = runTest {
+        val repo = repository()
+        val id = unknownPost(repo)
+        facebook.reconcile = SocketTimeoutException("feed timed out")
+
+        repo.processQueue()
+
+        assertTrue(post(id).outcomeUnknown)
+        assertEquals(1, facebook.calls)
+    }
+
+    @Test
+    fun `reconcile not found before the feed delay does not republish`() = runTest {
+        val repo = repository()
+        val id = unknownPost(repo)
+        facebook.reconcile = ReconcileResult.NotFound
+        // Lượt chạy đến sớm (enqueue bài khác, retry 30 giây): feed có thể chưa kịp hiện bài vừa lên.
+        nowMillis += PublishQueueRepository.RECONCILE_DELAY_MILLIS - 1
+
+        repo.processQueue()
+
+        assertTrue("Chưa qua thời gian chờ feed thì giữ nguyên", post(id).outcomeUnknown)
+        assertEquals("Không gọi API đăng lần hai", 1, facebook.calls)
+        assertEquals("Vẫn đối soát (Found vẫn được nhận ngay)", 1, facebook.reconcileSince.size)
+
+        nowMillis += 1
+        repo.processQueue()
+
+        assertEquals("Qua mốc thì mới đăng lại", PostStatus.PUBLISHED, post(id).status)
+        assertEquals(2, facebook.calls)
+    }
+
+    @Test
+    fun `reconcile republishes only once across repeated unknown outcomes`() = runTest {
+        val repo = repository()
+        val id = unknownPost(repo)
+        val createdAt = post(id).createdAtMillis
+        facebook.reconcile = ReconcileResult.NotFound
+        nowMillis += PublishQueueRepository.RECONCILE_DELAY_MILLIS
+        facebook.next(SocketTimeoutException("read timed out again")) // lần đăng lại cũng không rõ kết quả
+
+        repo.processQueue()
+
+        val second = post(id)
+        assertTrue(second.outcomeUnknown)
+        assertEquals(1, second.reconcileRequeueCount)
+        assertEquals(2, facebook.calls)
+
+        nowMillis += PublishQueueRepository.RECONCILE_DELAY_MILLIS
+        repo.processQueue()
+
+        assertTrue("Đã tự đăng lại một lần: lần sau chờ người dùng xác nhận", post(id).outcomeUnknown)
+        assertEquals("Không gọi API đăng lần ba", 2, facebook.calls)
+        assertEquals(
+            "Mọi lượt đối soát đều tìm từ lúc tạo bài, kể cả bài của lần thử trước",
+            listOf(createdAt - PublishQueueRepository.RECONCILE_WINDOW_MILLIS),
+            facebook.reconcileSince.toSet().toList(),
+        )
+        assertTrue("Người dùng vẫn tự đưa lại hàng đợi được", repo.requeueAfterUserCheck(id))
+    }
+
+    @Test
+    fun `reconcile requeue limit is enforced by the database update`() = runTest {
+        val repo = repository()
+        val id = unknownPost(repo)
+        db.postDao().update(post(id).copy(reconcileRequeueCount = PublishQueueRepository.MAX_RECONCILE_REQUEUES))
+
+        assertEquals(
+            0,
+            db.postDao().requeueUnknownAfterReconcile(id, nowMillis, PublishQueueRepository.MAX_RECONCILE_REQUEUES),
+        )
+        assertTrue(post(id).outcomeUnknown)
+    }
+
+    @Test
+    fun `reconcile does not override a post the user already resolved`() = runTest {
+        val repo = repository()
+        val id = unknownPost(repo)
+        assertTrue(repo.confirmPublishedManually(id, url = "https://facebook.com/manual"))
+        facebook.reconcile = ReconcileResult.Found("fb-9", "https://facebook.com/fb-9")
+
+        repo.processQueue()
+
+        assertEquals("https://facebook.com/manual", post(id).url)
+        assertTrue("Bài đã xác nhận không cần đối soát", facebook.reconcileSince.isEmpty())
+    }
+
+    @Test
+    fun `new unknown outcome schedules a delayed reconcile run`() = runTest {
+        saveDraft()
+        val repo = repository()
+        queuedId(repo)
+        facebook.next(SocketTimeoutException())
+
+        repo.processQueue()
+
+        assertEquals(
+            "Hẹn work riêng theo mốc tuyệt đối, không nối sau lượt kiểm tra bài kẹt",
+            listOf(nowMillis + PublishQueueRepository.RECONCILE_DELAY_MILLIS),
+            scheduler.retryAtMillis,
+        )
+        assertTrue(scheduler.staleCheckDelays.isEmpty())
+    }
+
+    @Test
+    fun `stale post from killed process is reconciled in the same run`() = runTest {
+        saveDraft()
+        db.postDao().insertIfAbsent(
+            existingPost("stale", PostStatus.PUBLISHING, createdAt = 1)
+                .copy(attemptStartedAtMillis = nowMillis - PublishQueueRepository.STALE_PUBLISHING_MILLIS - 1),
+        )
+        facebook.reconcile = ReconcileResult.Found("fb-1", "https://facebook.com/fb-1")
+
+        repository().processQueue()
+
+        assertEquals(PostStatus.PUBLISHED, post("stale").status)
+        assertEquals(0, facebook.calls)
+    }
+
     private class CountingScheduler : PublishScheduler {
         var calls = 0
         var idleCalls = 0
@@ -836,6 +1024,19 @@ class PublishQueueRepositoryTest {
         override suspend fun reply(commentId: String, text: String) = Unit
         override suspend fun fetchMetrics(remotePostId: String): PostMetrics = error("not used")
         override suspend fun fetchFollowerCount(): Int = 0
+
+        /** Kết quả đối soát (#94); null thì dùng mặc định của hợp đồng (Unavailable). */
+        var reconcile: Any? = null
+        val reconcileSince = mutableListOf<Long>()
+
+        override suspend fun findPublishedPost(draft: Draft, sinceMillis: Long): ReconcileResult {
+            reconcileSince += sinceMillis
+            return when (val outcome = reconcile) {
+                null -> super.findPublishedPost(draft, sinceMillis)
+                is Throwable -> throw outcome
+                else -> outcome as ReconcileResult
+            }
+        }
     }
 
     /** Giả lập ghi DB thất bại ngay sau khi API đăng thành công. */

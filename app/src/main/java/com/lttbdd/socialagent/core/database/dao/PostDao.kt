@@ -178,6 +178,27 @@ interface PostDao {
     )
     suspend fun getUnknownOutcome(publishing: PostStatus = PostStatus.PUBLISHING): List<PostEntity>
 
+    /**
+     * Đối soát không tìm thấy bài (#94): đưa lại hàng đợi và tăng [PostEntity.reconcileRequeueCount].
+     * Chỉ cập nhật khi số lần đã tự đăng lại còn dưới [maxRequeues], để hai lượt chạy song song không vượt giới hạn.
+     */
+    @Query(
+        """
+        UPDATE posts
+        SET status = :queued, outcomeUnknown = 0, errorMessage = NULL, updatedAtMillis = :nowMillis,
+            reconcileRequeueCount = reconcileRequeueCount + 1
+        WHERE id = :id AND status = :publishing AND outcomeUnknown = 1 AND remotePostId IS NULL
+          AND reconcileRequeueCount < :maxRequeues
+        """,
+    )
+    suspend fun requeueUnknownAfterReconcile(
+        id: String,
+        nowMillis: Long,
+        maxRequeues: Int,
+        publishing: PostStatus = PostStatus.PUBLISHING,
+        queued: PostStatus = PostStatus.QUEUED,
+    ): Int
+
     /** Người dùng xác nhận bài CHƯA được đăng: đưa lại hàng đợi. Cùng điều kiện với [resolveUnknownAsPublished]. */
     @Query(
         """

@@ -135,7 +135,10 @@ class PublishQueueRepository @Inject constructor(
         cleanup.finishDeferredCleanup()
         scheduleNextRetry()
         // Bài vừa thành "không rõ kết quả" trong lượt này: hẹn lượt đối soát sau một lúc, vì feed của kênh có độ trễ.
-        if (result.needsConfirmation > 0) scheduler.scheduleStaleCheck(RECONCILE_DELAY_MILLIS)
+        // Dùng work riêng theo mốc tuyệt đối để không bị nối sau lượt kiểm tra bài kẹt (review #118).
+        if (result.needsConfirmation > 0) {
+            scheduler.scheduleRetryAt(clock.nowMillis() + RECONCILE_DELAY_MILLIS, RECONCILE_DELAY_MILLIS)
+        }
         // Bài kẹt PUBLISHING chưa quá hạn (worker trước bị dừng giữa chừng) sẽ không còn ai xử lý nếu không hẹn
         // lượt sau: hẹn kiểm tra lại khi đã quá STALE_PUBLISHING_MILLIS để chuyển nó sang "chờ xác nhận".
         val inFlight = postDao.countInFlight()
@@ -190,7 +193,8 @@ class PublishQueueRepository @Inject constructor(
         for (post in postDao.getUnknownOutcome()) {
             val draft = post.draftId?.let { draftDao.getById(it) } ?: continue
             val client = clients.firstOrNull { it.type == post.channel } ?: continue
-            val since = (post.attemptStartedAtMillis ?: post.createdAtMillis) - RECONCILE_WINDOW_MILLIS
+            // Tìm từ lúc tạo bài để phủ mọi lần thử: bài của lần thử trước có thể hiện trên feed trễ (review #118).
+            val since = post.createdAtMillis - RECONCILE_WINDOW_MILLIS
             val result = try {
                 client.findPublishedPost(draft.toModel(), since)
             } catch (e: TimeoutCancellationException) {
@@ -204,9 +208,15 @@ class PublishQueueRepository @Inject constructor(
             when (result) {
                 is ReconcileResult.Found ->
                     postDao.resolveUnknownByReconcile(post.id, result.remotePostId, result.url, clock.nowMillis())
-                // Giới hạn số lần đăng lại tự động theo số lượt gọi API, để kênh trả NotFound sai không gây vòng lặp.
-                ReconcileResult.NotFound -> if (post.attemptCount < MAX_RETRYABLE_ATTEMPTS) {
-                    postDao.requeueUnknown(post.id, clock.nowMillis())
+                ReconcileResult.NotFound -> {
+                    val now = clock.nowMillis()
+                    // Chỉ tin "không thấy bài" khi đã qua thời gian chờ feed kể từ lần gọi API gần nhất: lượt chạy
+                    // đến sớm (enqueue bài khác, retry 30s) có thể chưa thấy bài vừa lên và gây đăng trùng.
+                    val lastAttempt = post.attemptStartedAtMillis ?: post.updatedAtMillis
+                    if (now - lastAttempt >= RECONCILE_DELAY_MILLIS) {
+                        // Chỉ tự đăng lại đúng MAX_RECONCILE_REQUEUES lần; sau đó chờ người dùng xác nhận.
+                        postDao.requeueUnknownAfterReconcile(post.id, now, MAX_RECONCILE_REQUEUES)
+                    }
                 }
                 is ReconcileResult.Unavailable -> Unit
             }
@@ -350,8 +360,14 @@ class PublishQueueRepository @Inject constructor(
         /** Lùi mốc tìm bài khi đối soát (#94): đồng hồ máy và server có thể lệch nhau. */
         const val RECONCILE_WINDOW_MILLIS = 60 * 1000L
 
-        /** Chờ trước khi đối soát bài vừa không rõ kết quả, để bài kịp hiện trên feed của kênh (#94). */
+        /**
+         * Chờ trước khi đối soát bài vừa không rõ kết quả, để bài kịp hiện trên feed của kênh (#94).
+         * `NotFound` nhận được trước mốc này không được dùng để đăng lại.
+         */
         const val RECONCILE_DELAY_MILLIS = 2 * 60 * 1000L
+
+        /** Số lần tối đa hàng đợi tự đăng lại sau khi đối soát không tìm thấy bài (#94): đúng một lần. */
+        const val MAX_RECONCILE_REQUEUES = 1
 
         /** Chờ tối đa theo `Retry-After` (#39); kênh trả lâu hơn thì vẫn thử lại sau mốc này. */
         const val MAX_RETRY_AFTER_MILLIS = 24 * 60 * 60 * 1000L

@@ -33,7 +33,10 @@ sealed interface ReconcileResult {
     /** Tìm thấy bài trên kênh: hàng đợi đánh dấu đã đăng và lưu link. */
     data class Found(val remotePostId: String, val url: String) : ReconcileResult
 
-    /** Đã kiểm tra và chắc chắn chưa có bài: hàng đợi được đăng lại đúng một lần với cùng idempotencyKey. */
+    /**
+     * Đã kiểm tra và chắc chắn chưa có bài. Hàng đợi chỉ dùng kết quả này khi đã qua thời gian chờ feed
+     * kể từ lần gọi API gần nhất, và tự đăng lại đúng một lần với cùng idempotencyKey; lần sau chờ người dùng.
+     */
     data object NotFound : ReconcileResult
 
     /** Kênh không hỗ trợ hoặc không kiểm tra được: hàng đợi chuyển sang chờ người dùng xác nhận. */

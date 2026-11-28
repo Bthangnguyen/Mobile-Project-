@@ -20,6 +20,8 @@ import com.lttbdd.socialagent.core.database.entity.PostEntity
  * Mạng chỉ cập nhật vào đây. Đổi schema thì tăng [version] và thêm migration — xem `app/schemas/`.
  * Enum (ChannelType, PostStatus…) được lưu theo tên: đổi tên một hằng số enum đã lưu cũng là đổi schema,
  * cần migration để chuyển dữ liệu cũ.
+ *
+ * Version 4 (#94) chỉ thêm cột `posts.reconcileRequeueCount` (mặc định 0), nên dùng AutoMigration.
  */
 @Database(
     entities = [
@@ -30,10 +32,11 @@ import com.lttbdd.socialagent.core.database.entity.PostEntity
         ChannelCleanupReceipt::class,
         DeferredChannelPostCleanup::class,
     ],
-    version = 3,
+    version = 4,
     autoMigrations = [
         AutoMigration(from = 1, to = 2),
         AutoMigration(from = 2, to = 3),
+        AutoMigration(from = 3, to = 4),
     ],
     exportSchema = true,
 )

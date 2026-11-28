@@ -385,4 +385,10 @@
     <string name="publish_error_storage">Could not save to the device storage.</string>
     <string name="publish_error_unknown">The channel returned an error.</string>
     <string name="publish_status_action_failed">Could not update the publishing queue. Please try again.</string>
+    <!-- #73: chế độ Demo -->
+    <string name="settings_demo_title">Demo mode</string>
+    <string name="settings_demo_switch">Use demo mode</string>
+    <string name="settings_demo_description">Try the app with sample content. No API key is needed, no LLM provider is called and nothing is charged. Drafts still need your approval before publishing.</string>
+    <string name="settings_demo_active">Demo mode is on: AI content is sample text, not written by a real model.</string>
+    <string name="settings_demo_save_failed">Could not save the demo mode setting. Please try again.</string>
 </resources>

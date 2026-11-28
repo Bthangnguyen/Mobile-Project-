@@ -14,6 +14,9 @@ import com.lttbdd.socialagent.data.ai.TaskModelResolver
 import com.lttbdd.socialagent.data.ai.TaskModelSelectionStore
 import com.lttbdd.socialagent.data.apikeys.ApiKeyStore
 import com.lttbdd.socialagent.data.apikeys.KeyStorageStatus
+import com.lttbdd.socialagent.data.demo.DemoAwareLlmClient
+import com.lttbdd.socialagent.data.demo.DemoModeStore
+import com.lttbdd.socialagent.data.fake.FakeLlmClient
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -52,7 +55,11 @@ object LlmModule {
 
     @Provides
     @Singleton
-    fun llmClient(configurations: LlmConfigurationSource, keys: ApiKeySource): LlmClient {
+    fun llmClient(
+        configurations: LlmConfigurationSource,
+        keys: ApiKeySource,
+        demoMode: DemoModeStore,
+    ): LlmClient {
         // Client riêng cho LLM, không ảnh hưởng HTTP/DI của mảng khác. Không có interceptor ghi log.
         val http = OkHttpClient.Builder()
             .followRedirects(false)
@@ -62,6 +69,8 @@ object LlmModule {
             .readTimeout(60, TimeUnit.SECONDS)
             .build()
         val transport = OkHttpSseTransport(EventSources.createFactory(http))
-        return RoutingLlmClient(configurations, keys, setOf(OpenAiClient(transport), GeminiClient(transport)))
+        val router = RoutingLlmClient(configurations, keys, setOf(OpenAiClient(transport), GeminiClient(transport)))
+        // Chế độ Demo (#73): bật thì dùng LLM giả, không cần key và không gọi nhà cung cấp.
+        return DemoAwareLlmClient(real = router, demo = FakeLlmClient(), demoMode = demoMode)
     }
 }

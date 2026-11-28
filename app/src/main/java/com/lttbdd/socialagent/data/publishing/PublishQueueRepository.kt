@@ -123,6 +123,8 @@ class PublishQueueRepository @Inject constructor(
      * phải được giữ chỗ thành công mới gọi API.
      */
     suspend fun processQueue(): QueueRunResult {
+        val cleanup = database.channelCleanupDao()
+        cleanup.finishDeferredCleanup()
         val now = clock.nowMillis()
         postDao.markStalePublishingAsUnknown(startedBeforeMillis = now - STALE_PUBLISHING_MILLIS, nowMillis = now)
 
@@ -137,6 +139,7 @@ class PublishQueueRepository @Inject constructor(
                 Outcome.SKIPPED -> result
             }
         }
+        cleanup.finishDeferredCleanup()
         scheduleNextRetry()
         // Bài kẹt PUBLISHING chưa quá hạn (worker trước bị dừng giữa chừng) sẽ không còn ai xử lý nếu không hẹn
         // lượt sau: hẹn kiểm tra lại khi đã quá STALE_PUBLISHING_MILLIS để chuyển nó sang "chờ xác nhận".
@@ -163,14 +166,23 @@ class PublishQueueRepository @Inject constructor(
 
     /** Người dùng xác nhận bài không rõ kết quả thật ra ĐÃ lên mạng xã hội. */
     suspend fun confirmPublishedManually(postId: String, url: String? = null): Boolean =
-        postDao.resolveUnknownAsPublished(postId, url, clock.nowMillis()) == 1
+        database.withTransaction {
+            val confirmed = postDao.resolveUnknownAsPublished(postId, url, clock.nowMillis()) == 1
+            if (confirmed) database.channelCleanupDao().finishDeferredCleanup()
+            confirmed
+        }
 
     /**
      * Người dùng đã kiểm tra trên mạng xã hội và bài CHƯA được đăng: đưa lại vào hàng đợi với cùng
      * idempotencyKey (client vẫn phải chặn trùng theo hợp đồng).
      */
     suspend fun requeueAfterUserCheck(postId: String): Boolean {
-        if (postDao.requeueUnknown(postId, clock.nowMillis()) == 0) return false
+        val requeued = database.withTransaction {
+            val changed = postDao.requeueUnknown(postId, clock.nowMillis()) == 1
+            if (changed) database.channelCleanupDao().retainPostForExplicitRetry(postId)
+            changed
+        }
+        if (!requeued) return false
         scheduler.schedule()
         return true
     }

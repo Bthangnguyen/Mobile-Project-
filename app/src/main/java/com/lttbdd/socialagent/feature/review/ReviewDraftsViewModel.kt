@@ -10,6 +10,7 @@ import com.lttbdd.socialagent.data.review.DraftApprovalGuard
 import com.lttbdd.socialagent.data.review.DraftApprovalResult
 import com.lttbdd.socialagent.data.review.DraftReviewRepository
 import com.lttbdd.socialagent.data.review.DraftRevokeResult
+import com.lttbdd.socialagent.data.review.PrePublishWarningAnalyzer
 import com.lttbdd.socialagent.data.review.PublishGateResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -42,6 +43,7 @@ class ReviewDraftsViewModel @Inject constructor(
                     ReviewDraftItemUiState(
                         draft = draft,
                         canPublish = DraftApprovalGuard.canPublish(draft),
+                        warnings = PrePublishWarningAnalyzer.analyze(draft.text),
                     )
                 },
             )
@@ -90,10 +92,37 @@ class ReviewDraftsViewModel @Inject constructor(
 
     /**
      * Yêu cầu đăng bản nháp — luôn đi qua cổng chặn cứng [DraftReviewRepository.requestPublish]
-     * để phòng vệ theo chiều sâu kể cả khi bị gọi ngoài UI, rồi mới thêm vào hàng đợi F5 (#37).
-     * Thêm vào hàng đợi chưa phải là đã đăng: thông báo chỉ nói bài đang chờ đăng.
+     * để phòng vệ theo chiều sâu kể cả khi bị gọi ngoài UI.
+     * Nếu nội dung có cảnh báo trước khi đăng (#65), yêu cầu người dùng xác nhận rõ trước khi đưa vào hàng đợi F5 (#37).
      */
     fun onPublishRequested(draftId: String) {
+        viewModelScope.launch {
+            when (val gate = repository.requestPublish(draftId)) {
+                is PublishGateResult.ReadyToPublish -> {
+                    val warnings = PrePublishWarningAnalyzer.analyze(gate.draft.text)
+                    if (warnings.isNotEmpty()) {
+                        _events.trySend(ReviewDraftsEvent.ConfirmPublishWithWarnings(draftId, warnings))
+                    } else {
+                        _events.trySend(ReviewDraftsEvent.ShowMessage(enqueue(draftId)))
+                    }
+                }
+                is PublishGateResult.BlockedUnapproved -> {
+                    _events.trySend(ReviewDraftsEvent.ShowMessage(R.string.review_publish_blocked_unapproved))
+                }
+                is PublishGateResult.BlockedEmptyContent -> {
+                    _events.trySend(ReviewDraftsEvent.ShowMessage(R.string.review_publish_blocked_empty))
+                }
+                PublishGateResult.NotFound,
+                is PublishGateResult.StorageError,
+                -> {
+                    _events.trySend(ReviewDraftsEvent.ShowMessage(R.string.review_draft_action_failed))
+                }
+            }
+        }
+    }
+
+    /** Người dùng xác nhận vẫn muốn đăng sau khi đã đọc cảnh báo nội dung (#65). */
+    fun onPublishConfirmedAfterWarnings(draftId: String) {
         viewModelScope.launch {
             val messageRes = when (repository.requestPublish(draftId)) {
                 is PublishGateResult.ReadyToPublish -> enqueue(draftId)

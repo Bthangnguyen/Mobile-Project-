@@ -64,9 +64,14 @@ import javax.inject.Singleton
 class ChannelRepositoryImpl @Inject constructor(
     private val tokenStore: TokenStore,
     private val accountStore: ChannelAccountStore,
+    private val channelDataCleanup: ChannelDataCleanup,
 ) : ChannelRepository {
 
     private val channelsFlow = MutableStateFlow<List<ChannelAccount>>(emptyList())
+    private val _hasPendingDisconnectCleanup = MutableStateFlow(false)
+    override val hasPendingDisconnectCleanup = _hasPendingDisconnectCleanup.asStateFlow()
+    private val _hasUnverifiedFacebookSignOut = MutableStateFlow(false)
+    override val hasUnverifiedFacebookSignOut = _hasUnverifiedFacebookSignOut.asStateFlow()
     /** Khách HTTP; tách ra (internal var) để unit test thay bằng bản giả trả phản hồi có sẵn, không gọi mạng thật. */
     internal var httpClient: okhttp3.OkHttpClient = okhttp3.OkHttpClient()
     private val accountsMutex = Mutex()
@@ -87,6 +92,44 @@ class ChannelRepositoryImpl @Inject constructor(
         emitAll(channelsFlow)
     }
 
+    override suspend fun retryPendingDisconnectCleanup(): Boolean = accountsMutex.withLock {
+        try {
+            if (!restored) {
+                restorePendingDisconnects(tokenStore.loadPendingWrites())
+            }
+            tryFinishPendingDisconnects()
+        } finally {
+            publishPendingDisconnectCleanup()
+        }
+        !_hasPendingDisconnectCleanup.value
+    }
+
+    override suspend fun resolveUnverifiedFacebookSignOut(signOutCurrentSession: Boolean): Boolean =
+        accountsMutex.withLock {
+            try {
+                if (!restored) {
+                    restorePendingDisconnects(tokenStore.loadPendingWrites())
+                }
+                withContext(NonCancellable) {
+                    // Tuyệt đối không đụng tới lượt ghi có dấu vân tay đã xác minh.
+                    val unverified = pendingWrites.values.filter {
+                        it.write.disconnect && it.write.facebookSessionToSignOut == UNVERIFIED_FACEBOOK_SESSION
+                    }
+                    if (unverified.isEmpty()) return@withContext
+                    if (signOutCurrentSession) channelDataCleanup.forceSignOutFacebook()
+                    for (pending in unverified) {
+                        val completed = tokenStore.completeFacebookSignOut(pending.write)
+                        val updated = pending.copy(write = completed)
+                        pendingWrites[completed.type to completed.accountId] = updated
+                        tryFinishPendingWrite(updated)
+                    }
+                }
+            } finally {
+                publishPendingDisconnectCleanup()
+            }
+            !_hasPendingDisconnectCleanup.value
+        }
+
     /**
      * Khôi phục danh sách kênh từ metadata đã lưu, chỉ giữ tài khoản còn token đọc được
      * (token mất/hỏng, ví dụ Keystore bị đặt lại, thì tài khoản đó coi như chưa kết nối).
@@ -96,19 +139,23 @@ class ChannelRepositoryImpl @Inject constructor(
         if (restored && !reload) return
         restored = false
         val accounts = try {
+            val savedWrites = tokenStore.loadPendingWrites().associateBy { it.type to it.accountId }
+            // Có thể tiếp tục ngắt kết nối mà chưa cần đọc metadata của các tài khoản khác.
+            restorePendingDisconnects(savedWrites.values)
+            tryFinishPendingDisconnects()
+
             val storedAccounts = accountStore.load()
-            val pending = tokenStore.loadPendingWrites().associate { write ->
-                (write.type to write.accountId) to PendingWrite(
+            pendingWrites.entries.removeAll { !it.value.write.disconnect }
+            savedWrites.filterValues { !it.disconnect }.forEach { (key, write) ->
+                pendingWrites[key] = PendingWrite(
                     write,
                     committed = storedAccounts.any {
                         it.type == write.type && it.accountId == write.accountId && it.tokenWriteId == write.id
                     },
                 )
             }
-            pendingWrites.clear()
-            pendingWrites.putAll(pending)
             // Token chính có thể đọc được ngay sau khi hoàn tất lần ghi đang chờ.
-            pendingWrites.values.toList().forEach { tryFinishPendingWrite(it) }
+            pendingWrites.values.filter { !it.write.disconnect }.forEach { tryFinishPendingWrite(it) }
             storedAccounts
                 .filter { readToken(it.type, it.accountId, pendingWrites[it.type to it.accountId]) != null }
                 .map { toChannelAccount(it.type, it.accountId, it.displayName) }
@@ -116,9 +163,25 @@ class ChannelRepositoryImpl @Inject constructor(
             throw e
         } catch (e: Exception) {
             throw ChannelException(ChannelError.CHANNELS_LOAD_FAILED, e)
+        } finally {
+            publishPendingDisconnectCleanup()
         }
         channelsFlow.value = accounts
         restored = true
+    }
+
+    private fun restorePendingDisconnects(writes: Collection<PendingChannelWrite>) {
+        pendingWrites.entries.removeAll { it.value.write.disconnect }
+        writes.filter { it.disconnect }.forEach { write ->
+            pendingWrites[write.type to write.accountId] = PendingWrite(write, committed = false)
+        }
+    }
+
+    private suspend fun tryFinishPendingDisconnects() {
+        pendingWrites.values.filter { it.write.disconnect }.forEach { pending ->
+            currentCoroutineContext().ensureActive()
+            tryFinishPendingWrite(pending)
+        }
     }
 
     private fun toChannelAccount(type: ChannelType, accountId: String, displayName: String) = ChannelAccount(
@@ -686,6 +749,7 @@ class ChannelRepositoryImpl @Inject constructor(
     }
 
     private suspend fun readToken(type: ChannelType, accountId: String, pending: PendingWrite?): OAuthToken? {
+        if (pending?.write?.disconnect == true) return null
         val write = pending?.takeIf { it.committed }?.write
         return if (write != null && write.type == type && write.accountId == accountId) {
             tokenStore.loadStagedToken(write)
@@ -698,8 +762,43 @@ class ChannelRepositoryImpl @Inject constructor(
     private suspend fun finishPendingWrite(pending: PendingWrite?) {
         if (pending == null) return
         withContext(NonCancellable) {
-            tokenStore.finishPendingWrite(pending.write, pending.committed)
-            pendingWrites.remove(pending.write.type to pending.write.accountId)
+            var write = pending.write
+            if (write.disconnect) {
+                var signOutFailure: ChannelException? = null
+                val facebookSession = write.facebookSessionToSignOut
+                if (facebookSession != null) {
+                    try {
+                        channelDataCleanup.signOutFacebook(facebookSession)
+                        write = tokenStore.completeFacebookSignOut(write)
+                        pendingWrites[write.type to write.accountId] = pending.copy(write = write)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: UnverifiedFacebookSessionException) {
+                        signOutFailure = ChannelException(ChannelError.FACEBOOK_SIGN_OUT_UNVERIFIED, e)
+                    } catch (e: Exception) {
+                        signOutFailure = ChannelException(ChannelError.FACEBOOK_SIGN_OUT_FAILED, e)
+                    }
+                }
+                try {
+                    accountStore.remove(write.type, write.accountId)
+                } finally {
+                    // Phạm vi dọn đã lưu cùng lần xoá token, nên vẫn có thể dọn Room khi kho metadata lỗi.
+                    if (write.clearChannelData) channelDataCleanup.clear(write.type, write.id)
+                }
+                // Khi SDK lỗi, dữ liệu nội bộ vẫn được dọn và journal giữ lại phiên cần đăng xuất.
+                signOutFailure?.let { throw it }
+            }
+            tokenStore.finishPendingWrite(write, pending.committed)
+            pendingWrites.remove(write.type to write.accountId)
+            if (write.disconnect) publishPendingDisconnectCleanup()
+        }
+    }
+
+    /** Phải giữ [accountsMutex] khi đọc danh sách lượt ghi đang chờ. */
+    private fun publishPendingDisconnectCleanup() {
+        _hasPendingDisconnectCleanup.value = pendingWrites.values.any { it.write.disconnect }
+        _hasUnverifiedFacebookSignOut.value = pendingWrites.values.any {
+            it.write.disconnect && it.write.facebookSessionToSignOut == UNVERIFIED_FACEBOOK_SESSION
         }
     }
 
@@ -710,6 +809,20 @@ class ChannelRepositoryImpl @Inject constructor(
             throw e
         } catch (_: Exception) {
             // Trạng thái lần ghi đã nằm trên đĩa. Lần sau sẽ thử dọn lại.
+        }
+    }
+
+    /** Lượt ngắt kết nối đã được lưu và token đã bị xoá trước khi dọn dữ liệu. */
+    private suspend fun finishDisconnectCleanup(pending: PendingWrite) {
+        try {
+            finishPendingWrite(pending)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            if (e is ChannelException &&
+                (e.error == ChannelError.FACEBOOK_SIGN_OUT_FAILED || e.error == ChannelError.FACEBOOK_SIGN_OUT_UNVERIFIED)
+            ) throw e
+            throw ChannelException(ChannelError.DISCONNECT_CLEANUP_FAILED, e)
         }
     }
 
@@ -834,13 +947,52 @@ class ChannelRepositoryImpl @Inject constructor(
                 ensureRestored()
                 currentCoroutineContext().ensureActive()
                 withContext(NonCancellable) {
-                    tokenStore.removeToken(type, accountId)
-                    pendingWrites.remove(type to accountId)
+                    val key = type to accountId
+                    val unfinished = pendingWrites[key]
+                    if (unfinished?.write?.disconnect == true) {
+                        finishDisconnectCleanup(unfinished)
+                        return@withContext
+                    }
+                    val remaining = channelsFlow.value.filterNot { it.type == type && it.accountId == accountId }
+                    val clearChannelData = remaining.size != channelsFlow.value.size && remaining.none { it.type == type }
+                    val facebookSession = if (clearChannelData && type == ChannelType.FACEBOOK) {
+                        try {
+                            // Chỉ đăng xuất phiên SDK thuộc đúng người đã cấp quyền cho token Page cuối cùng này.
+                            // Không đọc được token thì coi như chưa xác minh, vẫn cho phép ngắt cục bộ.
+                            val storedUserId = try {
+                                readToken(type, accountId, unfinished)?.facebookUserId
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (_: Exception) {
+                                null
+                            }
+                            channelDataCleanup.currentFacebookSession(storedUserId)
+                        } catch (_: UnverifiedFacebookSessionException) {
+                            UNVERIFIED_FACEBOOK_SESSION
+                        }
+                    } else null
+                    // Lưu phạm vi cleanup và phiên SDK cùng giao dịch xoá token của kênh.
+                    val write = PendingChannelWrite(
+                        id = UUID.randomUUID().toString(),
+                        type = type,
+                        accountId = accountId,
+                        disconnect = true,
+                        clearChannelData = clearChannelData,
+                        facebookSessionToSignOut = facebookSession,
+                    )
+                    tokenStore.stageDisconnect(write)
+                    val pending = PendingWrite(write, committed = false)
+                    pendingWrites[key] = pending
+                    publishPendingDisconnectCleanup()
+                    channelsFlow.value = remaining
                     if (type == ChannelType.FACEBOOK) {
                         facebookPageAccessIssues.value -= accountId
                     }
-                    channelsFlow.value = channelsFlow.value.filterNot { it.type == type && it.accountId == accountId }
-                    accountStore.remove(type, accountId)
+                    try {
+                        finishDisconnectCleanup(pending)
+                    } finally {
+                        publishPendingDisconnectCleanup()
+                    }
                 }
                 Result.success(Unit)
             }
@@ -883,6 +1035,9 @@ class ChannelRepositoryImpl @Inject constructor(
         return withContext(NonCancellable) {
             val write = PendingChannelWrite(UUID.randomUUID().toString(), type, accountId)
             try {
+                // Hoàn tất dọn dữ liệu của mạng trước khi thêm kết nối mới cùng loại.
+                pendingWrites.values.filter { it.write.type == type && it.write.clearChannelData }
+                    .forEach { finishPendingWrite(it) }
                 finishPendingWrite(pendingWrites[type to accountId])
                 if (!canCommit()) throw FacebookSessionChanged()
                 tokenStore.stageToken(write, token)

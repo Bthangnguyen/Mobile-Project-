@@ -1,5 +1,6 @@
 package com.lttbdd.socialagent.core.database.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -19,4 +20,5 @@ data class DraftEntity(
     val imageAltText: String?,
     val approved: Boolean,
     val updatedAtMillis: Long,
+    @ColumnInfo(defaultValue = "0") val revision: Long = 0,
 )

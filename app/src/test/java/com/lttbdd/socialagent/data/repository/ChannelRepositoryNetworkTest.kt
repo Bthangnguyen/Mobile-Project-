@@ -45,7 +45,7 @@ class ChannelRepositoryNetworkTest {
 
     private class Store : TokenStore {
         val storage = mutableMapOf<String, OAuthToken>()
-        private val staged = mutableMapOf<PendingChannelWrite, OAuthToken>()
+        private val staged = mutableMapOf<PendingChannelWrite, OAuthToken?>()
         override suspend fun saveToken(channelType: ChannelType, accountId: String, token: OAuthToken) {
             storage["${channelType.name}_$accountId"] = token
         }
@@ -55,6 +55,15 @@ class ChannelRepositoryNetworkTest {
             storage.remove("${channelType.name}_$accountId")
             staged.keys.removeAll { it.type == channelType && it.accountId == accountId }
         }
+        override suspend fun stageDisconnect(write: PendingChannelWrite) {
+            removeToken(write.type, write.accountId)
+            staged[write] = null
+        }
+
+        override suspend fun completeFacebookSignOut(write: PendingChannelWrite): PendingChannelWrite {
+            error("Bộ kiểm thử mạng không có phiên SDK.")
+        }
+
         override suspend fun stageToken(write: PendingChannelWrite, token: OAuthToken) {
             check(staged.put(write, token) == null)
         }
@@ -64,8 +73,12 @@ class ChannelRepositoryNetworkTest {
         override suspend fun loadStagedToken(write: PendingChannelWrite) = staged[write]
 
         override suspend fun finishPendingWrite(write: PendingChannelWrite, commit: Boolean) {
-            val token = checkNotNull(staged.remove(write))
-            if (commit) saveToken(write.type, write.accountId, token)
+            check(write in staged)
+            val token = staged.remove(write)
+            if (commit) {
+                if (token == null) removeToken(write.type, write.accountId)
+                else saveToken(write.type, write.accountId, token)
+            }
         }
     }
 
@@ -97,7 +110,7 @@ class ChannelRepositoryNetworkTest {
     fun setUp() {
         store = Store()
         accounts = AccountStore()
-        repository = ChannelRepositoryImpl(store, accounts).apply { elapsedRealtime = { 0L } }
+        repository = ChannelRepositoryImpl(store, accounts) { _, _ -> }.apply { elapsedRealtime = { 0L } }
         repository.linkedInBffUrl = "https://bff.example.com"
         repository.httpClient = OkHttpClient.Builder().addInterceptor(Interceptor { chain ->
             val request = chain.request()
@@ -521,7 +534,7 @@ class ChannelRepositoryNetworkTest {
         repository.connectFacebookProfile(user).getOrThrow()
         repository.connectFacebookSelectedPage(user, FacebookPage("page", "Page", "page_tok")).getOrThrow()
 
-        val restored = ChannelRepositoryImpl(store, accounts)
+        val restored = ChannelRepositoryImpl(store, accounts) { _, _ -> }
         assertEquals(true, restored.isFacebookProfile("profile"))
         assertEquals(false, restored.isFacebookProfile("page"))
         assertEquals("public_profile", restored.getGrantedScope(ChannelType.FACEBOOK, "page"))

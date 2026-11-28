@@ -15,6 +15,8 @@ import javax.inject.Singleton
 /** Kết quả lưu bản nháp đã chỉnh sửa thủ công. */
 sealed interface DraftSaveResult {
     data class Saved(val draft: Draft) : DraftSaveResult
+    /** Nội dung đã lưu vào Room và thu hồi duyệt, nhưng ghi mục lịch sử phiên bản thất bại (#62). */
+    data class SavedWithoutHistory(val draft: Draft, val cause: Throwable) : DraftSaveResult
     data object NotFound : DraftSaveResult
     data object BlockedBlankContent : DraftSaveResult
     data object BlockedOverLimit : DraftSaveResult
@@ -69,6 +71,8 @@ class RoomDraftEditorRepository @Inject constructor(
             }
             when (val updateResult = draftReviewRepository.updateDraftContent(draftId, newText)) {
                 is DraftContentUpdateResult.Updated -> DraftSaveResult.Saved(updateResult.draft)
+                is DraftContentUpdateResult.UpdatedWithoutHistory ->
+                    DraftSaveResult.SavedWithoutHistory(updateResult.draft, updateResult.cause)
                 DraftContentUpdateResult.EmptyContent -> DraftSaveResult.BlockedBlankContent
                 DraftContentUpdateResult.NotFound -> DraftSaveResult.NotFound
                 is DraftContentUpdateResult.StorageError -> DraftSaveResult.StorageError(updateResult.cause)

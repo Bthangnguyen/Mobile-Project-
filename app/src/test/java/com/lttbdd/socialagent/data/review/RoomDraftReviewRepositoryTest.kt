@@ -183,6 +183,7 @@ class RoomDraftReviewRepositoryTest {
             override suspend fun deleteIfAllPostsIn(id: String, finishedStatus: PostStatus): Int = 0
             override suspend fun insert(draft: DraftEntity) = Unit
             override suspend fun update(draft: DraftEntity): Int = 0
+            override suspend fun deleteByChannel(channel: ChannelType) {}
         }
 
         val repoWithFailingDao = RoomDraftReviewRepository(failingDao)

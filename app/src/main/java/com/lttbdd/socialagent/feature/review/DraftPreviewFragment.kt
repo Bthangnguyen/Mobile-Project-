@@ -69,7 +69,20 @@ class DraftPreviewFragment : Fragment() {
         )
         setupEmptyState()
         setupListeners()
+        observeVersionRestoredResult()
         observeViewModel()
+    }
+
+    private fun observeVersionRestoredResult() {
+        val currentEntry = findNavController().currentBackStackEntry ?: return
+        currentEntry.savedStateHandle
+            .getLiveData<Boolean>(DraftHistoryFragment.KEY_VERSION_RESTORED)
+            .observe(viewLifecycleOwner) { restored ->
+                if (restored == true) {
+                    currentEntry.savedStateHandle.remove<Boolean>(DraftHistoryFragment.KEY_VERSION_RESTORED)
+                    viewModel.reloadDraftFromStorage()
+                }
+            }
     }
 
     private fun setupEmptyState() {
@@ -99,6 +112,17 @@ class DraftPreviewFragment : Fragment() {
 
         binding.btnSaveEdits.setOnClickListener {
             viewModel.onSaveClicked()
+        }
+
+        binding.btnVersionHistory.setOnClickListener {
+            val draftId = viewModel.uiState.value.draft?.id ?: return@setOnClickListener
+            val navController = findNavController()
+            if (navController.currentDestination?.id == R.id.draftPreviewFragment) {
+                val args = Bundle().apply {
+                    putString(DraftHistoryViewModel.ARG_DRAFT_ID, draftId)
+                }
+                navController.navigate(R.id.action_draft_preview_to_draft_history, args)
+            }
         }
     }
 
@@ -156,6 +180,15 @@ class DraftPreviewFragment : Fragment() {
 
         // Bộ đếm ký tự theo giới hạn kênh xem trước
         renderCharacterCounter(state.characterCount, state.selectedChannel, state.draft?.channel)
+
+        // Cảnh báo nội dung trước khi đăng (số liệu chưa nguồn, PII, lời lẽ nhạy cảm)
+        if (state.prePublishWarnings.isNotEmpty()) {
+            binding.tvPrePublishWarnings.text =
+                PrePublishWarningFormatter.formatBulletList(requireContext(), state.prePublishWarnings)
+            binding.cardPrePublishWarnings.isVisible = true
+        } else {
+            binding.cardPrePublishWarnings.isVisible = false
+        }
 
         // Nút Khôi phục và Lưu chỉnh sửa
         binding.btnResetEdits.isEnabled = state.hasUnsavedChanges

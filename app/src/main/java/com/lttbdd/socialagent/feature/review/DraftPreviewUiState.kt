@@ -3,6 +3,7 @@ package com.lttbdd.socialagent.feature.review
 import androidx.annotation.StringRes
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.Draft
+import com.lttbdd.socialagent.data.review.PrePublishWarning
 
 /**
  * Trạng thái UI cho màn hình xem trước theo kênh, sửa tay và đếm ký tự (F4, Issue #34).
@@ -20,6 +21,7 @@ data class DraftPreviewUiState(
     val hasUnsavedChanges: Boolean = false,
     val canSave: Boolean = false,
     @param:StringRes val textErrorRes: Int? = null,
+    val prePublishWarnings: List<PrePublishWarning> = emptyList(),
 )
 
 /** Sự kiện dùng một lần phát từ [DraftPreviewViewModel] sang [DraftPreviewFragment]. */

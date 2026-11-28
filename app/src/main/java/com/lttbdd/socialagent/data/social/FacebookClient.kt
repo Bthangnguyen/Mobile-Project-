@@ -27,10 +27,8 @@ internal class FacebookClient(
     private val destinations: PublishDestinations,
     private val http: PublishHttp,
     private val readImage: suspend (String) -> RequestBody?,
-) : DestinationBoundClient, SocialChannelClient by FakeSocialChannelClient(ChannelType.FACEBOOK) {
+) : SocialChannelClient by FakeSocialChannelClient(ChannelType.FACEBOOK) {
     override val type = ChannelType.FACEBOOK
-
-    override suspend fun newPublishKey(): String? = destinations.newKey(type)
 
     override suspend fun publish(draft: Draft, idempotencyKey: String): PublishResult {
         if (!draft.approved || draft.channel != type) return PublishResult.PermanentError(PublishErrorReason.CONTENT_REJECTED)
@@ -67,7 +65,7 @@ internal class FacebookClient(
 
         return http.execute(request) { response, now ->
             val header = response.header("Retry-After")
-            httpRetry(response.code, header, now)?.let { return@execute it }
+            checkPublishHttpStatus(response.code, header, now)?.let { return@execute it }
             if (response.code == 408) throw SocketTimeoutException()
             val payload = response.readJson()
             if (!response.isSuccessful || payload?.containsKey("error") == true) {

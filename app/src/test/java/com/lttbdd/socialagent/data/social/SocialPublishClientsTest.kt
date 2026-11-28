@@ -3,6 +3,7 @@ package com.lttbdd.socialagent.data.social
 import com.lttbdd.socialagent.core.model.ChannelType
 import com.lttbdd.socialagent.core.model.Draft
 import com.lttbdd.socialagent.core.model.PublishResult
+import com.lttbdd.socialagent.core.social.SocialChannelClient
 import com.lttbdd.socialagent.core.publishing.PublishErrorReason
 import com.lttbdd.socialagent.data.model.OAuthToken
 import kotlinx.coroutines.test.runTest
@@ -144,8 +145,8 @@ class SocialPublishClientsTest {
     fun bothClientsReturnRetryAfterAndDoNotRepeatRequests() = runTest {
         val cases = listOf(
             Triple(429, "3", PublishResult.RetryableError(PublishErrorReason.RATE_LIMITED, 3000)),
-            Triple(503, "Sun, 06 Nov 1994 08:49:42 GMT", PublishResult.RetryableError(PublishErrorReason.SERVER_ERROR, 5000)),
-            Triple(500, null, PublishResult.RetryableError(PublishErrorReason.SERVER_ERROR)),
+            Triple(429, "Sun, 06 Nov 1994 08:49:42 GMT", PublishResult.RetryableError(PublishErrorReason.RATE_LIMITED, 5000)),
+            Triple(429, null, PublishResult.RetryableError(PublishErrorReason.RATE_LIMITED)),
         )
         for ((status, header, expected) in cases) {
             val fixture = FakeHttp(status, headers = if (header == null) emptyMap() else mapOf("Retry-After" to header))
@@ -153,6 +154,30 @@ class SocialPublishClientsTest {
                 assertEquals(expected, client.publish(draft(client.type), client.requirePublishKey()))
             }
             assertEquals(2, fixture.requests.size)
+        }
+    }
+
+    @Test
+    fun bothClientsTreatServerErrorsAsUnknownEvenWithRetryAfter() = runTest {
+        for (status in listOf(500, 502, 503, 504, 599)) {
+            val fixture = FakeHttp(status, headers = mapOf("Retry-After" to "0"))
+            for (client in listOf(facebook(fixture), linkedIn(fixture))) {
+                val error = runCatching { client.publish(draft(client.type), client.requirePublishKey()) }.exceptionOrNull()
+                assertEquals(IOException::class.java, error?.javaClass)
+                assertTrue(error?.message.orEmpty().contains("HTTP $status"))
+            }
+            assertEquals(2, fixture.requests.size)
+        }
+    }
+
+    @Test
+    fun facebookServiceErrorsAreUnknownEvenWithHttp400() = runTest {
+        for (code in listOf(1, 2)) {
+            val fixture = FakeHttp(400, """{"error":{"code":$code}}""")
+            val client = facebook(fixture)
+            val error = runCatching { client.publish(draft(client.type), client.requirePublishKey()) }.exceptionOrNull()
+            assertEquals(IOException::class.java, error?.javaClass)
+            assertEquals(1, fixture.requests.size)
         }
     }
 
@@ -260,7 +285,7 @@ class SocialPublishClientsTest {
         val client = facebook(fixture)
         val key = client.requirePublishKey()
         pages = pages + ("999" to OAuthToken("other-page", null, isFacebookProfile = false))
-        assertNull(client.newPublishKey())
+        assertNull(destinations.newKey(client.type))
         assertTrue(client.publish(draft(client.type), key) is PublishResult.Success)
         assertEquals("/v26.0/123/feed", fixture.requests.single().url.encodedPath)
 
@@ -285,7 +310,7 @@ class SocialPublishClientsTest {
 
     private fun linkedIn(fixture: FakeHttp) = LinkedInClient(destinations, fixture.http)
 
-    private suspend fun DestinationBoundClient.requirePublishKey(): String = requireNotNull(newPublishKey())
+    private suspend fun SocialChannelClient.requirePublishKey(): String = requireNotNull(destinations.newKey(type))
 
     private fun draft(type: ChannelType) = Draft("draft", "topic", type, "Bài đã duyệt", approved = true)
 

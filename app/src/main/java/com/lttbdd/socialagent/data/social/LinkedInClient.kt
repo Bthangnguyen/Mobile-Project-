@@ -17,10 +17,8 @@ import java.net.SocketTimeoutException
 internal class LinkedInClient(
     private val destinations: PublishDestinations,
     private val http: PublishHttp,
-) : DestinationBoundClient, SocialChannelClient by FakeSocialChannelClient(ChannelType.LINKEDIN) {
+) : SocialChannelClient by FakeSocialChannelClient(ChannelType.LINKEDIN) {
     override val type = ChannelType.LINKEDIN
-
-    override suspend fun newPublishKey(): String? = destinations.newKey(type)
 
     override suspend fun publish(draft: Draft, idempotencyKey: String): PublishResult {
         if (!draft.approved || draft.channel != type || draft.text.isBlank() || draft.imageUri != null) {
@@ -55,7 +53,7 @@ internal class LinkedInClient(
             .build()
         return http.execute(request) { response, now ->
             val header = response.header("Retry-After")
-            httpRetry(response.code, header, now)?.let { return@execute it }
+            checkPublishHttpStatus(response.code, header, now)?.let { return@execute it }
             if (response.code == 408) throw SocketTimeoutException()
             if (!response.isSuccessful) return@execute publishError(type, response.code, header, response.readJson(), now)
             val post = response.header("x-restli-id")?.takeIf(postUrn::matches)
